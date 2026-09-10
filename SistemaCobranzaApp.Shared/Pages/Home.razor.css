@@ -1,0 +1,125 @@
+.cartera-container {
+    padding: 16px;
+    max-width: 600px;
+    margin: 0 auto;
+    font-family: system-ui, -apple-system, sans-serif;
+}
+
+.header-cartera {
+    margin-bottom: 20px;
+}
+
+.header-cartera h3 {
+    margin: 0 0 4px 0;
+    color: #2c3e50;
+}
+
+.usuario-cobrador {
+    margin: 0;
+    font-size: 14px;
+    color: #7f8c8d;
+}
+
+.resumen-valores {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 20px;
+}
+
+.card-resumen {
+    background: #f8f9fa;
+    padding: 14px;
+    border-radius: 8px;
+    border: 1px solid #e9ecef;
+}
+
+.resumen-titulo {
+    display: block;
+    font-size: 12px;
+    color: #6c757d;
+    text-transform: uppercase;
+}
+
+.resumen-monto {
+    font-size: 20px;
+    color: #2c3e50;
+}
+
+.lista-clientes {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.cliente-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #ffffff;
+    padding: 16px;
+    border-radius: 8px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.04);
+    border: 1px solid #eef2f3;
+}
+
+.cliente-info h4 {
+    margin: 0 0 4px 0;
+    color: #2c3e50;
+}
+
+.venta-codigo {
+    margin: 0 0 6px 0;
+    font-size: 13px;
+    color: #95a5a6;
+}
+
+.badge-ruta {
+    font-size: 11px;
+    background: #e8f4fd;
+    color: #0078d4;
+    padding: 2px 8px;
+    border-radius: 12px;
+}
+
+.cliente-saldo {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 8px;
+}
+
+.saldo-monto {
+    font-weight: bold;
+    font-size: 16px;
+    color: #27ae60;
+}
+
+.btn-pago {
+    background: #0078d4;
+    color: white;
+    border: none;
+    padding: 6px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.loading-state {
+    text-align: center;
+    padding: 40px;
+    color: #7f8c8d;
+}
+
+.spinner-blue {
+    border: 3px solid #f3f3f3;
+    border-top: 3px solid #0078d4;
+    border-radius: 50%;
+    width: 24px;
+    height: 24px;
+    animation: spin 1s linear infinite;
+    margin: 0 auto 12px auto;
+}
+
+@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }

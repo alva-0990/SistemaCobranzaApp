@@ -1,0 +1,127 @@
+﻿@page "/"
+@using SistemaCobranzaApp.Shared.Services
+@using SistemaCobranzaApp.Shared.Dtos
+@inject ApiCliente ApiClienteService
+@inject NavigationManager NavigationManagerService
+
+<div class="cartera-container">
+    <div class="header-cartera">
+        <h3>Mi Cartera de Cobranza</h3>
+        <p class="usuario-cobrador">Cobrador: <strong>@ApiClienteService.Sesion?.Usuario</strong></p>
+    </div>
+
+    @if (!_inicializado || _cargando)
+    {
+        <div class="loading-state">
+            <div class="spinner-blue"></div>
+            <p>Cargando y validando credenciales de cartera...</p>
+        </div>
+    }
+    else if (!string.IsNullOrEmpty(_error))
+    {
+        <div class="error-box">
+            <p>@_error</p>
+            <button @onclick="CargarCartera" class="btn-reintentar">Reintentar</button>
+        </div>
+    }
+    else if (_cartera?.Cuentas == null || !_cartera.Cuentas.Any())
+    {
+        <div class="empty-state">
+            <p>No tienes cuentas asignadas con saldo pendiente.</p>
+        </div>
+    }
+    else
+    {
+        <div class="resumen-valores">
+            <div class="card-resumen">
+                <span class="resumen-titulo">Total a Cobrar</span>
+                <strong class="resumen-monto">@_cartera.SaldoTotal.ToString("C")</strong>
+            </div>
+            <div class="card-resumen">
+                <span class="resumen-titulo">Clientes</span>
+                <strong class="resumen-monto">@_cartera.Total</strong>
+            </div>
+        </div>
+
+        <div class="lista-clientes">
+            @foreach (var cuenta in _cartera.Cuentas)
+            {
+                <div class="cliente-item">
+                    <div class="cliente-info">
+                        <h4>@cuenta.Cliente</h4>
+                        <p class="venta-codigo">Ref: @cuenta.CodigoVenta</p>
+                        @if (!string.IsNullOrEmpty(cuenta.Ruta))
+                        {
+                            <span class="badge-ruta">Ruta: @cuenta.Ruta</span>
+                        }
+                    </div>
+                    <div class="cliente-saldo">
+                        <span class="saldo-monto">@cuenta.SaldoPendiente.ToString("C")</span>
+                        <button class="btn-pago" @onclick="() => IrAPago(cuenta.IdVenta)">Cobrar</button>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    private bool _inicializado;
+    private bool _cargando = true;
+    private string? _error;
+    private CarteraResponse? _cartera;
+
+    protected override Task OnInitializedAsync()
+    {
+        return Task.CompletedTask;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            if (!ApiClienteService.Autenticado)
+            {
+                await ApiClienteService.CargarSesionDesdeAlmacenamientoAsync();
+            }
+
+            if (!ApiClienteService.Autenticado)
+            {
+                NavigationManagerService.NavigateTo("/login");
+                return;
+            }
+
+            _inicializado = true;
+            await CargarCartera();
+            StateHasChanged();
+        }
+    }
+
+    private async Task CargarCartera()
+    {
+        _cargando = true;
+        _error = null;
+        
+        try
+        {
+            var (datos, err) = await ApiClienteService.ConsultarCarteraAsync(soloConSaldo: true);
+            if (err != null)
+            {
+                _error = err;
+            }
+            else
+            {
+                _cartera = datos;
+            }
+        }
+        finally
+        {
+            _cargando = false;
+        }
+    }
+
+    private void IrAPago(long idVenta)
+    {
+        NavigationManagerService.NavigateTo($"/registrar-pago/{idVenta}");
+    }
+}

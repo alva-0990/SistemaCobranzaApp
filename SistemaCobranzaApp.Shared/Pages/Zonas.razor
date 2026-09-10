@@ -1,0 +1,176 @@
+@page "/admin/zonas"
+@using SistemaCobranzaApp.Shared.Dtos
+@inject SistemaCobranzaApp.Shared.Services.ApiCliente Api
+@inject NavigationManager Navigation
+
+<div class="maui-grid-root">
+    <!-- Fila Superior: Título y Botón -->
+    <div class="maui-stack-top">
+        <h3 class="maui-title-main">Administración de Zonas</h3>
+        <button class="maui-button-primary" @onclick="NuevaZona">Nueva zona</button>
+        
+        @if (!string.IsNullOrEmpty(_mensajeExito))
+        {
+            <div class="maui-border-success">
+                <span class="maui-label-success">@_mensajeExito</span>
+            </div>
+        }
+    </div>
+
+    <!-- Fila Central: Listado de Datos Reales del Servidor -->
+    <div class="maui-refresh-view">
+        @if (_ocupado && _zonas.Count == 0)
+        {
+            <div class="maui-loading">Cargando catálogo de zonas...</div>
+        }
+        else if (_zonas.Count == 0)
+        {
+            <div class="maui-empty">No hay zonas registradas en el sistema.</div>
+        }
+        else
+        {
+            <div class="maui-collection-view">
+                @foreach (var zona in _zonas)
+                {
+                    <div class="maui-border-item">
+                        <div class="maui-grid-item">
+                            <!-- 🔥 ENLAZADO EXACTAMENTE A TU ENTIDAD: IdZona y Descripcion -->
+                            <span class="maui-label-desc">
+                                <strong class="maui-id-badge">#@zona.IdZona</strong> @zona.Descripcion
+                            </span>
+                            <div class="maui-item-actions">
+                                <button class="maui-button-item btn-edit" @onclick="() => Editar(zona)">Editar</button>
+                                <button class="maui-button-item btn-delete" @onclick="() => DarDeBajaAsync(zona)">Baja</button>
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+    </div>
+
+    <!-- Modal Formulario Flotante -->
+    @if (_formularioVisible)
+    {
+        <div class="maui-modal-overlay">
+            <div class="maui-border-modal">
+                <div class="maui-stack-modal">
+                    <h3 class="maui-modal-title">@(_idEditando is null ? "Nueva zona" : "Editar zona")</h3>
+                    
+                    <input type="text" 
+                           placeholder="Descripción" 
+                           @bind="_descripcion" 
+                           disabled="@_ocupado" 
+                           class="maui-entry" />
+
+                    @if (!string.IsNullOrEmpty(_mensajeError))
+                    {
+                        <span class="maui-label-error">@_mensajeError</span>
+                    }
+
+                    <div class="maui-grid-actions">
+                        <button class="maui-button-modal btn-cancel" @onclick="Cancelar" disabled="@_ocupado">Cancelar</button>
+                        <button class="maui-button-modal btn-save" @onclick="KeepGuardar" disabled="@_ocupado">Guardar</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+
+
+@code {
+    // 🔥 DEFINICIÓN OFICIAL ASOCIADA A TU BACKEND
+    public record ZonaBackendDto(long IdZona, string Descripcion);
+
+    private List<ZonaBackendDto> _zonas = new();
+    private bool _ocupado;
+    private string? _mensajeExito;
+    private string? _mensajeError;
+
+    private long? _idEditando;
+    private string _descripcion = string.Empty;
+    private bool _formularioVisible;
+
+    protected override Task OnInitializedAsync()
+    {
+        return Task.CompletedTask;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await Api.CargarSesionDesdeAlmacenamientoAsync();
+            if (!Api.Autenticado)
+            {
+                Navigation.NavigateTo("/login");
+                return;
+            }
+            await CargarAsync();
+            StateHasChanged();
+        }
+    }
+
+    private async Task CargarAsync()
+    {
+        if (_ocupado) return;
+        _ocupado = true;
+        _mensajeError = null;
+        StateHasChanged();
+        
+        try
+        {
+            // Consumimos el recurso pasándole el record unificado
+            var (datos, error) = await Api.AdminListarAsync<ZonaBackendDto>("zonas");
+            if (error is not null)
+            {
+                _mensajeError = error;
+                return;
+            }
+            _zonas = datos ?? new List<ZonaBackendDto>();
+        }
+        catch (Exception ex)
+        {
+            _mensajeError = "Fallo en la comunicación: " + ex.Message;
+        }
+        finally
+        {
+            _ocupado = false;
+        }
+    }
+
+    private void NuevaZona()
+    {
+        LimpiarFormulario();
+        _mensajeError = null;
+        _mensajeExito = null;
+        _formularioVisible = true;
+    }
+
+    private void Editar(ZonaBackendDto zona)
+    {
+        if (zona is null) return;
+        _idEditando = zona.IdZona; 
+        _descripcion = zona.Descripcion;
+        _mensajeError = null;
+        _mensajeExito = null;
+        _formularioVisible = true;
+    }
+
+    private void Cancelar()
+    {
+        LimpiarFormulario();
+        _formularioVisible = false;
+    }
+
+    private void LimpiarFormulario()
+    {
+        _idEditando = null;
+        _descripcion = string.Empty;
+    }
+
+    private Task KeepGuardar() => Task.CompletedTask;
+    private Task DarDeBajaAsync(ZonaBackendDto zona) => Task.CompletedTask;
+}

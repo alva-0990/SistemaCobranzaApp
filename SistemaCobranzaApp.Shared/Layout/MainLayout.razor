@@ -1,0 +1,41 @@
+﻿@inherits LayoutComponentBase
+@using SistemaCobranzaApp.Shared.Services
+@inject ApiCliente ApiClienteService
+@inject NavigationManager NavigationManagerService
+
+<div class="page">
+    <div class="sidebar">
+        <NavMenu />
+    </div>
+
+    <main>
+        <!-- Barra superior ejecutiva -->
+        <div class="top-row px-4" style="display: flex; justify-content: flex-end; align-items: center; gap: 16px; border-bottom: 1px solid #E5E7EB; background-color: #FFFFFF;">
+            @if (ApiClienteService.Autenticado)
+            {
+                <span style="font-size: 14px; color: #4B5563; font-weight: 500;">
+                    Usuario: <strong style="color: #111827;">@ApiClienteService.Sesion?.Usuario</strong>
+                </span>
+                <button @onclick="ManejarCerrarSesion" 
+                        style="background-color: #FEF2F2; color: #991B1B; border: 1px solid #FCA5A5; padding: 6px 12px; border-radius: 4px; font-size: 13px; font-weight: 600; cursor: pointer; transition: background 0.2s;">
+                    Cerrar sesión
+                </button>
+            }
+        </div>
+
+        <article class="content px-4">
+            @Body
+        </article>
+    </main>
+</div>
+
+@code {
+    private async Task ManejarCerrarSesion()
+    {
+        // 1. Limpiamos la sesión en memoria y el almacenamiento híbrido (Local o Secure)
+        await ApiClienteService.CerrarSesionAsync();
+
+        // 2. Redirigimos al Login de forma inmediata
+        NavigationManagerService.NavigateTo("/login");
+    }
+}

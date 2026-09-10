@@ -1,0 +1,102 @@
+@page "/login"
+@layout SistemaCobranzaApp.Shared.Layout.LoginLayout
+@using SistemaCobranzaApp.Shared.Services
+@using SistemaCobranzaApp.Shared.Dtos
+@inject SistemaCobranzaApp.Shared.Services.ApiCliente ApiClienteService
+@inject NavigationManager NavigationManagerService
+
+<div style="display: flex; justify-content: center; align-items: center; min-height: 75vh; padding: 16px; font-family: -apple-system, system-ui, sans-serif;">
+    <div style="width: 100%; max-width: 400px; background: #ffffff; padding: 32px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08); display: flex; flex-direction: column; gap: 16px; text-align: center; border: 1px solid #e5e7eb;">
+        
+        <h2 style="margin: 0; color: #1e3a8a; font-size: 24px; font-weight: 700;">Sistema de Cobranza</h2>
+        <p style="margin: -8px 0 8px 0; color: #6b7280; font-size: 14px;">Inicia sesión para continuar</p>
+
+        <div style="display: flex; flex-direction: column; text-align: left; gap: 4px;">
+            <input type="text" 
+                   placeholder="Usuario" 
+                   @bind="_usuario" 
+                   disabled="@_ocupado" 
+                   style="width: 100%; padding: 12px; border: 1px solid #d1d5db; border-radius: 6px; box-sizing: border-box; font-size: 15px; color: #111827;" />
+        </div>
+
+        <div style="display: flex; flex-direction: column; text-align: left; gap: 4px;">
+            <input type="password" 
+                   placeholder="Contraseña" 
+                   @bind="_password" 
+                   disabled="@_ocupado" 
+                   style="width: 100%; padding: 12px; border: 1px solid #d1d5db; border-radius: 6px; box-sizing: border-box; font-size: 15px; color: #111827;" />
+        </div>
+
+        @if (!string.IsNullOrEmpty(_mensajeError))
+        {
+            <div style="color: #dc2626; background: #fef2f2; padding: 10px 12px; border-radius: 6px; font-size: 13px; text-align: left; border-left: 4px solid #dc2626; font-weight: 500;">
+                @_mensajeError
+            </div>
+        }
+
+        <button @onclick="ManejarLogin" 
+                disabled="@_ocupado" 
+                style="width: 100%; padding: 12px; background: #1e3a8a; color: #ffffff; border: none; border-radius: 6px; font-size: 16px; font-weight: 600; cursor: pointer; transition: background 0.2s;">
+            @if (_ocupado)
+            {
+                <span>Cargando...</span>
+            }
+            else
+            {
+                <span>Entrar</span>
+            }
+        </button>
+    </div>
+</div>
+
+@code {
+    private string _usuario = string.Empty;
+    private string _password = string.Empty;
+    private bool _ocupado;
+    private string? _mensajeError;
+
+    // Bloqueamos ejecuciones prematuras en el Prerender del servidor
+    protected override Task OnInitializedAsync()
+    {
+        return Task.CompletedTask;
+    }
+
+    private async Task ManejarLogin()
+    {
+        if (_ocupado) return;
+        _mensajeError = null;
+
+        if (string.IsNullOrWhiteSpace(_usuario) || string.IsNullOrWhiteSpace(_password))
+        {
+            _mensajeError = "Ingresa usuario y contraseña.";
+            return;
+        }
+
+        _ocupado = true;
+        StateHasChanged(); // Forzamos a mostrar el estado "Cargando..."
+        
+        try
+        {
+            var (ok, error) = await ApiClienteService.LoginAsync(_usuario.Trim(), _password);
+            if (ok)
+            {
+                _password = string.Empty; 
+                // Navegamos directo a zonas como definimos en tu estrategia de validación
+                NavigationManagerService.NavigateTo("/admin/zonas"); 
+            }
+            else
+            {
+                _mensajeError = error;
+            }
+        }
+        catch (Exception ex)
+        {
+            _mensajeError = "Error interno de ejecución: " + ex.Message;
+        }
+        finally
+        {
+            _ocupado = false;
+            StateHasChanged();
+        }
+    }
+}
