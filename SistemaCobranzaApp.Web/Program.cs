@@ -1,3 +1,4 @@
+using MudBlazor.Services;
 using SistemaCobranzaApp.Web.Components;
 using SistemaCobranzaApp.Shared.Services;
 using SistemaCobranzaApp.Web.Services;
@@ -26,7 +27,7 @@ builder.Services.AddScoped<IServicioAlmacenamiento, AlmacenamientoWeb>();
 
 // 3. Registrar el cliente de la API (Esto resolverá el error en Routes.razor)
 builder.Services.AddScoped<ApiCliente>();
-
+builder.Services.AddMudServices();
 // ==========================================
 
 var app = builder.Build();

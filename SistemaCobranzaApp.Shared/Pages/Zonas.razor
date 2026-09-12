@@ -1,176 +1,138 @@
 @page "/admin/zonas"
-@using SistemaCobranzaApp.Shared.Dtos
-@inject SistemaCobranzaApp.Shared.Services.ApiCliente Api
-@inject NavigationManager Navigation
+@inherits ZonasBase
 
-<div class="maui-grid-root">
-    <!-- Fila Superior: Título y Botón -->
-    <div class="maui-stack-top">
-        <h3 class="maui-title-main">Administración de Zonas</h3>
-        <button class="maui-button-primary" @onclick="NuevaZona">Nueva zona</button>
-        
-        @if (!string.IsNullOrEmpty(_mensajeExito))
-        {
-            <div class="maui-border-success">
-                <span class="maui-label-success">@_mensajeExito</span>
-            </div>
-        }
+<div class="cobranza-container">
+    
+    <!-- Encabezado Principal -->
+    <div class="cobranza-header">
+        <div class="header-title-zone">
+            <span class="menu-icon">☰</span>
+            <h2>Productos / Zonas</h2>
+        </div>
+        <button class="btn-crear-nuevo" @onclick="NuevaZona">CREAR NUEVO</button>
     </div>
 
-    <!-- Fila Central: Listado de Datos Reales del Servidor -->
-    <div class="maui-refresh-view">
-        @if (_ocupado && _zonas.Count == 0)
+    <!-- Filtros de Control -->
+    <div class="cobranza-filters">
+        <div class="filter-group">
+            <label>Tipo</label>
+            <select class="form-select">
+                <option>Todos</option>
+            </select>
+        </div>
+    </div>
+
+    <!-- Contenedor del Catálogo Principal -->
+    <div class="catalog-content">
+        @if (Ocupado && ZonasList.Count == 0)
         {
-            <div class="maui-loading">Cargando catálogo de zonas...</div>
+            <div class="state-placeholder">Cargando registros desde la API...</div>
         }
-        else if (_zonas.Count == 0)
+        else if (ZonasList.Count == 0)
         {
-            <div class="maui-empty">No hay zonas registradas en el sistema.</div>
+            <div class="state-placeholder">No hay registros cargados en la base de datos (Puerto 8081).</div>
         }
         else
         {
-            <div class="maui-collection-view">
-                @foreach (var zona in _zonas)
+            <!-- VISTA ESCRITORIO: Tabla Horizontal Compacta -->
+            <div class="desktop-table-view">
+                <table class="cobranza-table">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Nombre de producto / Descripción</th>
+                            <th style="text-align: center;">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var zona in ZonasList)
+                        {
+                            <tr>
+                                <td class="td-id">#@zona.IdZona</td>
+                                <td class="td-desc">@zona.Descripcion</td>
+                                <td class="td-actions">
+                                    <button class="action-icon btn-tbl-edit" title="Editar" @onclick="() => Editar(zona)">📝</button>
+                                    <button class="action-icon btn-tbl-delete" title="Dar de baja" @onclick="() => DarDeBajaAsync(zona)">🗑️</button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- VISTA MÓVIL ANDROID: Acordeones Compactos Inteligentes -->
+            <div class="mobile-list-view">
+                @foreach (var zona in ZonasList)
                 {
-                    <div class="maui-border-item">
-                        <div class="maui-grid-item">
-                            <!-- 🔥 ENLAZADO EXACTAMENTE A TU ENTIDAD: IdZona y Descripcion -->
-                            <span class="maui-label-desc">
-                                <strong class="maui-id-badge">#@zona.IdZona</strong> @zona.Descripcion
-                            </span>
-                            <div class="maui-item-actions">
-                                <button class="maui-button-item btn-edit" @onclick="() => Editar(zona)">Editar</button>
-                                <button class="maui-button-item btn-delete" @onclick="() => DarDeBajaAsync(zona)">Baja</button>
-                            </div>
+                    <div class="mobile-row-card">
+                        <div class="card-summary" @onclick="() => AlternarDetalle(zona.IdZona)">
+                            <span class="arrow-indicator @(IdExpandido == zona.IdZona ? "expanded" : "")">▼</span>
+                            <span class="card-main-text">@zona.Descripcion</span>
+                            <span class="card-id-tag">#@zona.IdZona</span>
                         </div>
+                        
+                        @if (IdExpandido == zona.IdZona)
+                        {
+                            <div class="card-expanded-details">
+                                <div class="detail-line">
+                                    <span class="detail-label">Nombre:</span>
+                                    <span class="detail-value">@zona.Descripcion</span>
+                                </div>
+                                <div class="detail-line">
+                                    <span class="detail-label">Estado:</span>
+                                    <span class="status-badge badge-active">Activo</span>
+                                </div>
+                                <div class="detail-actions-row">
+                                    <span class="detail-label">Acción:</span>
+                                    <div class="actions-wrapper">
+                                        <button class="circle-btn edit-circle" @onclick="() => Editar(zona)">📝</button>
+                                        <button class="circle-btn delete-circle" @onclick="() => DarDeBajaAsync(zona)">🗑️</button>
+                                    </div>
+                                </div>
+                            </div>
+                        }
                     </div>
                 }
+            </div>
+            
+            <!-- Paginador Inferior Responsivo -->
+            <div class="cobranza-pagination">
+                <div class="pagination-selector">
+                    <span>Mostrando</span>
+                    <select class="select-mini">
+                        <option>10</option>
+                    </select>
+                    <span>de @ZonasList.Count entradas</span>
+                </div>
+                <div class="pagination-buttons">
+                    <button class="btn-pag-arrow" disabled>◀</button>
+                    <button class="btn-pag-arrow" disabled>▶</button>
+                </div>
             </div>
         }
     </div>
 
-    <!-- Modal Formulario Flotante -->
-    @if (_formularioVisible)
+    <!-- Modal Formulario Flotante de Alta/Edición -->
+    @if (FormularioVisible)
     {
-        <div class="maui-modal-overlay">
-            <div class="maui-border-modal">
-                <div class="maui-stack-modal">
-                    <h3 class="maui-modal-title">@(_idEditando is null ? "Nueva zona" : "Editar zona")</h3>
-                    
-                    <input type="text" 
-                           placeholder="Descripción" 
-                           @bind="_descripcion" 
-                           disabled="@_ocupado" 
-                           class="maui-entry" />
+        <div class="modal-backdrop">
+            <div class="modal-box">
+                <h4 class="modal-title">@(IdEditando is null ? "Nueva zona" : "Editar zona")</h4>
+                <div class="form-group-modal">
+                    <label>Descripción / Nombre</label>
+                    <input type="text" @bind="Descripcion" disabled="@Ocupado" class="input-flat" placeholder="Ej. Tecamachalco" />
+                </div>
+                
+                @if (!string.IsNullOrEmpty(MensajeError))
+                {
+                    <div class="error-toast">@MensajeError</div>
+                }
 
-                    @if (!string.IsNullOrEmpty(_mensajeError))
-                    {
-                        <span class="maui-label-error">@_mensajeError</span>
-                    }
-
-                    <div class="maui-grid-actions">
-                        <button class="maui-button-modal btn-cancel" @onclick="Cancelar" disabled="@_ocupado">Cancelar</button>
-                        <button class="maui-button-modal btn-save" @onclick="KeepGuardar" disabled="@_ocupado">Guardar</button>
-                    </div>
+                <div class="modal-buttons">
+                    <button class="btn-mdl btn-mdl-cancel" @onclick="Cancelar" disabled="@Ocupado">Cancelar</button>
+                    <button class="btn-mdl btn-mdl-save" @onclick="KeepGuardar" disabled="@Ocupado">Guardar</button>
                 </div>
             </div>
         </div>
     }
 </div>
-
-
-
-@code {
-    // 🔥 DEFINICIÓN OFICIAL ASOCIADA A TU BACKEND
-    public record ZonaBackendDto(long IdZona, string Descripcion);
-
-    private List<ZonaBackendDto> _zonas = new();
-    private bool _ocupado;
-    private string? _mensajeExito;
-    private string? _mensajeError;
-
-    private long? _idEditando;
-    private string _descripcion = string.Empty;
-    private bool _formularioVisible;
-
-    protected override Task OnInitializedAsync()
-    {
-        return Task.CompletedTask;
-    }
-
-    protected override async Task OnAfterRenderAsync(bool firstRender)
-    {
-        if (firstRender)
-        {
-            await Api.CargarSesionDesdeAlmacenamientoAsync();
-            if (!Api.Autenticado)
-            {
-                Navigation.NavigateTo("/login");
-                return;
-            }
-            await CargarAsync();
-            StateHasChanged();
-        }
-    }
-
-    private async Task CargarAsync()
-    {
-        if (_ocupado) return;
-        _ocupado = true;
-        _mensajeError = null;
-        StateHasChanged();
-        
-        try
-        {
-            // Consumimos el recurso pasándole el record unificado
-            var (datos, error) = await Api.AdminListarAsync<ZonaBackendDto>("zonas");
-            if (error is not null)
-            {
-                _mensajeError = error;
-                return;
-            }
-            _zonas = datos ?? new List<ZonaBackendDto>();
-        }
-        catch (Exception ex)
-        {
-            _mensajeError = "Fallo en la comunicación: " + ex.Message;
-        }
-        finally
-        {
-            _ocupado = false;
-        }
-    }
-
-    private void NuevaZona()
-    {
-        LimpiarFormulario();
-        _mensajeError = null;
-        _mensajeExito = null;
-        _formularioVisible = true;
-    }
-
-    private void Editar(ZonaBackendDto zona)
-    {
-        if (zona is null) return;
-        _idEditando = zona.IdZona; 
-        _descripcion = zona.Descripcion;
-        _mensajeError = null;
-        _mensajeExito = null;
-        _formularioVisible = true;
-    }
-
-    private void Cancelar()
-    {
-        LimpiarFormulario();
-        _formularioVisible = false;
-    }
-
-    private void LimpiarFormulario()
-    {
-        _idEditando = null;
-        _descripcion = string.Empty;
-    }
-
-    private Task KeepGuardar() => Task.CompletedTask;
-    private Task DarDeBajaAsync(ZonaBackendDto zona) => Task.CompletedTask;
-}

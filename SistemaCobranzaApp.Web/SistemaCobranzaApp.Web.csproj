@@ -7,7 +7,11 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\SistemaCobranzaApp.Shared\SistemaCobranzaApp.Shared.csproj"/>
+        <ProjectReference Include="..\SistemaCobranzaApp.Shared\SistemaCobranzaApp.Shared.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <PackageReference Include="MudBlazor" Version="9.9.0" />
     </ItemGroup>
 
 </Project>

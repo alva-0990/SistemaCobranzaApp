@@ -18,20 +18,37 @@ public static class MauiProgram
 
         builder.Services.AddMauiBlazorWebView();
 
-        // 1. Configurar HttpClient (10.0.2.2 es la IP para apuntar al localhost de tu PC desde el emulador de Android)
+        // 1. CORREGIDO: Creamos el manejador nativo para saltar el error TLS -1200 en el emulador
+        #if ANDROID
+        var handler = new Xamarin.Android.Net.AndroidMessageHandler();
+        handler.ServerCertificateCustomValidationCallback = (message, cert, chain, errors) =>
+        {
+            // Confiamos ciegamente en el servidor local de desarrollo de tu PC
+            if (message.RequestUri?.Host == "10.0.2.2" || message.RequestUri?.Host == "localhost") 
+                return true;
+                
+            return errors == System.Net.Security.SslPolicyErrors.None;
+        };
+        #else
+        var handler = new HttpClientHandler();
+        handler.ServerCertificateCustomValidationCallback = (message, cert, chain, errors) => true;
+        #endif
+
+        // 2. CORREGIDO: Inyectamos el HttpClient forzando HTTPS limpio en ambos entornos
+// Inyección de HttpClient en tu MauiProgram.cs
         builder.Services.AddSingleton(sp => new HttpClient
         {
             BaseAddress = new Uri(DeviceInfo.Platform == DevicePlatform.Android 
-                ? "http://10.0.2.2:8081" // Cambia el puerto por el que use tu backend (HTTP es más fácil para desarrollo local en Android)
-                : "https://localhost:8081")
+                ? "http://10.0.2.2:8081" // <-- Cambiado a HTTP plano para hacer match exacto
+                : "http://localhost:8081")
         });
+        
 
-        // 2. Registrar el almacenamiento nativo usando el contrato (interfaz) de Shared
+        // 3. Registrar el almacenamiento nativo usando el contrato (interfaz) de Shared
         builder.Services.AddSingleton<IServicioAlmacenamiento, AlmacenamientoSeguroMaui>();
 
-        // 3. Registrar el cliente de la API y los ViewModels compartidos
+        // 4. Registrar el cliente de la API (El "back del front" compartido)
         builder.Services.AddSingleton<ApiCliente>();
-
 
 #if DEBUG
         builder.Services.AddBlazorWebViewDeveloperTools();

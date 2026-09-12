@@ -857,4 +857,8 @@ public class ApiCliente
         catch (HttpRequestException ex) { return "No se pudo conectar.\n" + ex.Message; }
         catch (TaskCanceledException) { return "La conexión tardó demasiado."; }
     }
+    
+    
+    
+    
 }
