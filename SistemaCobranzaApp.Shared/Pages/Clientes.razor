@@ -1,0 +1,432 @@
+@page "/clientes"
+
+@using MudBlazor
+@using SistemaCobranzaApp.Shared.Components
+@using SistemaCobranzaApp.Shared.Dtos
+@using SistemaCobranzaApp.Shared.Services
+@using SistemaCobranzaApp.Domain.Constantes
+@inject ApiCliente Api
+@inject IDialogService _dialogo
+@inject ISnackbar _snackbar
+@inject IFormFactor _formFactor
+@inject NavigationManager _nav
+
+<MudPaper Elevation="2" Rounded="true" Class="ma-2 pa-4">
+    <div class="barra-acciones">
+        <MudTextField T="string"
+                      @ref="_campoBusqueda"
+                      Value="_busqueda"
+                      ValueChanged="OnBuscarChanged"
+                      Immediate="true"
+                      DebounceInterval="400"
+                      Placeholder="Buscar cliente por nombre, teléfono, ruta o zona..."
+                      Variant="Variant.Outlined"
+                      Adornment="Adornment.Start"
+                      AdornmentIcon="@Icons.Material.Filled.Search"
+                      AdornmentColor="Color.Primary"
+                      Clearable="true"
+                      Class="buscador-remarcado" />
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.PersonAddAlt"
+                   OnClick="AbrirModalNuevoCliente"
+                   Class="boton-nuevo">
+            <span class="d-inline d-sm-none">Nuevo</span>
+            <span class="d-none d-sm-inline">Nuevo cliente</span>
+        </MudButton>
+    </div>
+
+    @if (_cargando)
+    {
+        <div class="d-flex justify-center pa-8">
+            <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+        </div>
+    }
+    else if (!_haBuscado)
+    {
+        @EstadoInicial()
+    }
+    else
+    {
+        <MudTable Items="_clientes" Hover="true" Dense="true"
+                  Breakpoint="Breakpoint.Sm" Elevation="0" RowsPerPage="10"
+                  T="ClienteDto"
+                  OnRowClick="@((TableRowClickEventArgs<ClienteDto> e) => AbrirDetalle(e.Item))"
+                  RowClass="fila-clicable">
+            <HeaderContent>
+                <MudTh Style="width:8%;">ID</MudTh>
+                <MudTh>Nombre</MudTh>
+                <MudTh Style="width:14%;">Vendedor</MudTh>
+                <MudTh Style="width:11%;">Ruta</MudTh>
+                <MudTh Style="width:11%;">Zona</MudTh>
+                <MudTh>Dirección</MudTh>
+                <MudTh>Referencia</MudTh>
+                <MudTh Style="width:13%;">Clasificación</MudTh>
+                <MudTh Style="width:10%; text-align:right;">Acciones</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="ID">@context.IdCliente</MudTd>
+                <MudTd DataLabel="Nombre"><b>@context.NombreCompleto</b></MudTd>
+                <MudTd DataLabel="Vendedor">@(string.IsNullOrWhiteSpace(context.VendedorNombre) ? "—" : context.VendedorNombre)</MudTd>
+                <MudTd DataLabel="Ruta">
+                    <MudChip T="string" Size="Size.Small" Variant="Variant.Text" Color="Color.Primary">
+                        @(string.IsNullOrWhiteSpace(context.Ruta) ? "Sin ruta" : context.Ruta)
+                    </MudChip>
+                </MudTd>
+                <MudTd DataLabel="Zona">@NombreZona(context.IdZona)</MudTd>
+                <MudTd DataLabel="Dirección">@context.Direccion</MudTd>
+                <MudTd DataLabel="Referencia">@(string.IsNullOrWhiteSpace(context.ReferenciaUbicacion) ? "—" : context.ReferenciaUbicacion)</MudTd>
+                <MudTd DataLabel="Clasificación">
+                    <MudChip T="string" Size="Size.Small" Variant="Variant.Text"
+                             Color="@(RiesgoClienteRegla.Resaltar(context.IdClasificacion) ? Color.Error : Color.Secondary)">
+                        @(string.IsNullOrWhiteSpace(context.ClasificacionNombre) ? "Sin clasificación" : context.ClasificacionNombre)
+                    </MudChip>
+                </MudTd>
+                <MudTd DataLabel="Acciones" Style="text-align:right;">
+                    @AccionesFila(context)
+                </MudTd>
+            </RowTemplate>
+            <NoRecordsContent>@SinResultados()</NoRecordsContent>
+            <PagerContent>
+                <MudTablePager InfoFormat="{first_item}-{last_item} de {all_items}" RowsPerPageString="Filas:" />
+            </PagerContent>
+        </MudTable>
+    }
+</MudPaper>
+
+@{
+    RenderFragment AccionesFila(ClienteDto c) => __builder =>
+    {
+        // Clientes MALO/MOROSO: editar y dar de baja solo los puede el administrador (IdUsuario == 1).
+        var bloqueadoPorRiesgo = RiesgoClienteRegla.BloqueaVenta(c.IdClasificacion);
+        var puedeEditar = !bloqueadoPorRiesgo || EsAdministrador;
+        <span @onclick:stopPropagation="true">
+            <MudIconButton Icon="@Icons.Material.Filled.Visibility" Size="Size.Small" Color="Color.Primary"
+                           Title="Ver información" OnClick="@(() => AbrirDetalle(c))" />
+            @if (puedeEditar)
+            {
+                <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" Color="Color.Info"
+                               Title="Editar" OnClick="@(async () => await AbrirModalEditarCliente(c))" />
+                @if (c.Estatus == 1)
+                {
+                    <MudIconButton Icon="@Icons.Material.Filled.Block" Size="Size.Small" Color="Color.Error"
+                                   Title="Dar de baja" OnClick="@(async () => await DarDeBaja(c))" />
+                }
+            }
+        </span>
+    };
+
+    // Estado inicial: aún no se ha buscado nada; invita a usar el buscador.
+    RenderFragment EstadoInicial() => __builder =>
+    {
+        <div class="pa-8 text-center">
+            <MudIcon Icon="@Icons.Material.Filled.Search" Size="Size.Large" Color="Color.Secondary" />
+            <MudText Typo="Typo.h6" Class="mt-2">Busca un cliente para comenzar</MudText>
+            <MudText Color="Color.Secondary">
+                Escribe un nombre, teléfono, ruta o zona en el buscador de arriba.
+            </MudText>
+        </div>
+    };
+
+    // Estado "sin resultados": invita a dar de alta un cliente o a iniciar una nueva búsqueda.
+    RenderFragment SinResultados() => __builder =>
+    {
+        <div class="pa-8 text-center">
+            <MudIcon Icon="@Icons.Material.Filled.PersonSearch" Size="Size.Large" Color="Color.Secondary" />
+            <MudText Typo="Typo.h6" Class="mt-2">
+                @(string.IsNullOrWhiteSpace(_busqueda)
+                    ? "No hay clientes registrados."
+                    : $"No se encontró ningún cliente para \"{_busqueda}\".")
+            </MudText>
+            <MudText Color="Color.Secondary" Class="mb-4">
+                ¿Es un cliente nuevo? Puedes darlo de alta ahora mismo.
+            </MudText>
+            <div class="d-flex justify-center gap-2 flex-wrap">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Large"
+                           StartIcon="@Icons.Material.Filled.PersonAddAlt"
+                           OnClick="AbrirModalNuevoCliente"
+                           Class="boton-alta-grande">
+                    Dar de alta cliente
+                </MudButton>
+                <MudButton Variant="Variant.Outlined" Color="Color.Default" Size="Size.Large"
+                           StartIcon="@Icons.Material.Filled.Search"
+                           OnClick="NuevaBusqueda">
+                    Nueva búsqueda
+                </MudButton>
+            </div>
+        </div>
+    };
+}
+
+<style>
+    .barra-acciones {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 16px;
+    }
+
+    .barra-acciones .buscador-remarcado { flex: 1 1 auto; min-width: 0; }
+    .boton-nuevo { white-space: nowrap; flex: 0 0 auto; }
+    .buscador-remarcado .mud-input-outlined-border { border-width: 2px; }
+
+    /* En móvil: input arriba y botón "Nuevo cliente" grande debajo, ocupando el ancho. */
+    @@media (max-width: 600px) {
+        .barra-acciones {
+            flex-direction: column;
+            align-items: stretch;
+        }
+        .barra-acciones .boton-nuevo {
+            width: 100%;
+            height: 48px;
+        }
+    }
+
+    /* Filas de clientes clicables: indican que abren el detalle. */
+    .fila-clicable { cursor: pointer; }
+    .boton-alta-grande { padding-left: 32px; padding-right: 32px; }
+
+    .dialogo-cliente-fullscreen {
+        box-sizing: border-box;
+        padding-bottom: env(safe-area-inset-bottom);
+        padding-left: env(safe-area-inset-left);
+        padding-right: env(safe-area-inset-right);
+    }
+
+    .dialogo-cliente-fullscreen .mud-dialog-close-button {
+        top: calc(env(safe-area-inset-top) + 8px);
+        right: calc(env(safe-area-inset-right) + 8px);
+    }
+
+    .dialogo-cliente-fullscreen .mud-dialog-title {
+        padding-top: env(safe-area-inset-top);
+    }
+</style>
+
+@code {
+    private List<ClienteDto> _clientes = new();
+    private List<ZonaDto> _zonas = new();
+    private List<RutaAdminDto> _rutas = new();
+    private List<VendedorDto> _vendedores = new();
+    private List<ClasificaionClienteDto> _clasificaciones = new();
+    private bool _cargando;
+    private string _busqueda = "";
+    private bool _haBuscado;
+    private MudTextField<string>? _campoBusqueda;
+
+    // El administrador es el usuario con IdUsuario == 1: único autorizado a editar/dar de baja
+    // clientes clasificados como MALO/MOROSO.
+    private bool EsAdministrador => Api.Sesion?.IdUsuario == 1;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // No cargamos clientes al iniciar: la lista aparece sólo tras una búsqueda.
+        await CargarCatalogos();
+    }
+
+    private async Task CargarCatalogos()
+    {
+        var (zonas, errorZonas) = await Api.ListarZonasAdminAsync();
+        if (errorZonas is not null) _snackbar.Add(errorZonas, Severity.Error);
+        _zonas = zonas ?? new();
+
+        var (rutas, errorRutas) = await Api.ListarRutasAdminAsync(incluirInactivas: false);
+        if (errorRutas is not null) _snackbar.Add(errorRutas, Severity.Error);
+        _rutas = rutas ?? new();
+
+        var (vendedores, errorVend) = await Api.ListarVendedoresAdminAsync(incluirInactivos: false);
+        if (errorVend is not null) _snackbar.Add(errorVend, Severity.Error);
+        _vendedores = vendedores ?? new();
+
+        var (clas, errorClas) = await Api.ListarClasificacionesClienteAdminAsync();
+        if (errorClas is not null) _snackbar.Add(errorClas, Severity.Error);
+        _clasificaciones = clas ?? new();
+    }
+
+    private async Task CargarClientes()
+    {
+        _cargando = true;
+        var (datos, error) = await Api.ListarClientesAsync(
+            texto: string.IsNullOrWhiteSpace(_busqueda) ? null : _busqueda,
+            incluirInactivos: true, pagina: 1, tamanoPagina: 200);
+        if (error is not null) _snackbar.Add(error, Severity.Error);
+        _clientes = datos?.Items.ToList() ?? new();
+        _cargando = false;
+    }
+
+    private async Task OnBuscarChanged(string valor)
+    {
+        _busqueda = valor;
+        if (string.IsNullOrWhiteSpace(valor))
+        {
+            // Input vacío: volvemos al estado inicial (sin lista).
+            _haBuscado = false;
+            _clientes = new();
+            return;
+        }
+        _haBuscado = true;
+        await CargarClientes();
+    }
+
+    // Limpia el buscador, regresa al estado inicial y devuelve el foco al input.
+    private async Task NuevaBusqueda()
+    {
+        _busqueda = "";
+        _haBuscado = false;
+        _clientes = new();
+        StateHasChanged();
+        if (_campoBusqueda is not null)
+        {
+            await _campoBusqueda.FocusAsync();
+        }
+    }
+
+    // ===================== Alta / Edición =====================
+
+    private async Task AbrirModalNuevoCliente()
+    {
+        var modelo = new DialogoCliente.FormModel { Activo = true };
+        var m = await MostrarDialogoCliente("Dar de alta cliente", Icons.Material.Filled.PersonAddAlt, esNuevo: true, modelo);
+        if (m is null) return;
+
+        var idUsuario = Api.Sesion?.IdUsuario ?? 0;
+        var req = new CrearClienteRequest(
+            m.Nombre.Trim(), Limpiar(m.ApPaterno), Limpiar(m.ApMaterno),
+            m.TelefonoPrincipal.Trim(), Limpiar(m.TelefonoSecundario), Limpiar(m.Email),
+            m.Direccion.Trim(), Limpiar(m.CodigoPostal), Limpiar(m.ReferenciaUbicacion),
+            m.Latitud, m.Longitud,
+            m.IdRuta ?? 0, m.IdVendedor, m.IdClasificacion,
+            Limpiar(m.Observaciones), idUsuario);
+
+        var (clienteCreado, error) = await Api.CrearClienteAsync(req);
+        if (error is not null) { _snackbar.Add(error, Severity.Error); return; }
+
+        _snackbar.Add($"Cliente '{m.Nombre}' registrado.", Severity.Success);
+
+        // Al dar de alta, llevamos al usuario directo a la pantalla de información del nuevo cliente.
+        if (clienteCreado is not null)
+        {
+            _nav.NavigateTo($"/clientes/{clienteCreado.IdCliente}");
+        }
+        else
+        {
+            await CargarClientes();
+        }
+    }
+
+    private async Task AbrirModalEditarCliente(ClienteDto c)
+    {
+        // Doble barrera: solo el administrador puede editar clientes MALO/MOROSO.
+        if (RiesgoClienteRegla.BloqueaVenta(c.IdClasificacion) && !EsAdministrador)
+        {
+            _snackbar.Add("Solo el administrador puede editar clientes clasificados como MALO o MOROSO.", Severity.Warning);
+            return;
+        }
+
+        var modelo = new DialogoCliente.FormModel
+        {
+            Nombre = c.Nombre,
+            ApPaterno = c.ApPaterno,
+            ApMaterno = c.ApMaterno,
+            TelefonoPrincipal = c.TelefonoPrincipal,
+            TelefonoSecundario = c.TelefonoSecundario,
+            Email = c.Email,
+            Direccion = c.Direccion,
+            CodigoPostal = c.CodigoPostal,
+            ReferenciaUbicacion = c.ReferenciaUbicacion,
+            Latitud = c.Latitud,
+            Longitud = c.Longitud,
+            IdRuta = c.IdRuta,
+            IdVendedor = c.IdVendedor,
+            IdClasificacion = c.IdClasificacion,
+            Observaciones = c.Observaciones,
+            Activo = c.Estatus == 1
+        };
+        var m = await MostrarDialogoCliente("Modificar cliente", Icons.Material.Filled.ManageAccounts, esNuevo: false, modelo);
+        if (m is null) return;
+
+        var req = new ActualizarClienteRequest(
+            m.Nombre.Trim(), Limpiar(m.ApPaterno), Limpiar(m.ApMaterno),
+            m.TelefonoPrincipal.Trim(), Limpiar(m.TelefonoSecundario), Limpiar(m.Email),
+            m.Direccion.Trim(), Limpiar(m.CodigoPostal), Limpiar(m.ReferenciaUbicacion),
+            m.Latitud, m.Longitud,
+            m.IdRuta ?? 0, m.IdVendedor, m.IdClasificacion,
+            m.Activo ? 1 : 0, Limpiar(m.Observaciones));
+
+        var (_, error) = await Api.ActualizarClienteAsync(c.IdCliente, req);
+        Notificar(error, $"Cliente '{m.Nombre}' actualizado.");
+        if (error is null) await CargarClientes();
+    }
+
+    private async Task DarDeBaja(ClienteDto c)
+    {
+        // Doble barrera: solo el administrador puede dar de baja clientes MALO/MOROSO.
+        if (RiesgoClienteRegla.BloqueaVenta(c.IdClasificacion) && !EsAdministrador)
+        {
+            _snackbar.Add("Solo el administrador puede dar de baja clientes clasificados como MALO o MOROSO.", Severity.Warning);
+            return;
+        }
+
+        var (ok, error) = await Api.DarDeBajaClienteAsync(c.IdCliente);
+        Notificar(error, $"Cliente '{c.NombreCompleto}' dado de baja.");
+        if (ok) await CargarClientes();
+    }
+
+    // Navega a la pantalla de información/detalle del cliente.
+    private void AbrirDetalle(ClienteDto? c)
+    {
+        if (c is null) return;
+        _nav.NavigateTo($"/clientes/{c.IdCliente}");
+    }
+
+    // ===================== Helpers de diálogo =====================
+
+    private async Task<DialogoCliente.FormModel?> MostrarDialogoCliente(
+        string titulo, string icono, bool esNuevo, DialogoCliente.FormModel modelo)
+    {
+        var opciones = EsEntornoMovil
+            ? new DialogOptions { FullScreen = true, CloseButton = true }
+            : new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true, CloseButton = true };
+        var parametros = new DialogParameters<DialogoCliente>
+        {
+            { x => x.Titulo, titulo },
+            { x => x.Icono, icono },
+            { x => x.EsNuevo, esNuevo },
+            { x => x.Modelo, modelo },
+            { x => x.ClaseDialogo, EsEntornoMovil ? "dialogo-cliente-fullscreen" : null },
+            { x => x.Zonas, _zonas.Where(z => z.Activo).ToList() },
+            { x => x.Rutas, _rutas.Where(r => r.Activo).ToList() },
+            { x => x.Vendedores, _vendedores.Where(v => v.Activo).ToList() },
+            { x => x.Clasificaciones, _clasificaciones.Where(c => c.Activo).ToList() }
+        };
+        var dialogo = await _dialogo.ShowAsync<DialogoCliente>(titulo, parametros, opciones);
+        var resultado = await dialogo.Result;
+        return resultado is { Canceled: false, Data: DialogoCliente.FormModel datos } ? datos : null;
+    }
+
+    private void Notificar(string? error, string exito)
+    {
+        if (error is null) _snackbar.Add(exito, Severity.Success);
+        else _snackbar.Add(error, Severity.Error);
+    }
+
+    private static string? Limpiar(string? s) => string.IsNullOrWhiteSpace(s) ? null : s.Trim();
+
+    // Resuelve el nombre de la zona a partir de su Id usando el catálogo cargado.
+    private string NombreZona(long? idZona)
+    {
+        if (idZona is null) return "—";
+        var zona = _zonas.FirstOrDefault(z => z.IdZona == idZona.Value);
+        return zona is null ? "—" : zona.Descripcion;
+    }
+
+    private bool EsEntornoMovil
+    {
+        get
+        {
+            var ff = _formFactor.GetFormFactor();
+            return !ff.Equals("Web", StringComparison.OrdinalIgnoreCase)
+                   && !ff.Equals("Desktop", StringComparison.OrdinalIgnoreCase);
+        }
+    }
+}

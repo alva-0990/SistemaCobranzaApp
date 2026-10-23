@@ -1,0 +1,88 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: cobranza_postgres
+    restart: unless-stopped
+    command: ["postgres", "-c", "timezone=America/Mexico_City"]
+    environment:
+      POSTGRES_DB: sistema_cobranza
+      POSTGRES_USER: cobranza
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-cobranza_dev}
+      TZ: America/Mexico_City
+      PGTZ: America/Mexico_City
+    volumes:
+      - ./cobranza_pgdata:/var/lib/postgresql/data
+      - ./db/init:/docker-entrypoint-initdb.d:ro
+    networks:
+      - cobranza_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cobranza -d sistema_cobranza"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    # Publica el puerto SOLO si necesitas conectarte a la BD desde el host (p. ej. DBeaver).
+    # En producción puedes dejarlo comentado: la API llega a Postgres por la red interna.
+    ports:
+      - "127.0.0.1:5432:5432"
+
+  api:
+    build:
+      context: .
+      dockerfile: SistemaCobranzaApp.Api/Dockerfile
+    image: cobranza-api
+    container_name: cobranza_api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_URLS: http://+:8081
+      # La API alcanza Postgres por el nombre de servicio 'postgres' en la red interna.
+      ConnectionStrings__Cobranza: "Host=postgres;Port=5432;Database=sistema_cobranza;Username=cobranza;Password=${POSTGRES_PASSWORD:-cobranza_dev}"
+      Jwt__Issuer: SistemaCobranza
+      Jwt__Audience: SistemaCobranza
+      Jwt__Key: ${JWT_KEY}
+      Jwt__MinutosVigencia: ${JWT_MINUTOS:-900}
+    networks:
+      - cobranza_net
+
+  web:
+    build:
+      context: .
+      dockerfile: SistemaCobranzaApp.Web/Dockerfile
+    image: cobranza-web
+    container_name: cobranza_web
+    restart: unless-stopped
+    depends_on:
+      - api
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_URLS: http://+:8080
+      # El Web consume la API por su URL pública (Cloudflare) para que el navegador del
+      # cliente resuelva los mismos enlaces. Si prefieres tráfico interno, usa http://api:8081.
+      ApiSettings__BaseUrl: ${WEB_API_BASEURL:-https://api.cobragil.com}
+    networks:
+      - cobranza_net
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: cobranza_cloudflared
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    environment:
+      # Token del túnel creado en el panel de Cloudflare (Zero Trust → Tunnels).
+      TUNNEL_TOKEN: ${TUNNEL_TOKEN}
+    depends_on:
+      - api
+      - web
+    networks:
+      - cobranza_net
+
+volumes:
+  cobranza_pgdata:
+    name: cobranza_pgdata
+
+networks:
+  cobranza_net:
+    name: cobranza_net

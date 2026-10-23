@@ -12,7 +12,7 @@ public class JwtOptions
     public string Issuer { get; set; } = "SistemaCobranza";
     public string Audience { get; set; } = "SistemaCobranza";
     public string Key { get; set; } = string.Empty;
-    public int MinutosVigencia { get; set; } = 480; // 8 horas (jornada de campo)
+    public int MinutosVigencia { get; set; } = 900; // 15 horas (jornada de campo + renovación al recuperar señal)
 }
 
 public class JwtTokenGenerator : IJwtTokenGenerator

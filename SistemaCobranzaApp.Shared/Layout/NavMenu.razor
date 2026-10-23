@@ -1,25 +1,176 @@
-﻿<div class="top-row ps-3 navbar navbar-dark">
+@using MudBlazor
+@inject SistemaCobranzaApp.Shared.Services.EstadoEmpresaGlobal EmpresaGlobal
+
+<div class="top-row ps-3 navbar navbar-dark">
     <div class="container-fluid">
-        <a class="navbar-brand" href="">Cobranza App</a>
+        <a class="navbar-brand" href="">
+            @(string.IsNullOrWhiteSpace(EmpresaGlobal.Info?.NombreCorto) ? "CobrAgil" : EmpresaGlobal.Info.NombreCorto)
+        </a>
     </div>
 </div>
 
 <input type="checkbox" title="Navigation menu" class="navbar-toggler" />
-
 <div class="nav-scrollable" onclick="document.querySelector('.navbar-toggler').checked = false">
-    <nav class="flex-column">
-        <!-- Enlace a la Cartera (Home) -->
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
-                <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"></span> Home (Cartera)
-            </NavLink>
-        </div>
+    
+    <MudNavMenu Color="Color.Inherit" Bordered="false">
+        
+        <!-- INICIO / DASHBOARD -->
+        <MudNavLink Href="" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Home">
+            Home (Cartera)
+        </MudNavLink>
+        
+        <MudNavGroup Title="Operación Diaria" Icon="@Icons.Material.Filled.Assignment" Expanded="true">
+    
+            <MudNavLink Href="clientes" Icon="@Icons.Material.Filled.People" Match="NavLinkMatch.Prefix">
+                Cartera de Clientes
+            </MudNavLink>
 
-        <!-- Enlace al Catálogo de Zonas -->
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="admin/zonas">
-                <span class="bi bi-plus-square-fill-nav-menu" aria-hidden="true"></span> Catálogo Zonas
-            </NavLink>
-        </div>
-    </nav>
+            <MudNavLink Href="pagos" Icon="@Icons.Material.Filled.Payments" Match="NavLinkMatch.Prefix">
+                Registro de Pagos
+            </MudNavLink>
+    
+            <MudNavLink Href="reversion-pagos" Icon="@Icons.Material.Filled.HistoryToggleOff" Match="NavLinkMatch.Prefix">
+                Reversión de Pagos
+            </MudNavLink>
+
+            <MudNavLink Href="gastos" Icon="@Icons.Material.Filled.PriceChange" Match="NavLinkMatch.Prefix">
+                Gastos Operativos
+            </MudNavLink>
+
+            <MudNavLink Href="pagos-comisiones" Icon="@Icons.Material.Filled.PriceCheck" Match="NavLinkMatch.Prefix">
+                Pago Comisión Vendedores
+            </MudNavLink>
+
+        </MudNavGroup>
+
+        <MudNavGroup Title="Zonas y Personal" Icon="@Icons.Material.Filled.Map" Expanded="false">
+            
+            <MudNavLink Href="vendedores-cobradores" Icon="@Icons.Material.Filled.Badge">
+                Asignación de Vendedores
+            </MudNavLink>
+            
+            <MudNavLink Href="zonas-rutas" Icon="@Icons.Material.Filled.AltRoute">
+                Control de Zonas y Rutas
+            </MudNavLink>
+
+        </MudNavGroup>
+
+      
+        <MudNavGroup Title="Productos e Inventario" Icon="@Icons.Material.Filled.Inventory" Expanded="false">
+            
+            <MudNavLink Href="productos" Icon="@Icons.Material.Filled.LocalOffer">
+                Productos
+            </MudNavLink>
+            
+            <MudNavLink Href="inventario" Icon="@Icons.Material.Filled.Inventory2">
+                Inventario
+            </MudNavLink>
+
+        </MudNavGroup>
+
+     
+        <MudNavGroup Title="Catálogos y Tablas" Icon="@Icons.Material.Filled.FolderShared" Expanded="false">
+            
+            <MudNavLink Href="cartera-clientes" Icon="@Icons.Material.Filled.Rule">
+                Calificación de Clientes (B/M/R)
+            </MudNavLink>
+
+            <MudNavLink Href="operaciones-ventas" Icon="@Icons.Material.Filled.SettingsApplications">
+                Reglas de Venta y Crédito
+            </MudNavLink>
+            
+            <MudNavLink Href="parametros" Icon="@Icons.Material.Filled.Tune">
+                Parámetros Generales
+            </MudNavLink>
+
+        </MudNavGroup>
+
+ 
+        <MudNavLink Href="reportes" Icon="@Icons.Material.Filled.Assessment">
+            Reportes y Estadísticas
+        </MudNavLink>
+
+        <MudNavGroup Title="Seguridad y Empresa" Icon="@Icons.Material.Filled.AdminPanelSettings" Expanded="false">
+
+            <MudNavLink Href="roles-usuarios" Icon="@Icons.Material.Filled.GroupAdd">
+                Roles y Usuarios
+            </MudNavLink>
+            
+            <MudNavLink Href="empresa" Icon="@Icons.Material.Filled.Business">
+                Datos de la Empresa
+            </MudNavLink>
+
+        </MudNavGroup>
+
+    </MudNavMenu>
 </div>
+
+
+<style>
+    /* Estilos base de los enlaces en estado normal */
+    .nav-scrollable ::deep .mud-nav-link {
+        color: rgba(255, 255, 255, 0.75) !important;
+        padding: 10px 16px 10px 24px !important;
+        font-size: 0.88rem !important;
+    }
+    
+    .nav-scrollable ::deep .mud-nav-link .mud-nav-link-icon {
+        color: rgba(255, 255, 255, 0.65) !important;
+        margin-right: 12px !important;
+    }
+
+    /* Efecto Hover */
+    .nav-scrollable ::deep .mud-nav-link:hover {
+        background-color: rgba(255, 255, 255, 0.08) !important;
+    }
+    .nav-scrollable ::deep .mud-nav-link:hover *,
+    .nav-scrollable ::deep .mud-nav-link:hover .mud-nav-link-icon {
+        color: #ffffff !important;
+    }
+
+    /* 🛠️ BLINDAJE CSS TOTAL PARA EL ELEMENTO SELECCIONADO (.active) */
+    /* MudBlazor aplica `.mud-nav-link.active:not(.mud-nav-link-disabled){color:var(--mud-palette-primary)}`.
+       Ese selector tiene MÁS especificidad que `.mud-nav-link.active`, así que debemos
+       igualarla incluyendo `:not(.mud-nav-link-disabled)`; de lo contrario el texto queda
+       verde sobre fondo verde y "desaparece". */
+    .nav-scrollable ::deep .mud-nav-link.active:not(.mud-nav-link-disabled) {
+        background-color: #C99A3E !important;
+        border-inline-end: none !important;
+        border-left: 4px solid #ffffff !important;
+        color: #ffffff !important;
+    }
+
+    .nav-scrollable ::deep .mud-nav-link.active:not(.mud-nav-link-disabled):hover {
+        background-color: #B5862F !important;
+    }
+
+    /* El selector '*' obliga a cualquier texto, span o contenedor interno a ponerse blanco puro */
+    .nav-scrollable ::deep .mud-nav-link.active:not(.mud-nav-link-disabled),
+    .nav-scrollable ::deep .mud-nav-link.active:not(.mud-nav-link-disabled) * {
+        color: #ffffff !important;
+        font-weight: 700 !important;
+    }
+
+    /* Fuerza al icono interno de la opción activa a ponerse blanco puro */
+    .nav-scrollable ::deep .mud-nav-link.active:not(.mud-nav-link-disabled) .mud-nav-link-icon {
+        color: #ffffff !important;
+    }
+
+    /* Estilos de las cabeceras de grupos colapsables */
+    .nav-scrollable ::deep .mud-nav-group-title {
+        color: rgba(255, 255, 255, 0.9) !important;
+        font-weight: 600 !important;
+        font-size: 0.9rem !important;
+    }
+    
+    .nav-scrollable ::deep .mud-nav-group-title .mud-nav-link-icon {
+        color: rgba(255, 255, 255, 0.75) !important;
+    }
+
+    /* Fondo oscuro traslúcido para las sub-listas abiertas */
+    .nav-scrollable ::deep .mud-nav-group .mud-collapse-container {
+        background-color: rgba(0, 0, 0, 0.12) !important;
+        border-radius: 4px;
+        margin: 2px 8px;
+    }
+</style>

@@ -1,0 +1,901 @@
+@page "/gastos"
+
+@using MudBlazor
+@using SistemaCobranzaApp.Shared.Components
+@using SistemaCobranzaApp.Shared.Dtos
+@using SistemaCobranzaApp.Shared.Services
+@inject ApiCliente Api
+@inject IDialogService _dialogo
+@inject ISnackbar _snackbar
+
+<MudTabs Elevation="2" Rounded="true" Color="Color.Primary" ApplyEffectsToContainer="true"
+         PanelClass="pa-0 pt-4" SliderColor="Color.Warning" Class="ma-2 tabs-remarcados">
+
+    <!-- ============================================================= -->
+    <!-- ========================== GASTOS =========================== -->
+    <!-- ============================================================= -->
+    <MudTabPanel Text="Gastos" Icon="@Icons.Material.Filled.ReceiptLong">
+        <MudPaper Elevation="0" Class="pa-4">
+
+            <div class="encabezado-seccion mb-4">
+                <MudIcon Icon="@Icons.Material.Filled.ReceiptLong" Color="Color.Primary" Size="Size.Large" />
+                <div>
+                    <MudText Typo="Typo.h6" Class="titulo-seccion">Registro y administración de gastos</MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">
+                        Registre gastos, autorícelos, cancélelos y aplique pagos. Clasifique por zona,
+                        cobrador, vendedor o déjelos como gasto central (sin responsable operativo).
+                    </MudText>
+                </div>
+            </div>
+
+            <MudGrid Spacing="3">
+                <!-- Panel izquierdo: alta de gasto -->
+                <MudItem xs="12" md="4" lg="3">
+                    <MudPaper Elevation="0" Outlined="true" Class="pa-4 panel-accion">
+                        <div class="d-flex align-center gap-2 mb-3">
+                            <MudIcon Icon="@Icons.Material.Filled.AddCircle" Color="Color.Primary" />
+                            <MudText Typo="Typo.subtitle1"><b>Nuevo gasto</b></MudText>
+                        </div>
+
+                        <MudSelect T="long?" Label="Categoría" @bind-Value="_nvCategoria"
+                                   Variant="Variant.Outlined" Dense="true" Class="mb-3">
+                            @foreach (var c in _categoriasActivas)
+                            {
+                                <MudSelectItem T="long?" Value="@c.IdCategoriaGasto">@c.Nombre</MudSelectItem>
+                            }
+                        </MudSelect>
+
+                        <MudDatePicker Label="Fecha del gasto" @bind-Date="_nvFecha"
+                                       Variant="Variant.Outlined" Class="mb-3" />
+
+                        <MudTextField T="string" @bind-Value="_nvConcepto" Label="Concepto"
+                                      Variant="Variant.Outlined" Dense="true" Class="mb-3" MaxLength="250" />
+
+                        <MudNumericField T="decimal" @bind-Value="_nvImporte" Label="Importe"
+                                         Variant="Variant.Outlined" Dense="true" Min="0" Class="mb-3"
+                                         Format="N2" Culture="@System.Globalization.CultureInfo.CurrentCulture" />
+
+                        <MudTextField T="string" @bind-Value="_nvProveedor" Label="Proveedor (opcional)"
+                                      Variant="Variant.Outlined" Dense="true" Class="mb-3" MaxLength="200" />
+
+                        <MudSelect T="long?" Label="Zona (vacío = central)" @bind-Value="_nvZona"
+                                   Variant="Variant.Outlined" Dense="true" Clearable="true" Class="mb-3">
+                            @foreach (var z in _zonas)
+                            {
+                                <MudSelectItem T="long?" Value="@z.IdZona">@z.Descripcion</MudSelectItem>
+                            }
+                        </MudSelect>
+
+                        <MudSelect T="long?" Label="Cobrador (opcional)" @bind-Value="_nvCobrador"
+                                   Variant="Variant.Outlined" Dense="true" Clearable="true" Class="mb-3">
+                            @foreach (var p in _cobradores)
+                            {
+                                <MudSelectItem T="long?" Value="@p.IdCobrador">@p.Nombre</MudSelectItem>
+                            }
+                        </MudSelect>
+
+                        <MudSelect T="long?" Label="Vendedor (opcional)" @bind-Value="_nvVendedor"
+                                   Variant="Variant.Outlined" Dense="true" Clearable="true" Class="mb-3">
+                            @foreach (var p in _vendedores)
+                            {
+                                <MudSelectItem T="long?" Value="@p.IdVendedor">@p.Nombre</MudSelectItem>
+                            }
+                        </MudSelect>
+
+                        <MudSelect T="long?" Label="Cuenta prevista (de dónde saldrá)" @bind-Value="_nvCuenta"
+                                   Variant="Variant.Outlined" Dense="true" Clearable="true" Class="mb-3">
+                            @foreach (var c in _cuentas.Where(c => c.Activo))
+                            {
+                                <MudSelectItem T="long?" Value="@c.IdCuentaGasto">
+                                    @c.Nombre (@c.SaldoActual.ToString("C2"))
+                                </MudSelectItem>
+                            }
+                        </MudSelect>
+
+                        @if (CuentaPrevistaInsuficiente())
+                        {
+                            <MudAlert Severity="Severity.Warning" Dense="true" Class="mb-3">
+                                El saldo de la cuenta prevista (@(SaldoCuentaPrevista()?.ToString("C2")))
+                                es menor al importe del gasto. Podrás registrarlo, pero el pago no podrá
+                                exceder el saldo disponible al momento de pagar.
+                            </MudAlert>
+                        }
+
+                        <MudTextField T="string" @bind-Value="_nvObservaciones" Label="Observaciones (opcional)"
+                                      Variant="Variant.Outlined" Lines="2" Dense="true" Class="mb-3" />
+
+                        <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true"
+                                   StartIcon="@Icons.Material.Filled.Save" Class="mb-2"
+                                   Disabled="@_guardandoGasto" OnClick="CrearGasto">
+                            @(_guardandoGasto ? "Guardando..." : "Registrar gasto")
+                        </MudButton>
+                    </MudPaper>
+                </MudItem>
+
+                <!-- Tabla derecha: listado de gastos con filtros -->
+                <MudItem xs="12" md="8" lg="9">
+                    <div class="filtros-gastos mb-3">
+                        <MudTextField T="string" Value="_fFolio" ValueChanged="OnFolioChanged"
+                                      DebounceInterval="400" Immediate="true"
+                                      Placeholder="Folio..." Label="Folio" Variant="Variant.Outlined"
+                                      Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
+                                      Clearable="true" Class="f-item" />
+                        <MudSelect T="string" Value="_fEstatus" ValueChanged="OnEstatusChanged" Label="Estatus"
+                                   Variant="Variant.Outlined" Clearable="true" Class="f-item">
+                            @foreach (var e in _estatusGasto)
+                            {
+                                <MudSelectItem T="string" Value="@e">@e</MudSelectItem>
+                            }
+                        </MudSelect>
+                        <MudSelect T="long?" Value="_fZona" ValueChanged="OnZonaChanged" Label="Zona"
+                                   Variant="Variant.Outlined" Clearable="true" Class="f-item">
+                            @foreach (var z in _zonas)
+                            {
+                                <MudSelectItem T="long?" Value="@z.IdZona">@z.Descripcion</MudSelectItem>
+                            }
+                        </MudSelect>
+                        <MudDatePicker Date="_fDesde" DateChanged="OnDesdeChanged" Label="Desde"
+                                       Variant="Variant.Outlined" Clearable="true" Class="f-item" />
+                        <MudDatePicker Date="_fHasta" DateChanged="OnHastaChanged" Label="Hasta"
+                                       Variant="Variant.Outlined" Clearable="true" Class="f-item" />
+                    </div>
+
+                    @if (_cargandoGastos)
+                    {
+                        <div class="d-flex justify-center pa-8"><MudProgressCircular Indeterminate="true" /></div>
+                    }
+                    else
+                    {
+                        <MudTable Items="_gastos" Hover="true" Dense="true" Bordered="true" Striped="true"
+                                  SortLabel="Ordenar" FixedHeader="true" Height="520px">
+                            <HeaderContent>
+                                <MudTh>Folio</MudTh>
+                                <MudTh>Fecha</MudTh>
+                                <MudTh>Categoría</MudTh>
+                                <MudTh>Concepto</MudTh>
+                                <MudTh Style="text-align:right">Importe</MudTh>
+                                <MudTh Style="text-align:right">Pagado</MudTh>
+                                <MudTh Style="text-align:right">Saldo</MudTh>
+                                <MudTh>Clasificación</MudTh>
+                                <MudTh>Cuenta prevista</MudTh>
+                                <MudTh>Estatus</MudTh>
+                                <MudTh>Acciones</MudTh>
+                            </HeaderContent>
+                            <RowTemplate>
+                                <MudTd DataLabel="Folio">@context.FolioGasto</MudTd>
+                                <MudTd DataLabel="Fecha">@context.FechaGasto.EnZonaProyecto().DateTime.ToString("dd/MM/yyyy")</MudTd>
+                                <MudTd DataLabel="Categoría">@context.NombreCategoria</MudTd>
+                                <MudTd DataLabel="Concepto">@context.Concepto</MudTd>
+                                <MudTd DataLabel="Importe" Style="text-align:right">@context.Importe.ToString("C2")</MudTd>
+                                <MudTd DataLabel="Pagado" Style="text-align:right">@context.TotalPagado.ToString("C2")</MudTd>
+                                <MudTd DataLabel="Saldo" Style="text-align:right">@context.SaldoPendiente.ToString("C2")</MudTd>
+                                <MudTd DataLabel="Clasificación">@Clasificacion(context)</MudTd>
+                                <MudTd DataLabel="Cuenta prevista">@(context.NombreCuentaPrevista ?? "—")</MudTd>
+                                <MudTd DataLabel="Estatus">
+                                    <MudChip T="string" Size="Size.Small" Color="@ColorEstatus(context.Estatus)" Variant="Variant.Text">
+                                        @context.Estatus
+                                    </MudChip>
+                                </MudTd>
+                                <MudTd DataLabel="Acciones">
+                                    <MudIconButton Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Success"
+                                                   Size="Size.Small" title="Autorizar"
+                                                   Disabled="@(context.Estatus != "PENDIENTE")"
+                                                   OnClick="@(() => AutorizarGasto(context))" />
+                                    <MudIconButton Icon="@Icons.Material.Filled.Payments" Color="Color.Primary"
+                                                   Size="Size.Small" title="Registrar pago"
+                                                   Disabled="@(!PuedePagar(context))"
+                                                   OnClick="@(() => AbrirPago(context))" />
+                                    <MudIconButton Icon="@Icons.Material.Filled.Cancel" Color="Color.Error"
+                                                   Size="Size.Small" title="Cancelar"
+                                                   Disabled="@(context.Estatus is "PAGADO" or "PARCIAL" or "CANCELADO")"
+                                                   OnClick="@(() => CancelarGasto(context))" />
+                                </MudTd>
+                            </RowTemplate>
+                        </MudTable>
+                        <MudText Typo="Typo.body2" Class="mt-2">
+                            <b>Total:</b> @_gastos.Sum(x => x.Importe).ToString("C2") &nbsp;•&nbsp;
+                            <b>Pagado:</b> @_gastos.Sum(x => x.TotalPagado).ToString("C2") &nbsp;•&nbsp;
+                            <b>Saldo:</b> @_gastos.Sum(x => x.SaldoPendiente).ToString("C2")
+                        </MudText>
+                    }
+                </MudItem>
+            </MudGrid>
+        </MudPaper>
+    </MudTabPanel>
+
+    <!-- ============================================================= -->
+    <!-- ========================= CUENTAS =========================== -->
+    <!-- ============================================================= -->
+    <MudTabPanel Text="Cuentas" Icon="@Icons.Material.Filled.AccountBalanceWallet">
+        <MudPaper Elevation="0" Class="pa-4">
+            <div class="encabezado-seccion mb-4">
+                <MudIcon Icon="@Icons.Material.Filled.AccountBalanceWallet" Color="Color.Primary" Size="Size.Large" />
+                <div>
+                    <MudText Typo="Typo.h6" Class="titulo-seccion">Cuentas de gastos</MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">
+                        Efectivo, caja chica, bancos y otras fuentes. Consulte saldo y movimientos.
+                    </MudText>
+                </div>
+            </div>
+
+            <div class="barra-gastos mb-3">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                           StartIcon="@Icons.Material.Filled.Add" OnClick="NuevaCuenta" Class="b-item">
+                    Nueva cuenta
+                </MudButton>
+            </div>
+
+            @if (_cargandoCuentas)
+            {
+                <div class="d-flex justify-center pa-8"><MudProgressCircular Indeterminate="true" /></div>
+            }
+            else
+            {
+                <MudTable Items="_cuentas" Hover="true" Dense="true" Bordered="true" Striped="true">
+                    <HeaderContent>
+                        <MudTh>Nombre</MudTh>
+                        <MudTh>Tipo</MudTh>
+                        <MudTh>Moneda</MudTh>
+                        <MudTh Style="text-align:right">Saldo inicial</MudTh>
+                        <MudTh Style="text-align:right">Saldo actual</MudTh>
+                        <MudTh>Estatus</MudTh>
+                        <MudTh>Acciones</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd DataLabel="Nombre">@context.Nombre</MudTd>
+                        <MudTd DataLabel="Tipo">@context.TipoCuenta</MudTd>
+                        <MudTd DataLabel="Moneda">@context.Moneda</MudTd>
+                        <MudTd DataLabel="Saldo inicial" Style="text-align:right">@context.SaldoInicial.ToString("C2")</MudTd>
+                        <MudTd DataLabel="Saldo actual" Style="text-align:right">@context.SaldoActual.ToString("C2")</MudTd>
+                        <MudTd DataLabel="Estatus">
+                            <MudChip T="string" Size="Size.Small" Color="@(context.Activo ? Color.Success : Color.Default)" Variant="Variant.Text">
+                                @(context.Activo ? "Activa" : "Inactiva")
+                            </MudChip>
+                        </MudTd>
+                        <MudTd DataLabel="Acciones">
+                            <MudIconButton Icon="@Icons.Material.Filled.ListAlt" Color="Color.Primary" Size="Size.Small"
+                                           title="Movimientos" OnClick="@(() => VerMovimientos(context))" />
+                            <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="Color.Primary" Size="Size.Small"
+                                           title="Editar" OnClick="@(() => EditarCuenta(context))" />
+                            <MudIconButton Icon="@Icons.Material.Filled.AddCard" Color="Color.Success" Size="Size.Small"
+                                           title="Registrar entrada/salida" OnClick="@(() => NuevoMovimiento(context))" />
+                            <MudIconButton Icon="@(context.Activo ? Icons.Material.Filled.ToggleOn : Icons.Material.Filled.ToggleOff)"
+                                           Color="@(context.Activo ? Color.Success : Color.Default)" Size="Size.Small"
+                                           title="Activar/Desactivar" OnClick="@(() => CambiarEstatusCuenta(context))" />
+                        </MudTd>
+                    </RowTemplate>
+                </MudTable>
+            }
+
+            @if (_cuentaMovimientos is not null)
+            {
+                <MudPaper Elevation="0" Outlined="true" Class="pa-4 mt-4">
+                    <MudText Typo="Typo.subtitle1" Class="mb-2">
+                        <b>Movimientos de @_cuentaMovimientos.Nombre</b>
+                    </MudText>
+                    <MudTable Items="_movimientos" Dense="true" Bordered="true" Striped="true" Height="320px" FixedHeader="true">
+                        <HeaderContent>
+                            <MudTh>Fecha</MudTh>
+                            <MudTh>Tipo</MudTh>
+                            <MudTh>Concepto</MudTh>
+                            <MudTh Style="text-align:right">Importe</MudTh>
+                        </HeaderContent>
+                        <RowTemplate>
+                            <MudTd>@context.FechaMovimiento.EnZonaProyecto().DateTime.ToString("dd/MM/yyyy HH:mm")</MudTd>
+                            <MudTd>
+                                <MudChip T="string" Size="Size.Small"
+                                         Color="@(context.TipoMovimiento == "ENTRADA" ? Color.Success : Color.Error)"
+                                         Variant="Variant.Text">@context.TipoMovimiento</MudChip>
+                            </MudTd>
+                            <MudTd>@context.Concepto</MudTd>
+                            <MudTd Style="text-align:right">@context.Importe.ToString("C2")</MudTd>
+                        </RowTemplate>
+                    </MudTable>
+                </MudPaper>
+            }
+        </MudPaper>
+    </MudTabPanel>
+
+    <!-- ============================================================= -->
+    <!-- ======================== CATEGORÍAS ========================= -->
+    <!-- ============================================================= -->
+    <MudTabPanel Text="Categorías" Icon="@Icons.Material.Filled.Category">
+        <MudPaper Elevation="0" Class="pa-4">
+            <div class="encabezado-seccion mb-4">
+                <MudIcon Icon="@Icons.Material.Filled.Category" Color="Color.Primary" Size="Size.Large" />
+                <div>
+                    <MudText Typo="Typo.h6" Class="titulo-seccion">Categorías de gasto</MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">
+                        Defina nombre, descripción y si requieren comprobante. No se pueden desactivar
+                        categorías con gastos relacionados.
+                    </MudText>
+                </div>
+            </div>
+
+            <div class="barra-gastos mb-3">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                           StartIcon="@Icons.Material.Filled.Add" OnClick="NuevaCategoria" Class="b-item">
+                    Nueva categoría
+                </MudButton>
+                <MudSwitch T="bool" Value="_incluirCategoriasInactivas" ValueChanged="OnIncluirInactivasChanged"
+                           Color="Color.Primary" Label="Incluir inactivas" Class="b-item" />
+            </div>
+
+            @if (_cargandoCategorias)
+            {
+                <div class="d-flex justify-center pa-8"><MudProgressCircular Indeterminate="true" /></div>
+            }
+            else
+            {
+                <MudTable Items="_categorias" Hover="true" Dense="true" Bordered="true" Striped="true">
+                    <HeaderContent>
+                        <MudTh>Nombre</MudTh>
+                        <MudTh>Descripción</MudTh>
+                        <MudTh>¿Comprobante?</MudTh>
+                        <MudTh>Estatus</MudTh>
+                        <MudTh>Acciones</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd DataLabel="Nombre">@context.Nombre</MudTd>
+                        <MudTd DataLabel="Descripción">@context.Descripcion</MudTd>
+                        <MudTd DataLabel="¿Comprobante?">@(context.RequiereComprobante ? "Sí" : "No")</MudTd>
+                        <MudTd DataLabel="Estatus">
+                            <MudChip T="string" Size="Size.Small" Color="@(context.Activo ? Color.Success : Color.Default)" Variant="Variant.Text">
+                                @(context.Activo ? "Activa" : "Inactiva")
+                            </MudChip>
+                        </MudTd>
+                        <MudTd DataLabel="Acciones">
+                            <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="Color.Primary" Size="Size.Small"
+                                           title="Editar" OnClick="@(() => EditarCategoria(context))" />
+                            <MudIconButton Icon="@(context.Activo ? Icons.Material.Filled.ToggleOn : Icons.Material.Filled.ToggleOff)"
+                                           Color="@(context.Activo ? Color.Success : Color.Default)" Size="Size.Small"
+                                           title="Activar/Desactivar" OnClick="@(() => CambiarEstatusCategoria(context))" />
+                        </MudTd>
+                    </RowTemplate>
+                </MudTable>
+            }
+        </MudPaper>
+    </MudTabPanel>
+
+    <!-- ============================================================= -->
+    <!-- ========================= REPORTES ========================== -->
+    <!-- ============================================================= -->
+    <MudTabPanel Text="Reportes" Icon="@Icons.Material.Filled.Assessment">
+        <MudPaper Elevation="0" Class="pa-4">
+            <div class="encabezado-seccion mb-4">
+                <MudIcon Icon="@Icons.Material.Filled.Assessment" Color="Color.Primary" Size="Size.Large" />
+                <div>
+                    <MudText Typo="Typo.h6" Class="titulo-seccion">Reportes de gastos</MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">
+                        Totales por rango de fechas y agrupaciones. Los importes no se duplican al
+                        relacionar gastos con pagos.
+                    </MudText>
+                </div>
+            </div>
+
+            <div class="filtros-gastos mb-3">
+                <MudDatePicker Label="Desde" @bind-Date="_repDesde" Variant="Variant.Outlined" Class="f-item" />
+                <MudDatePicker Label="Hasta" @bind-Date="_repHasta" Variant="Variant.Outlined" Class="f-item" />
+                <MudSelect T="string" @bind-Value="_repAgrupacion" Label="Agrupar por"
+                           Variant="Variant.Outlined" Class="f-item">
+                    <MudSelectItem T="string" Value="@("detalle")">Detalle</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("categoria")">Por categoría</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("zona")">Por zona</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("cobrador")">Por cobrador</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("vendedor")">Por vendedor</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("estatus")">Por estatus</MudSelectItem>
+                </MudSelect>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                           StartIcon="@Icons.Material.Filled.PlayArrow" OnClick="GenerarReporte" Class="f-item">
+                    Generar
+                </MudButton>
+            </div>
+
+            @if (_cargandoReporte)
+            {
+                <div class="d-flex justify-center pa-8"><MudProgressCircular Indeterminate="true" /></div>
+            }
+            else if (_repAgrupacion == "detalle" && _repDetalle is not null)
+            {
+                <MudTable Items="_repDetalle.Filas" Dense="true" Bordered="true" Striped="true" Height="500px" FixedHeader="true">
+                    <HeaderContent>
+                        <MudTh>Folio</MudTh>
+                        <MudTh>Fecha</MudTh>
+                        <MudTh>Categoría</MudTh>
+                        <MudTh>Concepto</MudTh>
+                        <MudTh Style="text-align:right">Importe</MudTh>
+                        <MudTh Style="text-align:right">Pagado</MudTh>
+                        <MudTh Style="text-align:right">Saldo</MudTh>
+                        <MudTh>Estatus</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd>@context.FolioGasto</MudTd>
+                        <MudTd>@context.FechaGasto.EnZonaProyecto().DateTime.ToString("dd/MM/yyyy")</MudTd>
+                        <MudTd>@context.Categoria</MudTd>
+                        <MudTd>@context.Concepto</MudTd>
+                        <MudTd Style="text-align:right">@context.Importe.ToString("C2")</MudTd>
+                        <MudTd Style="text-align:right">@context.TotalPagado.ToString("C2")</MudTd>
+                        <MudTd Style="text-align:right">@context.SaldoPendiente.ToString("C2")</MudTd>
+                        <MudTd>@context.Estatus</MudTd>
+                    </RowTemplate>
+                </MudTable>
+                <MudText Typo="Typo.body2" Class="mt-2">
+                    <b>Total:</b> @_repDetalle.ImporteTotal.ToString("C2") &nbsp;•&nbsp;
+                    <b>Pagado:</b> @_repDetalle.TotalPagado.ToString("C2") &nbsp;•&nbsp;
+                    <b>Saldo:</b> @_repDetalle.SaldoPendiente.ToString("C2")
+                </MudText>
+            }
+            else if (_repAgrupado is not null)
+            {
+                <MudTable Items="_repAgrupado.Filas" Dense="true" Bordered="true" Striped="true" Height="500px" FixedHeader="true">
+                    <HeaderContent>
+                        <MudTh>Grupo</MudTh>
+                        <MudTh Style="text-align:right"># Gastos</MudTh>
+                        <MudTh Style="text-align:right">Importe</MudTh>
+                        <MudTh Style="text-align:right">Pagado</MudTh>
+                        <MudTh Style="text-align:right">Saldo</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd>@context.Etiqueta</MudTd>
+                        <MudTd Style="text-align:right">@context.NumeroGastos</MudTd>
+                        <MudTd Style="text-align:right">@context.Importe.ToString("C2")</MudTd>
+                        <MudTd Style="text-align:right">@context.TotalPagado.ToString("C2")</MudTd>
+                        <MudTd Style="text-align:right">@context.SaldoPendiente.ToString("C2")</MudTd>
+                    </RowTemplate>
+                </MudTable>
+                <MudText Typo="Typo.body2" Class="mt-2">
+                    <b>Total:</b> @_repAgrupado.ImporteTotal.ToString("C2") &nbsp;•&nbsp;
+                    <b>Pagado:</b> @_repAgrupado.TotalPagado.ToString("C2") &nbsp;•&nbsp;
+                    <b>Saldo:</b> @_repAgrupado.SaldoPendiente.ToString("C2")
+                </MudText>
+            }
+        </MudPaper>
+    </MudTabPanel>
+</MudTabs>
+
+@code {
+    private long? IdUsuarioActual => Api.Sesion?.IdUsuario;
+
+    private static readonly string[] _estatusGasto =
+        { "PENDIENTE", "AUTORIZADO", "PARCIAL", "PAGADO", "CANCELADO" };
+
+    // Catálogos de apoyo
+    private List<ZonaDto> _zonas = new();
+    private List<CobradorDto> _cobradores = new();
+    private List<VendedorDto> _vendedores = new();
+    private List<CatalogoCategoriaGastoDto> _categoriasActivas = new();
+
+    // ---- Gastos ----
+    private List<GastoDto> _gastos = new();
+    private bool _cargandoGastos;
+    private bool _guardandoGasto;
+    private string? _fFolio;
+    private string? _fEstatus;
+    private long? _fZona;
+    private DateTime? _fDesde;
+    private DateTime? _fHasta;
+
+    private long? _nvCategoria;
+    private DateTime? _nvFecha = FechaProyecto.Hoy;
+    private string _nvConcepto = "";
+    private decimal _nvImporte;
+    private string? _nvProveedor;
+    private long? _nvZona;
+    private long? _nvCobrador;
+    private long? _nvVendedor;
+    private long? _nvCuenta;
+    private string? _nvObservaciones;
+
+    // ---- Cuentas ----
+    private List<CuentaGastoDto> _cuentas = new();
+    private bool _cargandoCuentas;
+    private CuentaGastoDto? _cuentaMovimientos;
+    private List<MovimientoCuentaGastoDto> _movimientos = new();
+
+    // ---- Categorías ----
+    private List<CatalogoCategoriaGastoDto> _categorias = new();
+    private bool _cargandoCategorias;
+    private bool _incluirCategoriasInactivas;
+
+    // ---- Reportes ----
+    private DateTime? _repDesde = FechaProyecto.Hoy.AddMonths(-1);
+    private DateTime? _repHasta = FechaProyecto.Hoy;
+    private string _repAgrupacion = "detalle";
+    private bool _cargandoReporte;
+    private ReporteGastosResponse? _repDetalle;
+    private ReporteGastosAgrupadoResponse? _repAgrupado;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CargarCatalogos();
+        await CargarGastos();
+        await CargarCuentas();
+        await CargarCategorias();
+    }
+
+    private async Task CargarCatalogos()
+    {
+        var (zonas, _) = await Api.ListarZonasOperativasAsync();
+        _zonas = zonas ?? new();
+        var (cob, _) = await Api.ListarCobradoresOperativosAsync();
+        _cobradores = cob ?? new();
+        var (ven, _) = await Api.ListarVendedoresOperativosAsync();
+        _vendedores = ven ?? new();
+        var (cats, _) = await Api.ListarCategoriasGastoAsync(incluirInactivas: false);
+        _categoriasActivas = cats ?? new();
+    }
+
+    // ===================== GASTOS =====================
+
+    private async Task CargarGastos()
+    {
+        _cargandoGastos = true;
+        DateTimeOffset? desde = _fDesde is { } d ? FechaProyecto.DesdeFechaLocal(d) : null;
+        DateTimeOffset? hasta = _fHasta is { } h ? FechaProyecto.DesdeFechaLocal(h.Date.AddDays(1)).AddTicks(-1) : null;
+        var (datos, error) = await Api.ListarGastosAsync(
+            desde: desde, hasta: hasta,
+            estatus: _fEstatus, idZona: _fZona,
+            folio: string.IsNullOrWhiteSpace(_fFolio) ? null : _fFolio);
+        _cargandoGastos = false;
+        if (error is not null) { _snackbar.Add(error, Severity.Error); return; }
+        _gastos = datos ?? new();
+    }
+
+    // Handlers de filtros: cada cambio recarga la lista automáticamente.
+    private async Task OnFolioChanged(string? v) { _fFolio = v; await CargarGastos(); }
+    private async Task OnEstatusChanged(string? v) { _fEstatus = v; await CargarGastos(); }
+    private async Task OnZonaChanged(long? v) { _fZona = v; await CargarGastos(); }
+    private async Task OnDesdeChanged(DateTime? v) { _fDesde = v; await CargarGastos(); }
+    private async Task OnHastaChanged(DateTime? v) { _fHasta = v; await CargarGastos(); }
+
+    private async Task CrearGasto()
+    {
+        if (_nvCategoria is null) { _snackbar.Add("Selecciona una categoría.", Severity.Warning); return; }
+        if (string.IsNullOrWhiteSpace(_nvConcepto)) { _snackbar.Add("El concepto es obligatorio.", Severity.Warning); return; }
+        if (_nvImporte <= 0) { _snackbar.Add("El importe debe ser mayor que cero.", Severity.Warning); return; }
+
+        _guardandoGasto = true;
+        var req = new CrearGastoRequest(
+            _nvCategoria.Value,
+            FechaProyecto.DesdeFechaLocal(_nvFecha ?? FechaProyecto.Hoy),
+            _nvConcepto.Trim(),
+            _nvImporte,
+            null,
+            string.IsNullOrWhiteSpace(_nvProveedor) ? null : _nvProveedor.Trim(),
+            null,
+            null,
+            _nvZona,
+            _nvCobrador,
+            _nvVendedor,
+            _nvCuenta,
+            string.IsNullOrWhiteSpace(_nvObservaciones) ? null : _nvObservaciones.Trim());
+
+        var (datos, error) = await Api.CrearGastoAsync(req);
+        _guardandoGasto = false;
+        if (error is not null) { _snackbar.Add(error, Severity.Error); return; }
+
+        _snackbar.Add($"Gasto {datos?.FolioGasto} registrado.", Severity.Success);
+        LimpiarNuevoGasto();
+        await CargarGastos();
+    }
+
+    private void LimpiarNuevoGasto()
+    {
+        _nvCategoria = null;
+        _nvFecha = FechaProyecto.Hoy;
+        _nvConcepto = "";
+        _nvImporte = 0;
+        _nvProveedor = null;
+        _nvZona = _nvCobrador = _nvVendedor = null;
+        _nvCuenta = null;
+        _nvObservaciones = null;
+    }
+
+    private async Task AutorizarGasto(GastoDto g)
+    {
+        var ok = await ConfirmarDialogo("Autorizar gasto",
+            $"¿Autorizar el gasto {g.FolioGasto} por {g.Importe:C2}?", "Autorizar", Color.Success);
+        if (!ok) return;
+
+        var (_, error) = await Api.AutorizarGastoAsync(g.IdGasto);
+        if (error is not null) { _snackbar.Add(error, Severity.Error); return; }
+        _snackbar.Add("Gasto autorizado.", Severity.Success);
+        await CargarGastos();
+    }
+
+    private async Task CancelarGasto(GastoDto g)
+    {
+        var motivo = await PedirTexto("Cancelar gasto",
+            $"Motivo de cancelación del gasto {g.FolioGasto}:");
+        if (string.IsNullOrWhiteSpace(motivo)) return;
+
+        var (_, error) = await Api.CancelarGastoAsync(g.IdGasto,
+            new CancelarGastoRequest(IdUsuarioActual ?? 0, motivo.Trim()));
+        if (error is not null) { _snackbar.Add(error, Severity.Error); return; }
+        _snackbar.Add("Gasto cancelado.", Severity.Success);
+        await CargarGastos();
+    }
+
+    private static bool PuedePagar(GastoDto g)
+        => g.Estatus is "AUTORIZADO" or "PARCIAL" && g.SaldoPendiente > 0;
+
+    private decimal? SaldoCuentaPrevista()
+        => _nvCuenta is { } id
+            ? _cuentas.FirstOrDefault(c => c.IdCuentaGasto == id)?.SaldoActual
+            : null;
+
+    private bool CuentaPrevistaInsuficiente()
+        => _nvCuenta is not null && _nvImporte > 0
+           && SaldoCuentaPrevista() is { } saldo && saldo < _nvImporte;
+
+    private async Task AbrirPago(GastoDto g)
+    {
+        if (_cuentas.Count == 0) await CargarCuentas();
+        var activas = _cuentas.Where(c => c.Activo).ToList();
+        if (activas.Count == 0) { _snackbar.Add("No hay cuentas activas para pagar.", Severity.Warning); return; }
+
+        var dialogo = await _dialogo.ShowAsync<DialogoPagoGasto>("Registrar pago",
+            new DialogParameters<DialogoPagoGasto>
+            {
+                { x => x.Folio, g.FolioGasto },
+                { x => x.SaldoPendiente, g.SaldoPendiente },
+                { x => x.Cuentas, activas }
+            },
+            new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+        var r = await dialogo.Result;
+        if (r is not { Canceled: false, Data: DialogoPagoGasto.Resultado d }) return;
+
+        var req = new RegistrarGastoPagoRequest(d.IdCuenta, d.Importe, d.FormaPago,
+            null, d.Referencia, d.Observaciones);
+        var (_, error) = await Api.RegistrarPagoGastoAsync(g.IdGasto, req);
+        if (error is not null) { _snackbar.Add(error, Severity.Error); return; }
+        _snackbar.Add("Pago aplicado correctamente.", Severity.Success);
+        await CargarGastos();
+        await CargarCuentas();
+    }
+
+    private static string Clasificacion(GastoDto g)
+    {
+        if (!string.IsNullOrWhiteSpace(g.NombreZona)
+            || !string.IsNullOrWhiteSpace(g.NombreCobrador)
+            || !string.IsNullOrWhiteSpace(g.NombreVendedor))
+        {
+            var partes = new List<string>();
+            if (!string.IsNullOrWhiteSpace(g.NombreZona)) partes.Add($"Zona: {g.NombreZona}");
+            if (!string.IsNullOrWhiteSpace(g.NombreCobrador)) partes.Add($"Cob: {g.NombreCobrador}");
+            if (!string.IsNullOrWhiteSpace(g.NombreVendedor)) partes.Add($"Vend: {g.NombreVendedor}");
+            return string.Join(" · ", partes);
+        }
+        return "Central";
+    }
+
+    private static Color ColorEstatus(string estatus) => estatus switch
+    {
+        "PENDIENTE" => Color.Warning,
+        "AUTORIZADO" => Color.Info,
+        "PARCIAL" => Color.Primary,
+        "PAGADO" => Color.Success,
+        "CANCELADO" => Color.Error,
+        _ => Color.Default
+    };
+
+    // ===================== CUENTAS =====================
+
+    private async Task CargarCuentas()
+    {
+        _cargandoCuentas = true;
+        var (datos, error) = await Api.ListarCuentasGastoAsync(incluirInactivas: true);
+        _cargandoCuentas = false;
+        if (error is not null) { _snackbar.Add(error, Severity.Error); return; }
+        _cuentas = datos ?? new();
+    }
+
+    private async Task NuevaCuenta()
+    {
+        var dialogo = await _dialogo.ShowAsync<DialogoCuentaGasto>("Nueva cuenta",
+            new DialogParameters<DialogoCuentaGasto> { { x => x.EsEdicion, false } },
+            new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+        var r = await dialogo.Result;
+        if (r is not { Canceled: false, Data: DialogoCuentaGasto.Resultado d }) return;
+
+        var req = new CrearCuentaGastoRequest(d.Nombre, d.TipoCuenta, d.Moneda, d.SaldoInicial, d.Observaciones);
+        var (_, error) = await Api.CrearCuentaGastoAsync(req);
+        if (error is not null) { _snackbar.Add(error, Severity.Error); return; }
+        _snackbar.Add("Cuenta creada.", Severity.Success);
+        await CargarCuentas();
+    }
+
+    private async Task EditarCuenta(CuentaGastoDto c)
+    {
+        var dialogo = await _dialogo.ShowAsync<DialogoCuentaGasto>("Editar cuenta",
+            new DialogParameters<DialogoCuentaGasto>
+            {
+                { x => x.EsEdicion, true },
+                { x => x.Nombre, c.Nombre },
+                { x => x.TipoCuenta, c.TipoCuenta },
+                { x => x.Moneda, c.Moneda },
+                { x => x.Observaciones, c.Observaciones },
+                { x => x.Activo, c.Activo }
+            },
+            new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+        var r = await dialogo.Result;
+        if (r is not { Canceled: false, Data: DialogoCuentaGasto.Resultado d }) return;
+
+        var req = new ActualizarCuentaGastoRequest(d.Nombre, d.TipoCuenta, d.Moneda, d.Observaciones, d.Activo);
+        var (_, error) = await Api.ActualizarCuentaGastoAsync(c.IdCuentaGasto, req);
+        if (error is not null) { _snackbar.Add(error, Severity.Error); return; }
+        _snackbar.Add("Cuenta actualizada.", Severity.Success);
+        await CargarCuentas();
+    }
+
+    private async Task CambiarEstatusCuenta(CuentaGastoDto c)
+    {
+        var (_, error) = await Api.CambiarEstatusCuentaGastoAsync(c.IdCuentaGasto, !c.Activo);
+        if (error is not null) { _snackbar.Add(error, Severity.Error); return; }
+        await CargarCuentas();
+    }
+
+    private async Task VerMovimientos(CuentaGastoDto c)
+    {
+        _cuentaMovimientos = c;
+        var (datos, error) = await Api.ListarMovimientosCuentaGastoAsync(c.IdCuentaGasto);
+        if (error is not null) { _snackbar.Add(error, Severity.Error); return; }
+        _movimientos = datos ?? new();
+    }
+
+    private async Task NuevoMovimiento(CuentaGastoDto c)
+    {
+        var importeTxt = await PedirTexto("Entrada de dinero",
+            $"Importe de la entrada/reposición a '{c.Nombre}':");
+        if (!decimal.TryParse(importeTxt, out var importe) || importe <= 0)
+        {
+            if (importeTxt is not null) _snackbar.Add("Importe inválido.", Severity.Warning);
+            return;
+        }
+
+        var req = new CrearMovimientoCuentaGastoRequest("ENTRADA", importe, "Reposición de fondos");
+        var (_, error) = await Api.RegistrarMovimientoCuentaGastoAsync(c.IdCuentaGasto, req);
+        if (error is not null) { _snackbar.Add(error, Severity.Error); return; }
+        _snackbar.Add("Movimiento registrado.", Severity.Success);
+        await CargarCuentas();
+        if (_cuentaMovimientos?.IdCuentaGasto == c.IdCuentaGasto) await VerMovimientos(c);
+    }
+
+    // ===================== CATEGORÍAS =====================
+
+    private async Task CargarCategorias()
+    {
+        _cargandoCategorias = true;
+        var (datos, error) = await Api.ListarCategoriasGastoAsync(_incluirCategoriasInactivas);
+        _cargandoCategorias = false;
+        if (error is not null) { _snackbar.Add(error, Severity.Error); return; }
+        _categorias = datos ?? new();
+    }
+
+    private async Task OnIncluirInactivasChanged(bool v)
+    {
+        _incluirCategoriasInactivas = v;
+        await CargarCategorias();
+    }
+
+    private async Task NuevaCategoria()
+    {
+        var dialogo = await _dialogo.ShowAsync<DialogoCategoriaGasto>("Nueva categoría",
+            new DialogParameters<DialogoCategoriaGasto> { { x => x.EsEdicion, false } },
+            new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+        var r = await dialogo.Result;
+        if (r is not { Canceled: false, Data: DialogoCategoriaGasto.Resultado d }) return;
+
+        var req = new CrearCatalogoCategoriaGastoRequest(d.Nombre, d.Descripcion, d.RequiereComprobante);
+        var (_, error) = await Api.CrearCategoriaGastoAsync(req);
+        if (error is not null) { _snackbar.Add(error, Severity.Error); return; }
+        _snackbar.Add("Categoría creada.", Severity.Success);
+        await CargarCategorias();
+        await CargarCatalogos();
+    }
+
+    private async Task EditarCategoria(CatalogoCategoriaGastoDto cat)
+    {
+        var dialogo = await _dialogo.ShowAsync<DialogoCategoriaGasto>("Editar categoría",
+            new DialogParameters<DialogoCategoriaGasto>
+            {
+                { x => x.EsEdicion, true },
+                { x => x.Nombre, cat.Nombre },
+                { x => x.Descripcion, cat.Descripcion },
+                { x => x.RequiereComprobante, cat.RequiereComprobante },
+                { x => x.Activo, cat.Activo }
+            },
+            new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+        var r = await dialogo.Result;
+        if (r is not { Canceled: false, Data: DialogoCategoriaGasto.Resultado d }) return;
+
+        var req = new ActualizarCatalogoCategoriaGastoRequest(d.Nombre, d.Descripcion, d.RequiereComprobante, d.Activo);
+        var (_, error) = await Api.ActualizarCategoriaGastoAsync(cat.IdCategoriaGasto, req);
+        if (error is not null) { _snackbar.Add(error, Severity.Error); return; }
+        _snackbar.Add("Categoría actualizada.", Severity.Success);
+        await CargarCategorias();
+        await CargarCatalogos();
+    }
+
+    private async Task CambiarEstatusCategoria(CatalogoCategoriaGastoDto cat)
+    {
+        var (_, error) = await Api.CambiarEstatusCategoriaGastoAsync(cat.IdCategoriaGasto, !cat.Activo);
+        if (error is not null) { _snackbar.Add(error, Severity.Error); return; }
+        await CargarCategorias();
+        await CargarCatalogos();
+    }
+
+    // ===================== REPORTES =====================
+
+    private async Task GenerarReporte()
+    {
+        _cargandoReporte = true;
+        _repDetalle = null;
+        _repAgrupado = null;
+
+        DateTimeOffset? desde = _repDesde is { } d ? FechaProyecto.DesdeFechaLocal(d) : null;
+        DateTimeOffset? hasta = _repHasta is { } h ? FechaProyecto.DesdeFechaLocal(h.Date.AddDays(1)).AddTicks(-1) : null;
+
+        string? error;
+        switch (_repAgrupacion)
+        {
+            case "categoria":
+                (_repAgrupado, error) = await Api.ReporteGastosPorCategoriaAsync(desde, hasta);
+                break;
+            case "zona":
+                (_repAgrupado, error) = await Api.ReporteGastosPorZonaAsync(desde, hasta);
+                break;
+            case "cobrador":
+                (_repAgrupado, error) = await Api.ReporteGastosPorCobradorAsync(desde, hasta);
+                break;
+            case "vendedor":
+                (_repAgrupado, error) = await Api.ReporteGastosPorVendedorAsync(desde, hasta);
+                break;
+            case "estatus":
+                (_repAgrupado, error) = await Api.ReporteGastosPorEstatusAsync(desde, hasta);
+                break;
+            default:
+                (_repDetalle, error) = await Api.ReporteGastosDetalleAsync(desde, hasta);
+                break;
+        }
+
+        _cargandoReporte = false;
+        if (error is not null) _snackbar.Add(error, Severity.Error);
+    }
+
+    // ===================== Helpers de diálogo =====================
+
+    private async Task<bool> ConfirmarDialogo(string titulo, string mensaje, string textoAceptar, Color color)
+    {
+        var opciones = new DialogOptions { MaxWidth = MaxWidth.ExtraSmall, FullWidth = true };
+        var parametros = new DialogParameters<DialogoConfirmacion>
+        {
+            { x => x.Titulo, titulo },
+            { x => x.Mensaje, mensaje },
+            { x => x.TextoAceptar, textoAceptar },
+            { x => x.ColorAceptar, color },
+            { x => x.Icono, Icons.Material.Filled.CheckCircle },
+            { x => x.ColorIcono, color }
+        };
+        var dialogo = await _dialogo.ShowAsync<DialogoConfirmacion>(titulo, parametros, opciones);
+        var resultado = await dialogo.Result;
+        return resultado is { Canceled: false, Data: true };
+    }
+
+    // Prompt de texto simple usando MudBlazor (MessageBox con input no existe,
+    // por lo que usamos un diálogo genérico de confirmación con campo editable).
+    private async Task<string?> PedirTexto(string titulo, string etiqueta, string? valorInicial = null)
+    {
+        var resultado = await _dialogo.ShowAsync<DialogoPromptTexto>(titulo,
+            new DialogParameters<DialogoPromptTexto>
+            {
+                { x => x.Titulo, titulo },
+                { x => x.Etiqueta, etiqueta },
+                { x => x.Valor, valorInicial ?? "" }
+            },
+            new DialogOptions { MaxWidth = MaxWidth.ExtraSmall, FullWidth = true });
+
+        var r = await resultado.Result;
+        return r is { Canceled: false, Data: string s } ? s : null;
+    }
+}

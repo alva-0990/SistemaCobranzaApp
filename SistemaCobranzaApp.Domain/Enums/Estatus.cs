@@ -5,6 +5,6 @@ namespace SistemaCobranzaApp.Domain.Enums;
 /// </summary>
 public enum Estatus
 {
-    Activo,
-    Inactivo
+    Activo = 1,
+    Inactivo= 0
 }

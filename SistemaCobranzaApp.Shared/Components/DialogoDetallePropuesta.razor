@@ -1,0 +1,83 @@
+@using MudBlazor
+@using SistemaCobranzaApp.Shared.Dtos
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6" Style="font-weight: 600;">
+            <MudIcon Icon="@Icons.Material.Filled.LocalShipping" Class="mr-2" Style="vertical-align: middle;" Color="Color.Primary" />
+            Propuesta #@Propuesta.IdPropuesta
+        </MudText>
+    </TitleContent>
+
+    <DialogContent>
+        <MudGrid Spacing="2" Class="mb-2">
+            <MudItem xs="12" sm="6">
+                <MudText Typo="Typo.caption" Color="Color.Secondary">Zona destino</MudText>
+                <MudText Typo="Typo.body1"><b>@(string.IsNullOrWhiteSpace(Propuesta.ZonaDestino) ? $"Zona #{Propuesta.IdZonaDestino}" : Propuesta.ZonaDestino)</b></MudText>
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudText Typo="Typo.caption" Color="Color.Secondary">Estatus</MudText>
+                <MudChip T="string" Size="Size.Small" Variant="Variant.Filled" Color="@ColorEstatus(Propuesta.Estatus)">
+                    @Propuesta.Estatus
+                </MudChip>
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudText Typo="Typo.caption" Color="Color.Secondary">Fecha de creación</MudText>
+                <MudText Typo="Typo.body2">@Propuesta.FechaCreacion.EnZonaProyecto().DateTime.ToString("dd/MM/yyyy HH:mm")</MudText>
+            </MudItem>
+            @if (Propuesta.FechaResolucion is not null)
+            {
+                <MudItem xs="12" sm="6">
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">Fecha de resolución</MudText>
+                    <MudText Typo="Typo.body2">@Propuesta.FechaResolucion.Value.EnZonaProyecto().DateTime.ToString("dd/MM/yyyy HH:mm")</MudText>
+                </MudItem>
+            }
+            @if (!string.IsNullOrWhiteSpace(Propuesta.Observaciones))
+            {
+                <MudItem xs="12">
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">Observaciones</MudText>
+                    <MudText Typo="Typo.body2">@Propuesta.Observaciones</MudText>
+                </MudItem>
+            }
+        </MudGrid>
+
+        <MudDivider Class="my-2" />
+
+        <MudText Typo="Typo.subtitle2" Class="mb-2"><b>Artículos (@Propuesta.Detalles.Count)</b></MudText>
+        <MudTable Items="Propuesta.Detalles" Dense="true" Hover="true" Elevation="0"
+                  Breakpoint="Breakpoint.None" T="PropuestaDetalleDto">
+            <HeaderContent>
+                <MudTh>Producto</MudTh>
+                <MudTh Style="width:30%; text-align:right;">Cantidad</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="Producto">@(context.Producto ?? $"Producto #{context.IdProducto}")</MudTd>
+                <MudTd DataLabel="Cantidad" Style="text-align:right;"><b>@context.Cantidad</b></MudTd>
+            </RowTemplate>
+            <NoRecordsContent>
+                <MudText Color="Color.Secondary" Class="pa-4 text-center">Sin artículos.</MudText>
+            </NoRecordsContent>
+        </MudTable>
+    </DialogContent>
+
+    <DialogActions>
+        <MudButton OnClick="Cerrar" Variant="Variant.Filled" Color="Color.Primary">Cerrar</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter] public PropuestaDto Propuesta { get; set; } = null!;
+
+    private void Cerrar() => MudDialog.Close();
+
+    private static Color ColorEstatus(string? estatus) => estatus?.ToUpperInvariant() switch
+    {
+        "CONFIRMADA" => Color.Success,
+        "RECHAZADA" => Color.Error,
+        "PENDIENTE" => Color.Warning,
+        _ => Color.Default
+    };
+}

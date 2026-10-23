@@ -1,0 +1,218 @@
+@page "/cartera-clientes"
+
+@using MudBlazor
+@using SistemaCobranzaApp.Shared.Components
+@using SistemaCobranzaApp.Shared.Dtos
+@using SistemaCobranzaApp.Shared.Services
+@inject ApiCliente Api
+@inject IDialogService _dialogo
+@inject ISnackbar _snackbar
+
+<MudTabs Elevation="2" Rounded="true" Color="Color.Primary" ApplyEffectsToContainer="true"
+         PanelClass="pa-0 pt-4" SliderColor="Color.Warning" Class="ma-2 tabs-remarcados">
+
+    <!-- ===================== CLASIFICACIÓN ===================== -->
+    <MudTabPanel Text="Clasificación" Icon="@Icons.Material.Filled.GroupWork">
+        <MudPaper Elevation="0" Class="pa-4">
+            <div class="barra-acciones">
+                <MudTextField T="string"
+                              Value="_busquedaClasificacion"
+                              ValueChanged="@(v => { _busquedaClasificacion = v; })"
+                              Immediate="true"
+                              Placeholder="Buscar clasificación por descripción o ID..."
+                              Variant="Variant.Outlined"
+                              Adornment="Adornment.Start"
+                              AdornmentIcon="@Icons.Material.Filled.Search"
+                              AdornmentColor="Color.Primary"
+                              Clearable="true"
+                              Class="buscador-remarcado" />
+                <MudButton Variant="Variant.Filled"
+                           Color="Color.Primary"
+                           StartIcon="@Icons.Material.Filled.Add"
+                           OnClick="AbrirModalNuevaClasificacion"
+                           Class="boton-nuevo">
+                    Nueva clasificación
+                </MudButton>
+            </div>
+
+            @if (_cargandoClasificaciones)
+            {
+                <div class="d-flex justify-center pa-8">
+                    <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+                </div>
+            }
+            else
+            {
+                <MudTable Items="ClasificacionesFiltradas" Hover="true" Dense="true"
+                          Breakpoint="Breakpoint.Sm" Elevation="0" RowsPerPage="10">
+                    <HeaderContent>
+                        <MudTh Style="width:10%;">ID</MudTh>
+                        <MudTh>Descripción</MudTh>
+                        <MudTh Style="width:15%;">Estatus</MudTh>
+                        <MudTh Style="width:15%; text-align:right;">Acciones</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd DataLabel="ID">@context.IdClasificaionCliente</MudTd>
+                        <MudTd DataLabel="Descripción"><b>@context.Descripcion</b></MudTd>
+                        <MudTd DataLabel="Estatus">@ChipEstatus(context.Activo)</MudTd>
+                        <MudTd DataLabel="Acciones" Style="text-align:right;">
+                            @AccionesFila(() => AbrirModalEditarClasificacion(context),
+                                () => AlternarEstatusClasificacion(context), context.Activo)
+                        </MudTd>
+                    </RowTemplate>
+                    <NoRecordsContent>@EstadoVacio("No hay clasificaciones que coincidan.")</NoRecordsContent>
+                    <PagerContent>
+                        <MudTablePager InfoFormat="{first_item}-{last_item} de {all_items}" RowsPerPageString="Filas:" />
+                    </PagerContent>
+                </MudTable>
+            }
+        </MudPaper>
+    </MudTabPanel>
+</MudTabs>
+
+@{
+    RenderFragment ChipEstatus(bool activo) => __builder =>
+    {
+        <MudChip T="string" Size="Size.Small" Variant="Variant.Filled"
+                 Color="@(activo ? Color.Success : Color.Default)">
+            @(activo ? "Activo" : "Inactivo")
+        </MudChip>
+    };
+
+    RenderFragment AccionesFila(Func<Task> onEditar, Func<Task> onAlternar, bool activo) => __builder =>
+    {
+        <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" Color="Color.Info"
+                       Title="Editar" OnClick="@(async () => await onEditar())" />
+        @if (activo)
+        {
+            <MudIconButton Icon="@Icons.Material.Filled.Block" Size="Size.Small" Color="Color.Error"
+                           Title="Desactivar" OnClick="@(async () => await onAlternar())" />
+        }
+        else
+        {
+            <MudIconButton Icon="@Icons.Material.Filled.CheckCircle" Size="Size.Small" Color="Color.Success"
+                           Title="Reactivar" OnClick="@(async () => await onAlternar())" />
+        }
+    };
+
+    RenderFragment EstadoVacio(string mensaje) => __builder =>
+    {
+        <div class="pa-8 text-center">
+            <MudIcon Icon="@Icons.Material.Filled.SearchOff" Size="Size.Large" Color="Color.Secondary" />
+            <MudText Color="Color.Secondary" Class="mt-2">@mensaje</MudText>
+        </div>
+    };
+}
+
+<style>
+    .barra-acciones {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 16px;
+    }
+
+    .barra-acciones .buscador-remarcado { flex: 1 1 auto; min-width: 0; }
+    .boton-nuevo { white-space: nowrap; flex: 0 0 auto; }
+    .buscador-remarcado .mud-input-outlined-border { border-width: 2px; }
+
+    .tabs-remarcados .mud-tab { opacity: 0.65; font-weight: 500; transition: opacity 0.15s ease, background-color 0.15s ease; }
+    .tabs-remarcados .mud-tab.mud-tab-active { opacity: 1; font-weight: 800; background-color: rgba(255,255,255,0.18); border-radius: 8px 8px 0 0; }
+    .tabs-remarcados .mud-tab-slider { height: 4px; }
+</style>
+
+@code {
+    private List<ClasificaionClienteDto> _clasificaciones = new();
+    private bool _cargandoClasificaciones;
+    private string _busquedaClasificacion = "";
+
+    private IEnumerable<ClasificaionClienteDto> ClasificacionesFiltradas
+    {
+        get
+        {
+            var q = _busquedaClasificacion?.Trim() ?? "";
+            if (string.IsNullOrEmpty(q)) return _clasificaciones;
+            return _clasificaciones.Where(x =>
+                x.IdClasificaionCliente.ToString().Contains(q, StringComparison.OrdinalIgnoreCase)
+                || (x.Descripcion ?? "").Contains(q, StringComparison.OrdinalIgnoreCase));
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CargarClasificaciones();
+    }
+
+    private async Task CargarClasificaciones()
+    {
+        _cargandoClasificaciones = true;
+        var (datos, error) = await Api.ListarClasificacionesClienteAdminAsync();
+        if (error is not null) _snackbar.Add(error, Severity.Error);
+        _clasificaciones = datos ?? new();
+        _cargandoClasificaciones = false;
+    }
+
+    // ===================== Clasificación =====================
+
+    private async Task AbrirModalNuevaClasificacion()
+    {
+        var modelo = new DialogoGenerico.FormModel { Activo = true };
+        var m = await MostrarDialogoGenerico("Registrar nueva clasificación", Icons.Material.Filled.GroupWork, "Descripción de la clasificación", modelo);
+        if (m is null) return;
+
+        var (_, error) = await Api.CrearClasificacionClienteAsync(m.Nombre.Trim());
+        Notificar(error, $"Clasificación '{m.Nombre}' registrada.");
+        if (error is null) await CargarClasificaciones();
+    }
+
+    private async Task AbrirModalEditarClasificacion(ClasificaionClienteDto c)
+    {
+        var modelo = new DialogoGenerico.FormModel { Nombre = c.Descripcion, Activo = c.Activo };
+        var m = await MostrarDialogoGenerico("Modificar clasificación", Icons.Material.Filled.GroupWork, "Descripción de la clasificación", modelo);
+        if (m is null) return;
+
+        var (_, error) = await Api.ActualizarClasificacionClienteAsync(c.IdClasificaionCliente, m.Nombre.Trim(), m.Activo);
+        Notificar(error, $"Clasificación '{m.Nombre}' actualizada.");
+        if (error is null) await CargarClasificaciones();
+    }
+
+    private async Task AlternarEstatusClasificacion(ClasificaionClienteDto c)
+    {
+        if (c.Activo)
+        {
+            var (_, error) = await Api.DarDeBajaClasificacionClienteAsync(c.IdClasificaionCliente);
+            Notificar(error, $"Clasificación '{c.Descripcion}' desactivada.");
+            if (error is null) await CargarClasificaciones();
+        }
+        else
+        {
+            var (_, error) = await Api.ActualizarClasificacionClienteAsync(c.IdClasificaionCliente, c.Descripcion, true);
+            Notificar(error, $"Clasificación '{c.Descripcion}' reactivada.");
+            if (error is null) await CargarClasificaciones();
+        }
+    }
+
+    // ===================== Helpers de diálogo =====================
+
+    private async Task<DialogoGenerico.FormModel?> MostrarDialogoGenerico(
+        string titulo, string icono, string labelNombre, DialogoGenerico.FormModel modelo)
+    {
+        var opciones = new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true, CloseButton = true };
+        var parametros = new DialogParameters<DialogoGenerico>
+        {
+            { x => x.Titulo, titulo },
+            { x => x.Icono, icono },
+            { x => x.LabelNombre, labelNombre },
+            { x => x.Modelo, modelo }
+        };
+        var dialogo = await _dialogo.ShowAsync<DialogoGenerico>(titulo, parametros, opciones);
+        var resultado = await dialogo.Result;
+        return resultado is { Canceled: false, Data: DialogoGenerico.FormModel datos } ? datos : null;
+    }
+
+    private void Notificar(string? error, string exito)
+    {
+        if (error is null) _snackbar.Add(exito, Severity.Success);
+        else _snackbar.Add(error, Severity.Error);
+    }
+}

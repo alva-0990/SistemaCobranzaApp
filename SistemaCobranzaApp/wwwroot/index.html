@@ -5,21 +5,69 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <title>SistemaCobranzaApp</title>
     <base href="/" />
+
+    <!-- 1. Estilos base compartidos -->
     <link rel="stylesheet" href="_content/SistemaCobranzaApp.Shared/lib/bootstrap/dist/css/bootstrap.min.css" />
     <link rel="stylesheet" href="_content/SistemaCobranzaApp.Shared/app.css" />
     <link rel="stylesheet" href="app.css" />
     <link rel="stylesheet" href="SistemaCobranzaApp.styles.css" />
+
+    <!-- 2. Hojas de estilo de MudBlazor.
+            No dependemos de Google Fonts remoto: en el WebView de Android (arranque en frío
+            o sin red) el recurso remoto no carga y los estilos se ven inconsistentes.
+            MudBlazor cae a la fuente del sistema, que es suficiente y siempre disponible. -->
+    <link href="_content/MudBlazor/MudBlazor.min.css" rel="stylesheet" />
+
     <link rel="icon" href="data:,">
 </head>
 
 <body>
 
-    <div class="status-bar-safe-area"></div>
+<div class="status-bar-safe-area"></div>
 
-    <div id="app">Loading...</div>
+<div id="app">Loading...</div>
 
-    <script src="_framework/blazor.webview.js" autostart="false"></script>
+<!-- 3. Arranque controlado de Blazor para el WebView de Android.
+        Con el arranque automático, en el WebView de Android el script corre antes de que
+        el puente nativo (window.external.receiveMessage) esté listo y la app se queda en
+        "Loading...". Con autostart="false" esperamos a que el puente exista y arrancamos
+        Blazor una sola vez. -->
+<script src="_framework/blazor.webview.js" autostart="false"></script>
+
+<!-- 4. Script de MudBlazor para la interactividad en el WebView. -->
+<script src="_content/MudBlazor/MudBlazor.min.js"></script>
+
+<script>
+    (function () {
+        if (window.__blazorArrancado) return;
+        var intentos = 0;
+
+        function iniciarBlazor() {
+            if (window.__blazorArrancado) return;
+
+            var puenteListo = window.external && typeof window.external.receiveMessage === 'function';
+            var blazorListo = window.Blazor && typeof window.Blazor.start === 'function';
+
+            // Solo arrancamos cuando AMBOS están listos: el puente nativo de MAUI
+            // y el runtime de Blazor. Si falta cualquiera, reintentamos.
+            if (!puenteListo || !blazorListo) {
+                if (intentos++ < 200) { // ~10s de margen (200 x 50ms)
+                    setTimeout(iniciarBlazor, 50);
+                }
+                return;
+            }
+
+            window.__blazorArrancado = true;
+            window.Blazor.start().catch(function () { /* ya iniciado: ignorar */ });
+        }
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', iniciarBlazor);
+        } else {
+            iniciarBlazor();
+        }
+    })();
+</script>
 
 </body>
-
 </html>

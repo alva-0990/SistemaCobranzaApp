@@ -8,9 +8,12 @@ namespace SistemaCobranzaApp.Domain.Cobranza;
 /// </summary>
 public static class BusquedaHelper
 {
-    // Un texto de venta válido es: solo dígitos (IdVenta) o V####### (CodigoVenta).
+    // Un texto de venta válido es: solo dígitos (IdVenta) o un código de venta que empieza con 'V'.
     private static readonly Regex SoloDigitos = new(@"^\d+$", RegexOptions.Compiled);
-    private static readonly Regex CodigoVenta = new(@"^V\d{7}$", RegexOptions.Compiled);
+    // Código de venta actual: V{idVendedor}-{yyMMdd}-{HHmmss}-{sufijo}, p.ej. "V1-261015-080004-M6K".
+    // Aceptamos de forma tolerante cualquier código que empiece con 'V' seguido de un dígito,
+    // para no romper la búsqueda si el formato del sufijo/segmentos cambia.
+    private static readonly Regex CodigoVenta = new(@"^V\d", RegexOptions.Compiled);
 
     public enum TipoBusquedaVenta
     {

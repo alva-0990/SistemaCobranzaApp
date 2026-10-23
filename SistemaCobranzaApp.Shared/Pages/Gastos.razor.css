@@ -1,0 +1,36 @@
+/* Barra de filtros de gastos y barras de acción (cuentas/categorías).
+   Escritorio: controles en una sola línea, con ajuste de salto si no caben.
+   Móvil (<= 600px): cada control ocupa el ancho completo, apilados. */
+
+.filtros-gastos,
+.barra-gastos {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+}
+
+.filtros-gastos .f-item {
+    flex: 1 1 180px;
+    min-width: 160px;
+    max-width: 240px;
+}
+
+.barra-gastos .b-item {
+    flex: 0 0 auto;
+}
+
+@media (max-width: 600px) {
+    .filtros-gastos,
+    .barra-gastos {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .filtros-gastos .f-item,
+    .barra-gastos .b-item {
+        flex: 1 1 auto;
+        max-width: none;
+        width: 100%;
+    }
+}

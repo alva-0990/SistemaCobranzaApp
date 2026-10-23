@@ -1,31 +1,5 @@
 namespace SistemaCobranzaApp.Shared.Dtos;
 
-// ---- Productos ----
-public record CrearProductoRequest(
-    string CodigoClave,
-    string Descripcion,
-    decimal Costo,
-    decimal PrecioSugerido,
-    decimal PrecioMinimo,
-    int StockMini);
-
-public record ActualizarProductoRequest(
-    string CodigoClave,
-    string Descripcion,
-    decimal Costo,
-    decimal PrecioSugerido,
-    decimal PrecioMinimo,
-    int StockMini);
-
-public record ProductoDto(
-    long IdProducto,
-    string CodigoClave,
-    string Descripcion,
-    decimal Costo,
-    decimal PrecioSugerido,
-    decimal PrecioMinimo,
-    int StockMini,
-    bool Activo);
 
 public record ProductosPaginaResponse(
     IReadOnlyList<ProductoDto> Items,
@@ -40,7 +14,11 @@ public record ExistenciaCentralDto(
     string Descripcion,
     int Cantidad,
     int StockMini,
-    DateTimeOffset? FechaActualizacion);
+    DateTimeOffset? FechaActualizacion,
+    string? Marca = null,
+    string? Categoria = null,
+    string? Color = null,
+    string? Talla = null);
 
 public record ExistenciaZonaDto(
     long IdZona,
@@ -48,7 +26,11 @@ public record ExistenciaZonaDto(
     string CodigoClave,
     string Descripcion,
     int Cantidad,
-    DateTimeOffset? FechaActualizacion);
+    DateTimeOffset? FechaActualizacion,
+    string? Marca = null,
+    string? Categoria = null,
+    string? Color = null,
+    string? Talla = null);
 
 // ---- Movimientos de inventario (entrada/ajuste) ----
 
@@ -83,3 +65,27 @@ public record MovimientoInventarioDto(
     long? IdZonaOrigen,
     long? IdZonaDestino,
     DateTimeOffset FechaMovimiento);
+
+// ---- Historial global de inventario (vista con filtros) ----
+
+/// <summary>
+/// Renglón del historial global de movimientos de inventario, enriquecido con
+/// clave y descripción del producto, nombre de la zona afectada y usuario que
+/// registró el movimiento. Pensado para la vista "Historial de inventario".
+/// </summary>
+public record MovimientoHistorialDto(
+    long IdMovimientoInv,
+    DateTimeOffset FechaMovimiento,
+    string TipoMovimiento,
+    long IdProducto,
+    string CodigoClave,
+    string Descripcion,
+    int Cantidad,
+    int ExistenciaAnterior,
+    int ExistenciaNueva,
+    long? IdZona,
+    string? Zona,
+    string? Usuario,
+    string? Observaciones,
+    string? Marca = null,
+    string? Categoria = null);

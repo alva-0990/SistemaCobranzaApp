@@ -7,7 +7,7 @@ namespace SistemaCobranzaApp.Infrastructure.Cobranza;
 
 /// <summary>
 /// Consulta de cartera del cobrador: ventas con saldo pendiente,
-/// filtrables por cobrador (vía pagos históricos), zona o ruta.
+/// filtrables por cobrador (vía pagos históricos), zona o ruta bajo el esquema de cuotas fijas.
 /// </summary>
 public class ServicioCartera
 {
@@ -49,9 +49,9 @@ public class ServicioCartera
 
         var cuentas = filas.Select(x =>
         {
-            // Saldo pendiente = TotalFinal - (Enganche + TotalAbonos), piso 0.
+            // 🎯 CORREGIDO: Se sustituyó 'TotalAbonos' por 'TotalAbonado' alineado a tu tabla real de PostgreSQL
             var saldo = Domain.Cobranza.CalculoCobranza.CalcularSaldoAnterior(
-                x.v.TotalFinal, x.v.Enganche, x.v.TotalAbonos);
+                x.v.TotalFinal, x.v.Enganche, x.v.TotalAbonado);
 
             var nombre = string.Join(" ", new[] { x.c.Nombre, x.c.ApPaterno, x.c.ApMaterno }
                 .Where(s => !string.IsNullOrWhiteSpace(s))).Trim();
@@ -65,7 +65,7 @@ public class ServicioCartera
                 x.v.CodigoVenta,
                 x.v.TotalFinal,
                 saldo,
-                x.v.PagoRequerido,
+                x.v.MontoCuotaFija, // 🎯 CORREGIDO: Cambiado de PagoRequerido a tu columna unificada MontoCuotaFija
                 x.v.IdEstatusVenta,
                 x.ev?.Descripcion,
                 x.v.FechaUltimoPago);

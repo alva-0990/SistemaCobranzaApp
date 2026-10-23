@@ -1,0 +1,134 @@
+@using MudBlazor
+@using SistemaCobranzaApp.Shared.Dtos
+
+<MudDialog Class="@ClaseDialogo">
+    <TitleContent>
+        <MudText Typo="Typo.h6" Style="font-weight: 600;">
+            <MudIcon Icon="@Icono" Class="mr-2" Style="vertical-align: middle;" />
+            @Titulo
+        </MudText>
+    </TitleContent>
+
+    <DialogContent>
+        <MudForm Disabled="_guardando" @ref="_form" @bind-IsValid="@_formValido">
+            <MudGrid>
+                <MudItem xs="12">
+                    <MudTextField T="string"
+                                  Label="Nombre de usuario"
+                                  @bind-Value="Modelo.Usuario"
+                                  Required="true"
+                                  RequiredError="El usuario es obligatorio."
+                                  Variant="Variant.Outlined"
+                                  Margin="Margin.Dense" />
+                </MudItem>
+
+                <MudItem xs="12">
+                    <MudTextField T="string"
+                                  Label="Nombre completo"
+                                  @bind-Value="Modelo.NombreCompleto"
+                                  Required="true"
+                                  RequiredError="El nombre completo es obligatorio."
+                                  Variant="Variant.Outlined"
+                                  Margin="Margin.Dense" />
+                </MudItem>
+
+                @if (!EsPerfil)
+                {
+                    <MudItem xs="12">
+                        <MudSelect T="long?"
+                                   Label="Rol"
+                                   @bind-Value="Modelo.IdRol"
+                                   Variant="Variant.Outlined"
+                                   Margin="Margin.Dense"
+                                   Clearable="true"
+                                  >
+                            @foreach (var r in Roles)
+                            {
+                                <MudSelectItem T="long?" Value="@r.IdRol">@r.Descripcion</MudSelectItem>
+                            }
+                        </MudSelect>
+                    </MudItem>
+
+                    <MudItem xs="12">
+                        <MudTextField T="string"
+                                      Label="@(EsNuevo ? "Contraseña" : "Nueva contraseña (opcional)")"
+                                      @bind-Value="Modelo.Password"
+                                      InputType="InputType.Password"
+                                      Required="@EsNuevo"
+                                      RequiredError="La contraseña es obligatoria."
+                                      HelperText="@(EsNuevo ? null : "Déjala vacía para conservar la actual.")"
+                                      Variant="Variant.Outlined"
+                                      Margin="Margin.Dense" />
+                    </MudItem>
+
+                    <MudItem xs="12" Class="d-flex align-center">
+                        <MudSwitch T="bool"
+                                   @bind-Value="Modelo.Activo"
+                                   Color="Color.Primary"
+                                   Label="@(Modelo.Activo ? "Estatus: Activo" : "Estatus: Inactivo")" />
+                    </MudItem>
+                }
+            </MudGrid>
+        </MudForm>
+        @if (_error is not null)
+        {
+            <MudAlert Severity="Severity.Error" Class="mt-4">@_error</MudAlert>
+        }
+    </DialogContent>
+
+    <DialogActions>
+        <MudButton OnClick="Cancelar" Disabled="_guardando" Variant="Variant.Text" Color="Color.Default">Cancelar</MudButton>
+        <MudButton OnClick="Guardar" Variant="Variant.Filled" Color="Color.Primary" Disabled="@(!_formValido || _guardando)">
+            Guardar
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter] public string Titulo { get; set; } = "Gestionar usuario";
+    [Parameter] public string Icono { get; set; } = Icons.Material.Filled.PersonAdd;
+    [Parameter] public bool EsPerfil { get; set; }
+    [Parameter] public bool EsNuevo { get; set; }
+    [Parameter] public FormModel Modelo { get; set; } = new();
+    [Parameter] public IReadOnlyList<RolDto> Roles { get; set; } = new List<RolDto>();
+
+    /// <summary>Clase CSS extra aplicada al contenedor del diálogo (p. ej. safe-area en móvil a pantalla completa).</summary>
+    [Parameter] public string? ClaseDialogo { get; set; }
+
+    [Parameter] public Func<FormModel, Task<string?>>? GuardarModelo { get; set; }
+    private string? _error;
+    private bool _guardando;
+    private MudForm _form = null!;
+    private bool _formValido;
+
+    private void Cancelar() => MudDialog.Cancel();
+
+    private async Task Guardar()
+    {
+        if (_guardando) return;
+        await _form.ValidateAsync();
+        if (!_formValido) return;
+        _guardando = true;
+        try
+        {
+            _error = GuardarModelo is null ? null : await GuardarModelo(Modelo);
+            if (_error is null) MudDialog.Close(DialogResult.Ok(Modelo));
+        }
+        catch
+        {
+            _error = "No se pudo guardar el usuario. Intenta de nuevo.";
+        }
+        finally { _guardando = false; }
+    }
+
+    public class FormModel
+    {
+        public string Usuario { get; set; } = string.Empty;
+        public string NombreCompleto { get; set; } = string.Empty;
+        public long? IdRol { get; set; }
+        public string? Password { get; set; }
+        public bool Activo { get; set; } = true;
+    }
+}

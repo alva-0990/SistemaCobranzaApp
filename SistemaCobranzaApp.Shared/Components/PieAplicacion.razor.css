@@ -1,0 +1,12 @@
+.pie-aplicacion {
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 4px 16px;
+    padding: 16px;
+    color: var(--mud-palette-text-secondary);
+    border-top: 1px solid var(--mud-palette-divider);
+    font-size: .8rem;
+    text-align: center;
+}
+.pie-discreto { border: 0; font-size: .75rem; }

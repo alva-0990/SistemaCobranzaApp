@@ -38,10 +38,15 @@ public class ServicioClientesAdmin
         pagina = pagina < 1 ? 1 : pagina;
         tamanoPagina = tamanoPagina is < 1 or > 200 ? 50 : tamanoPagina;
 
+        // 1. Ampliamos la consulta con JOINS para traer los nombres legibles
         var q = from c in _db.Clientes.AsNoTracking()
                 join r in _db.Rutas.AsNoTracking() on c.IdRuta equals r.IdRuta into rj
                 from r in rj.DefaultIfEmpty()
-                select new { c, r };
+                join v in _db.Vendedores.AsNoTracking() on c.IdVendedor equals v.IdVendedor into vj
+                from v in vj.DefaultIfEmpty()
+                join cl in _db.Clasificaciones.AsNoTracking() on c.IdClasificacion equals cl.IdClasificacion into clj
+                from cl in clj.DefaultIfEmpty()
+                select new { c, r, v, cl };
 
         if (!incluirInactivos)
             q = q.Where(x => x.c.Estatus == Estatus.Activo);
@@ -51,11 +56,19 @@ public class ServicioClientesAdmin
 
         if (!string.IsNullOrWhiteSpace(texto))
         {
-            var like = BusquedaHelper.ParaLike(texto);
-            q = q.Where(x =>
-                EF.Functions.ILike(x.c.Nombre, like)
-                || EF.Functions.ILike(x.c.ApPaterno ?? "", like)
-                || EF.Functions.ILike(x.c.ApMaterno ?? "", like));
+            // Búsqueda por palabras: cada término debe aparecer en ALGÚN campo
+            // (nombre/ap. paterno/ap. materno/teléfono). Así "alva pe sanc" encuentra
+            // a "alvaro perez sanchez" (AND entre palabras, OR entre campos).
+            var palabras = texto.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            foreach (var palabra in palabras)
+            {
+                var like = BusquedaHelper.ParaLike(palabra);
+                q = q.Where(x =>
+                    EF.Functions.ILike(x.c.Nombre, like)
+                    || EF.Functions.ILike(x.c.ApPaterno ?? "", like)
+                    || EF.Functions.ILike(x.c.ApMaterno ?? "", like)
+                    || EF.Functions.ILike(x.c.TelefonoPrincipal, like));
+            }
         }
 
         var total = await q.CountAsync(ct);
@@ -66,7 +79,7 @@ public class ServicioClientesAdmin
             .Take(tamanoPagina)
             .ToListAsync(ct);
 
-        var items = filas.Select(x => Mapear(x.c, x.r)).ToList();
+        var items = filas.Select(x => Mapear(x.c, x.r, x.v, x.cl)).ToList();
         return new ClientesPaginaResponse(items, total, pagina, tamanoPagina);
     }
 
@@ -76,9 +89,13 @@ public class ServicioClientesAdmin
                           where c.IdCliente == id
                           join r in _db.Rutas.AsNoTracking() on c.IdRuta equals r.IdRuta into rj
                           from r in rj.DefaultIfEmpty()
-                          select new { c, r }).FirstOrDefaultAsync(ct);
+                          join v in _db.Vendedores.AsNoTracking() on c.IdVendedor equals v.IdVendedor into vj
+                          from v in vj.DefaultIfEmpty()
+                          join cl in _db.Clasificaciones.AsNoTracking() on c.IdClasificacion equals cl.IdClasificacion into clj
+                          from cl in clj.DefaultIfEmpty()
+                          select new { c, r, v, cl }).FirstOrDefaultAsync(ct);
 
-        return fila is null ? null : Mapear(fila.c, fila.r);
+        return fila is null ? null : Mapear(fila.c, fila.r, fila.v, fila.cl);
     }
 
     public async Task<ResultadoCliente> CrearAsync(CrearClienteRequest req, CancellationToken ct = default)
@@ -97,6 +114,14 @@ public class ServicioClientesAdmin
             Nombre = req.Nombre.Trim(),
             ApPaterno = Limpiar(req.ApPaterno),
             ApMaterno = Limpiar(req.ApMaterno),
+            TelefonoPrincipal = req.TelefonoPrincipal.Trim(),      // Guardamos contacto
+            TelefonoSecundario = Limpiar(req.TelefonoSecundario),
+            Email = Limpiar(req.Email),
+            Direccion = req.Direccion.Trim(),                      // Guardamos localización
+            CodigoPostal = Limpiar(req.CodigoPostal),
+            ReferenciaUbicacion = Limpiar(req.ReferenciaUbicacion),
+            Latitud = req.Latitud,                                 // Guardamos GPS automático de MAUI
+            Longitud = req.Longitud,
             IdRuta = req.IdRuta,
             IdVendedor = req.IdVendedor,
             IdClasificacion = req.IdClasificacion,
@@ -131,12 +156,50 @@ public class ServicioClientesAdmin
         cliente.Nombre = req.Nombre.Trim();
         cliente.ApPaterno = Limpiar(req.ApPaterno);
         cliente.ApMaterno = Limpiar(req.ApMaterno);
+        cliente.TelefonoPrincipal = req.TelefonoPrincipal.Trim(); // Actualizamos contacto
+        cliente.TelefonoSecundario = Limpiar(req.TelefonoSecundario);
+        cliente.Email = Limpiar(req.Email);
+        cliente.Direccion = req.Direccion.Trim();                 // Actualizamos localización
+        cliente.CodigoPostal = Limpiar(req.CodigoPostal);
+        cliente.ReferenciaUbicacion = Limpiar(req.ReferenciaUbicacion);
+        cliente.Latitud = req.Latitud;                            // Por si se recalibra el GPS en campo
+        cliente.Longitud = req.Longitud;
         cliente.IdRuta = req.IdRuta;
         cliente.IdVendedor = req.IdVendedor;
         cliente.IdClasificacion = req.IdClasificacion;
+        cliente.Estatus = (Estatus)req.Estatus;                   // Mapeo del estatus cambiado
         cliente.Observaciones = Limpiar(req.Observaciones);
         cliente.FechaModificacion = DateTimeOffset.UtcNow;
 
+        await _db.SaveChangesAsync(ct);
+
+        var dto = await ObtenerPorIdAsync(id, ct);
+        return ResultadoCliente.Ok(dto!);
+    }
+
+    /// <summary>
+    /// Actualiza la clasificación del cliente (NUEVO/BUENO/REGULAR/MALO/MOROSO) y, opcionalmente,
+    /// sus observaciones. Operación ligera usada desde el reporte de seguimiento: no toca el resto
+    /// de los datos. Si <paramref name="observaciones"/> es null no modifica las observaciones;
+    /// si viene vacío/espacios las limpia.
+    /// </summary>
+    public async Task<ResultadoCliente> ActualizarClasificacionAsync(long id, long idClasificacion, string? observaciones = null, CancellationToken ct = default)
+    {
+        if (idClasificacion <= 0)
+            return ResultadoCliente.Fallo("La clasificación indicada no es válida.");
+
+        var cliente = await _db.Clientes.FirstOrDefaultAsync(c => c.IdCliente == id, ct);
+        if (cliente is null)
+            return ResultadoCliente.Fallo($"No se encontró el cliente #{id}.");
+
+        if (!await _db.Clasificaciones.AsNoTracking().AnyAsync(cl => cl.IdClasificacion == idClasificacion, ct))
+            return ResultadoCliente.Fallo($"La clasificación #{idClasificacion} no existe.");
+
+        cliente.IdClasificacion = idClasificacion;
+        // null = no tocar; vacío/espacios = limpiar; con texto = actualizar.
+        if (observaciones is not null)
+            cliente.Observaciones = Limpiar(observaciones);
+        cliente.FechaModificacion = DateTimeOffset.UtcNow;
         await _db.SaveChangesAsync(ct);
 
         var dto = await ObtenerPorIdAsync(id, ct);
@@ -184,9 +247,30 @@ public class ServicioClientesAdmin
 
     private static string? Limpiar(string? s) => string.IsNullOrWhiteSpace(s) ? null : s.Trim();
 
-    private static ClienteDto Mapear(Cliente c, Ruta? r) => new(
-        c.IdCliente, c.Nombre, c.ApPaterno, c.ApMaterno,
+    // 2. Corregido: Mapeamos los 23 parámetros esperados por el ClienteDto unificado
+    private static ClienteDto Mapear(Cliente c, Ruta? r, Vendedor? v, CatalogoClasificacion? cl) => new(
+        c.IdCliente, 
+        c.Nombre, 
+        c.ApPaterno, 
+        c.ApMaterno,
         BusquedaHelper.NombreCompleto(c.Nombre, c.ApPaterno, c.ApMaterno),
-        c.IdRuta, r?.Descripcion, r?.IdZona,
-        c.IdVendedor, c.IdClasificacion, c.Observaciones);
+        c.TelefonoPrincipal,
+        c.TelefonoSecundario,
+        c.Email,
+        c.Direccion,
+        c.CodigoPostal,
+        c.ReferenciaUbicacion,
+        c.Latitud,
+        c.Longitud,
+        c.IdRuta, 
+        r?.Descripcion, 
+        r?.IdZona,
+        c.IdVendedor, 
+        v?.Nombre,          // Nombre legible del Vendedor mapeado desde el JOIN
+        c.IdClasificacion,
+        cl?.Descripcion,    // Nombre legible de la Clasificación mapeado desde el JOIN
+        (int)c.Estatus,     // Casteo del Enum de dominio a int para el DTO
+        c.Observaciones,
+        c.FechaAlta
+    );
 }

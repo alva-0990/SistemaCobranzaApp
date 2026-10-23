@@ -1,0 +1,646 @@
+
+@using MudBlazor
+@using SistemaCobranzaApp.Shared.Dtos
+@using SistemaCobranzaApp.Shared.Services
+
+@inject EstadoEmpresaGlobal EmpresaGlobal
+@inject ApiCliente Api
+@inject ISnackbar Snackbar
+
+<MudDialog Class="dialogo-empresa">
+    <TitleContent>
+        <div class="d-flex align-center gap-3">
+            <MudIcon Icon="@Icons.Material.Filled.Business"
+                     Color="Color.Primary"
+                     Size="Size.Large" />
+            <div>
+                <MudText Typo="Typo.h6">
+                    <b>@(EsEdicion ? "Editar empresa" : "Registrar empresa")</b>
+                </MudText>
+                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                    Completa la información de tu organización.
+                </MudText>
+            </div>
+        </div>
+    </TitleContent>
+
+    <DialogContent>
+        <MudForm @ref="_form">
+            <MudGrid Spacing="2" Class="pa-1">
+
+                <MudItem xs="12">
+                    <MudText Typo="Typo.subtitle1" Color="Color.Primary">
+                        <b>Datos generales</b>
+                    </MudText>
+                </MudItem>
+
+                <MudItem xs="12" md="6">
+                    <MudTextField @bind-Value="_razonSocial"
+                                  Label="Razón social"
+                                  Required="true"
+                                  RequiredError="Ingresa la razón social."
+                                  MaxLength="200"
+                                  Variant="Variant.Outlined"
+                                  Margin="Margin.Dense"
+                                  FullWidth />
+                </MudItem>
+
+                <MudItem xs="12" md="6">
+                    <MudTextField @bind-Value="_nombreComercial"
+                                  Label="Nombre comercial"
+                                  Required="true"
+                                  RequiredError="Ingresa el nombre comercial."
+                                  MaxLength="150"
+                                  Variant="Variant.Outlined"
+                                  Margin="Margin.Dense"
+                                  FullWidth />
+                </MudItem>
+
+                <MudItem xs="12" md="6">
+                    <MudTextField @bind-Value="_nombreCorto"
+                                  Label="Nombre corto"
+                                  Required="true"
+                                  MaxLength="50"
+                                  Variant="Variant.Outlined"
+                                  Margin="Margin.Dense"
+                                  FullWidth />
+                </MudItem>
+
+                <MudItem xs="12" md="6">
+                    <MudTextField @bind-Value="_rfcNit"
+                                  Label="RFC / NIT"
+                                  Required="true"
+                                  MaxLength="30"
+                                  Variant="Variant.Outlined"
+                                  Margin="Margin.Dense"
+                                  FullWidth />
+                </MudItem>
+
+                <MudItem xs="12" md="6">
+                    <MudTextField @bind-Value="_regimenFiscal"
+                                  Label="Régimen fiscal"
+                                  Required="true"
+                                  MaxLength="100"
+                                  Variant="Variant.Outlined"
+                                  Margin="Margin.Dense"
+                                  FullWidth />
+                </MudItem>
+
+                <MudItem xs="12" md="6">
+                    <MudNumericField T="int"
+                                     @bind-Value="_anioFundacion"
+                                     Label="Año de fundación"
+                                     Min="0"
+                                     Max="@FechaProyecto.Hoy.Year"
+                                     Variant="Variant.Outlined"
+                                     Margin="Margin.Dense"
+                                     FullWidth />
+                </MudItem>
+
+                <MudItem xs="12">
+                    <MudTextField @bind-Value="_lema"
+                                  Label="Lema o eslogan"
+                                  MaxLength="250"
+                                  Variant="Variant.Outlined"
+                                  Margin="Margin.Dense"
+                                  FullWidth />
+                </MudItem>
+
+                <MudItem xs="12" md="6">
+                    <SelectorLogoEmpresa Titulo="Logotipo" @bind-Value="_logoUrl" Disabled="_guardando" />
+                </MudItem>
+                <MudItem xs="12" md="6">
+                    <SelectorLogoEmpresa Titulo="Logotipo para fondos oscuros" @bind-Value="_logoBlancoUrl" Blanco="true" Disabled="_guardando" />
+                </MudItem>
+
+                <MudItem xs="12">
+                    <MudDivider Class="my-2" />
+                    <MudText Typo="Typo.subtitle1" Color="Color.Primary">
+                        <b>Contacto</b>
+                    </MudText>
+                </MudItem>
+
+                <MudItem xs="12" md="6">
+                    <MudTextField @bind-Value="_telefonoPrincipal"
+                                  Label="Teléfono principal"
+                                  Required="true"
+                                  MaxLength="30"
+                                  Variant="Variant.Outlined"
+                                  Margin="Margin.Dense"
+                                  FullWidth />
+                </MudItem>
+
+                <MudItem xs="12" md="6">
+                    <MudTextField @bind-Value="_telefonoSecundario"
+                                  Label="Teléfono secundario"
+                                  MaxLength="30"
+                                  Variant="Variant.Outlined"
+                                  Margin="Margin.Dense"
+                                  FullWidth />
+                </MudItem>
+
+                <MudItem xs="12" md="6">
+                    <MudTextField T="string"
+                                  @bind-Value="_correoContacto"
+                                  Label="Correo de contacto"
+                                  InputType="InputType.Email"
+                                  MaxLength="150"
+                                  Variant="Variant.Outlined"
+                                  Margin="Margin.Dense"
+                                  FullWidth />
+                </MudItem>
+
+                <MudItem xs="12" md="6">
+                    <MudTextField T="string"
+                                  @bind-Value="_correoSoporte"
+                                  Label="Correo de soporte"
+                                  InputType="InputType.Email"
+                                  MaxLength="150"
+                                  Variant="Variant.Outlined"
+                                  Margin="Margin.Dense"
+                                  FullWidth />
+                </MudItem>
+
+                <MudItem xs="12" md="6">
+                    <MudTextField @bind-Value="_sitioWeb"
+                                  Label="Sitio web"
+                                  Variant="Variant.Outlined"
+                                  Margin="Margin.Dense"
+                                  FullWidth />
+                </MudItem>
+
+                <MudItem xs="12" md="6">
+                    <MudTextField @bind-Value="_horarioAtencion"
+                                  Label="Horario de atención"
+                                  MaxLength="150"
+                                  Variant="Variant.Outlined"
+                                  Margin="Margin.Dense"
+                                  FullWidth />
+                </MudItem>
+
+                <MudItem xs="12">
+                    <MudDivider Class="my-2" />
+                    <MudText Typo="Typo.subtitle1" Color="Color.Primary">
+                        <b>Domicilio</b>
+                    </MudText>
+                </MudItem>
+
+                <MudItem xs="12" md="8">
+                    <MudTextField @bind-Value="_calle"
+                                  Label="Calle"
+                                  MaxLength="150"
+                                  Variant="Variant.Outlined"
+                                  Margin="Margin.Dense"
+                                  FullWidth />
+                </MudItem>
+
+                <MudItem xs="6" md="2">
+                    <MudTextField @bind-Value="_numeroExterior"
+                                  Label="Número exterior"
+                                  MaxLength="20"
+                                  Variant="Variant.Outlined"
+                                  Margin="Margin.Dense"
+                                  FullWidth />
+                </MudItem>
+
+                <MudItem xs="6" md="2">
+                    <MudTextField @bind-Value="_numeroInterior"
+                                  Label="Número interior"
+                                  MaxLength="20"
+                                  Variant="Variant.Outlined"
+                                  Margin="Margin.Dense"
+                                  FullWidth />
+                </MudItem>
+
+                <MudItem xs="12" md="6">
+                    <MudTextField @bind-Value="_colonia"
+                                  Label="Colonia"
+                                  MaxLength="100"
+                                  Variant="Variant.Outlined"
+                                  Margin="Margin.Dense"
+                                  FullWidth />
+                </MudItem>
+
+                <MudItem xs="6" md="3">
+                    <MudTextField @bind-Value="_codigoPostal"
+                                  Label="Código postal"
+                                  MaxLength="15"
+                                  Variant="Variant.Outlined"
+                                  Margin="Margin.Dense"
+                                  FullWidth />
+                </MudItem>
+
+                <MudItem xs="6" md="3">
+                    <MudTextField @bind-Value="_ciudad"
+                                  Label="Ciudad"
+                                  MaxLength="100"
+                                  Variant="Variant.Outlined"
+                                  Margin="Margin.Dense"
+                                  FullWidth />
+                </MudItem>
+
+                <MudItem xs="12" md="6">
+                    <MudTextField @bind-Value="_estadoProvincia"
+                                  Label="Estado / provincia"
+                                  MaxLength="100"
+                                  Variant="Variant.Outlined"
+                                  Margin="Margin.Dense"
+                                  FullWidth />
+                </MudItem>
+
+                <MudItem xs="12" md="6">
+                    <MudTextField @bind-Value="_pais"
+                                  Label="País"
+                                  MaxLength="100"
+                                  Variant="Variant.Outlined"
+                                  Margin="Margin.Dense"
+                                  FullWidth />
+                </MudItem>
+
+                <MudItem xs="12">
+                    <MudDivider Class="my-2" />
+                    <MudText Typo="Typo.subtitle1" Color="Color.Primary">
+                        <b>Moneda e impuestos</b>
+                    </MudText>
+                </MudItem>
+
+                <MudItem xs="12" md="6">
+                    <MudTextField @bind-Value="_moneda"
+                                  Label="Moneda por defecto"
+                                  Required="true"
+                                  MaxLength="10"
+                                  Placeholder="MXN"
+                                  Variant="Variant.Outlined"
+                                  Margin="Margin.Dense"
+                                  FullWidth />
+                </MudItem>
+
+                <MudItem xs="12" md="6">
+                    <MudTextField @bind-Value="_simboloMoneda"
+                                  Label="Símbolo de moneda"
+                                  Required="true"
+                                  MaxLength="5"
+                                  Placeholder="$"
+                                  Variant="Variant.Outlined"
+                                  Margin="Margin.Dense"
+                                  FullWidth />
+                </MudItem>
+
+                <MudItem xs="12" md="6">
+                    <MudNumericField T="decimal"
+                                     @bind-Value="_porcentajeImpuesto"
+                                     Label="Porcentaje de impuesto"
+                                     Min="0"
+                                     Max="100"
+                                     Format="N2"
+                                     Adornment="Adornment.End"
+                                     AdornmentText="%"
+                                     Variant="Variant.Outlined"
+                                     Margin="Margin.Dense"
+                                     FullWidth />
+                </MudItem>
+
+                <MudItem xs="12">
+                    <MudDivider Class="my-2" />
+                    <MudText Typo="Typo.subtitle1" Color="Color.Primary">
+                        <b>Redes sociales</b>
+                    </MudText>
+                </MudItem>
+
+                <MudItem xs="12" md="4">
+                    <MudTextField @bind-Value="_facebookUrl"
+                                  Label="Facebook"
+                                  Variant="Variant.Outlined"
+                                  Margin="Margin.Dense"
+                                  FullWidth />
+                </MudItem>
+
+                <MudItem xs="12" md="4">
+                    <MudTextField @bind-Value="_instagramUrl"
+                                  Label="Instagram"
+                                  Variant="Variant.Outlined"
+                                  Margin="Margin.Dense"
+                                  FullWidth />
+                </MudItem>
+
+                <MudItem xs="12" md="4">
+                    <MudTextField @bind-Value="_linkedinUrl"
+                                  Label="LinkedIn"
+                                  Variant="Variant.Outlined"
+                                  Margin="Margin.Dense"
+                                  FullWidth />
+                </MudItem>
+
+            </MudGrid>
+        </MudForm>
+    </DialogContent>
+
+    <DialogActions>
+        <div class="acciones-empresa">
+            @if (EsEdicion)
+            {
+                <MudButton Variant="Variant.Text"
+                           OnClick="Cancelar"
+                           Disabled="@_guardando">
+                    Cancelar
+                </MudButton>
+            }
+
+            <MudButton Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       StartIcon="@Icons.Material.Filled.Save"
+                       OnClick="GuardarAsync"
+                       Disabled="@_guardando">
+                @if (_guardando)
+                {
+                    <MudProgressCircular Size="Size.Small"
+                                         Indeterminate="true"
+                                         Class="mr-2" />
+                    <span>Guardando...</span>                }
+                else
+                {
+                    <span>Guardar</span>
+
+                }
+            </MudButton>
+        </div>
+    </DialogActions>
+</MudDialog>
+
+<style>
+    .dialogo-empresa {
+        width: 100%;
+    }
+
+    .acciones-empresa {
+        display: flex;
+        justify-content: flex-end;
+        gap: 8px;
+        width: 100%;
+        padding: 4px;
+    }
+
+    @@media (max-width: 600px) {
+        .dialogo-empresa {
+            width: 100%;
+            max-width: 100%;
+            margin: 0;
+        }
+
+        .acciones-empresa {
+            flex-direction: column-reverse;
+            align-items: stretch;
+        }
+
+        .acciones-empresa .mud-button-root {
+            width: 100%;
+            min-height: 42px;
+        }
+    }
+</style>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter]
+    public EmpresaDto? Empresa { get; set; }
+
+    [Parameter]
+    public bool EsEdicion { get; set; }
+
+    private MudForm _form = default!;
+    private bool _guardando;
+
+    private string _razonSocial = "";
+    private string _nombreComercial = "";
+    private string _nombreCorto = "";
+    private string _rfcNit = "";
+    private string _regimenFiscal = "";
+    private int _anioFundacion;
+    private string _lema = "";
+    private string _logoUrl = "";
+    private string _logoBlancoUrl = "";
+
+    private string _telefonoPrincipal = "";
+    private string _telefonoSecundario = "";
+    private string _correoContacto = "";
+    private string _correoSoporte = "";
+    private string _sitioWeb = "";
+    private string _horarioAtencion = "";
+
+    private string _facebookUrl = "";
+    private string _instagramUrl = "";
+    private string _linkedinUrl = "";
+
+    private string _calle = "";
+    private string _numeroExterior = "";
+    private string _numeroInterior = "";
+    private string _colonia = "";
+    private string _codigoPostal = "";
+    private string _ciudad = "";
+    private string _estadoProvincia = "";
+    private string _pais = "";
+
+    private string _moneda = "MXN";
+    private string _simboloMoneda = "$";
+    private decimal _porcentajeImpuesto;
+
+    protected override void OnInitialized()
+    {
+        if (Empresa is null)
+            return;
+
+        _razonSocial = Empresa.RazonSocial ?? "";
+        _nombreComercial = Empresa.NombreComercial ?? "";
+        _nombreCorto = Empresa.NombreCorto ?? "";
+        _rfcNit = Empresa.Rfc_o_Nit ?? "";
+        _regimenFiscal = Empresa.RegimenFiscal ?? "";
+        _anioFundacion = Empresa.AnioFundacion;
+        _lema = Empresa.Lema ?? "";
+        _logoUrl = Empresa.LogoUrl ?? "";
+        _logoBlancoUrl = Empresa.LogoBlancoUrl ?? "";
+
+        _telefonoPrincipal = Empresa.TelefonoPrincipal ?? "";
+        _telefonoSecundario = Empresa.TelefonoSecundario ?? "";
+        _correoContacto = Empresa.CorreoContacto ?? "";
+        _correoSoporte = Empresa.CorreoSoporte ?? "";
+        _sitioWeb = Empresa.SitioWeb ?? "";
+        _horarioAtencion = Empresa.HorarioAtencion ?? "";
+
+        _facebookUrl = Empresa.FacebookUrl ?? "";
+        _instagramUrl = Empresa.InstagramUrl ?? "";
+        _linkedinUrl = Empresa.LinkedinUrl ?? "";
+
+        _calle = Empresa.Calle ?? "";
+        _numeroExterior = Empresa.NumeroExterior ?? "";
+        _numeroInterior = Empresa.NumeroInterior ?? "";
+        _colonia = Empresa.Colonia ?? "";
+        _codigoPostal = Empresa.CodigoPostal ?? "";
+        _ciudad = Empresa.Ciudad ?? "";
+        _estadoProvincia = Empresa.Estado_o_Provincia ?? "";
+        _pais = Empresa.Pais ?? "";
+
+        _moneda = Empresa.MonedaPorDefecto ?? "MXN";
+        _simboloMoneda = Empresa.SimboloMoneda ?? "$";
+        _porcentajeImpuesto = Empresa.PorcentajeImpuesto;
+    }
+
+    private async Task GuardarAsync()
+    {
+        if (_guardando)
+            return;
+
+        await _form.ValidateAsync();
+
+        if (!_form.IsValid)
+        {
+            Snackbar.Add(
+                "Revisa los campos obligatorios antes de continuar.",
+                Severity.Warning);
+            return;
+        }
+
+        _guardando = true;
+
+        try
+        {
+            var razonSocial = Limpiar(_razonSocial);
+            var nombreComercial = Limpiar(_nombreComercial);
+            var nombreCorto = Limpiar(_nombreCorto);
+            var rfcNit = Limpiar(_rfcNit);
+            var regimenFiscal = Limpiar(_regimenFiscal);
+
+            if (new[]
+                {
+                    razonSocial, nombreComercial, nombreCorto,
+                    rfcNit, regimenFiscal
+                }.Any(string.IsNullOrWhiteSpace))
+            {
+                Snackbar.Add(
+                    "Completa los datos generales obligatorios.",
+                    Severity.Warning);
+                return;
+            }
+
+            if (_porcentajeImpuesto is < 0 or > 100)
+            {
+                Snackbar.Add(
+                    "El impuesto debe estar entre 0 y 100.",
+                    Severity.Warning);
+                return;
+            }
+
+            var solicitud = new CrearEmpresaRequest(
+                RazonSocial: razonSocial,
+                NombreComercial: nombreComercial,
+                NombreCorto: nombreCorto,
+                Rfc_o_Nit: rfcNit,
+                RegimenFiscal: regimenFiscal,
+                AnioFundacion: _anioFundacion,
+                Lema: Limpiar(_lema),
+                LogoUrl: Limpiar(_logoUrl),
+                LogoBlancoUrl: Limpiar(_logoBlancoUrl),
+                TelefonoPrincipal: Limpiar(_telefonoPrincipal),
+                TelefonoSecundario: Limpiar(_telefonoSecundario),
+                CorreoContacto: Limpiar(_correoContacto),
+                CorreoSoporte: Limpiar(_correoSoporte),
+                SitioWeb: Limpiar(_sitioWeb),
+                FacebookUrl: Limpiar(_facebookUrl),
+                InstagramUrl: Limpiar(_instagramUrl),
+                LinkedinUrl: Limpiar(_linkedinUrl),
+                Calle: Limpiar(_calle),
+                NumeroExterior: Limpiar(_numeroExterior),
+                NumeroInterior: Limpiar(_numeroInterior),
+                Colonia: Limpiar(_colonia),
+                CodigoPostal: Limpiar(_codigoPostal),
+                Ciudad: Limpiar(_ciudad),
+                Estado_o_Provincia: Limpiar(_estadoProvincia),
+                Pais: Limpiar(_pais),
+                MonedaPorDefecto: Limpiar(_moneda),
+                SimboloMoneda: Limpiar(_simboloMoneda),
+                PorcentajeImpuesto: _porcentajeImpuesto,
+                HorarioAtencion: Limpiar(_horarioAtencion)
+            );
+
+            EmpresaDto? guardada;
+            string? error;
+
+            if (EsEdicion && Empresa is not null)
+            {
+                var actualizacion = new ActualizarEmpresaRequest(
+                    RazonSocial: solicitud.RazonSocial,
+                    NombreComercial: solicitud.NombreComercial,
+                    NombreCorto: solicitud.NombreCorto,
+                    Rfc_o_Nit: solicitud.Rfc_o_Nit,
+                    RegimenFiscal: solicitud.RegimenFiscal,
+                    AnioFundacion: solicitud.AnioFundacion,
+                    Lema: solicitud.Lema,
+                    LogoUrl: solicitud.LogoUrl,
+                    LogoBlancoUrl: solicitud.LogoBlancoUrl,
+                    TelefonoPrincipal: solicitud.TelefonoPrincipal,
+                    TelefonoSecundario: solicitud.TelefonoSecundario,
+                    CorreoContacto: solicitud.CorreoContacto,
+                    CorreoSoporte: solicitud.CorreoSoporte,
+                    SitioWeb: solicitud.SitioWeb,
+                    FacebookUrl: solicitud.FacebookUrl,
+                    InstagramUrl: solicitud.InstagramUrl,
+                    LinkedinUrl: solicitud.LinkedinUrl,
+                    Calle: solicitud.Calle,
+                    NumeroExterior: solicitud.NumeroExterior,
+                    NumeroInterior: solicitud.NumeroInterior,
+                    Colonia: solicitud.Colonia,
+                    CodigoPostal: solicitud.CodigoPostal,
+                    Ciudad: solicitud.Ciudad,
+                    Estado_o_Provincia: solicitud.Estado_o_Provincia,
+                    Pais: solicitud.Pais,
+                    MonedaPorDefecto: solicitud.MonedaPorDefecto,
+                    SimboloMoneda: solicitud.SimboloMoneda,
+                    PorcentajeImpuesto: solicitud.PorcentajeImpuesto,
+                    HorarioAtencion: solicitud.HorarioAtencion
+                );
+
+                (guardada, error) = await Api.ActualizarEmpresaAsync(
+                    Empresa.Id, actualizacion);
+            }
+            else
+            {
+                (guardada, error) = await Api.CrearEmpresaAsync(solicitud);
+            }
+
+            if (error is not null)
+            {
+                Snackbar.Add(error, Severity.Error);
+                return;
+            }
+
+            if (guardada is null)
+            {
+                Snackbar.Add(
+                    "La API no devolvió los datos de la empresa guardada.",
+                    Severity.Warning);
+                return;
+            }
+
+            EmpresaGlobal.Actualizar(guardada);
+            await Api.GuardarIdentidadEmpresaAsync(EmpresaGlobal.Identidad!);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(
+                $"No fue posible guardar la empresa: {ex.Message}",
+                Severity.Error);
+        }
+        finally
+        {
+            _guardando = false;
+        }
+    }
+
+    private static string Limpiar(string? valor)
+        => valor?.Trim() ?? "";
+
+    private void Cancelar()
+        => MudDialog.Cancel();
+}

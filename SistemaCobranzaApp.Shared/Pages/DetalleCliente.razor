@@ -1,0 +1,837 @@
+@page "/clientes/{IdCliente:long}"
+
+@using MudBlazor
+@using SistemaCobranzaApp.Shared.Components
+@using SistemaCobranzaApp.Shared.Dtos
+@using SistemaCobranzaApp.Shared.Services
+@using SistemaCobranzaApp.Domain.Constantes
+@inject ApiCliente Api
+@inject IDialogService _dialogo
+@inject ISnackbar _snackbar
+@inject NavigationManager _nav
+@inject IFormFactor _formFactor
+@inject ServicioImpresionTicket _impresionTicket
+@inject SistemaCobranzaApp.Shared.Services.EstadoEmpresaGlobal EmpresaGlobal
+
+<div class="ma-2">
+
+    <!-- Encabezado + acciones -->
+    <MudPaper Elevation="2" Class="pa-3 mb-2">
+        <div class="encabezado-detalle">
+            <div class="d-flex align-center gap-2">
+                <MudIcon Icon="@Icons.Material.Filled.CreditCard" Color="Color.Primary" />
+                <MudText Typo="Typo.h6" Class="titulo-detalle">Información del Cliente</MudText>
+            </div>
+            <div class="d-flex align-center gap-2 flex-wrap">
+                <MudButton Variant="Variant.Outlined" Color="Color.Default" Size="Size.Small"
+                           StartIcon="@Icons.Material.Filled.ArrowBack"
+                           OnClick="Regresar">
+                    Regresar
+                </MudButton>
+                <MudButton Variant="Variant.Filled" Color="Color.Success" Size="Size.Small"
+                           StartIcon="@Icons.Material.Filled.PointOfSale"
+                           OnClick="AsignarVenta"
+                           Disabled="@(_cliente is null || _ventaBloqueada)">
+                    Asignar venta
+                </MudButton>
+            </div>
+        </div>
+    </MudPaper>
+
+    @if (_cargando)
+    {
+        <div class="d-flex justify-center pa-6">
+            <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+        </div>
+    }
+    else if (_cliente is null)
+    {
+        <MudPaper Elevation="0" Outlined="true" Class="pa-6 text-center">
+            <MudIcon Icon="@Icons.Material.Filled.PersonOff" Size="Size.Large" Color="Color.Secondary" />
+            <MudText Color="Color.Secondary" Class="mt-2">No se encontró el cliente solicitado.</MudText>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" Class="mt-3" Size="Size.Small"
+                       StartIcon="@Icons.Material.Filled.ArrowBack" OnClick="Regresar">
+                Volver a la consulta
+            </MudButton>
+        </MudPaper>
+    }
+    else
+    {
+        var c = _cliente;
+
+        <!-- Datos del Cliente + Domicilio (dos tarjetas lado a lado) -->
+        <MudGrid Spacing="2" Class="mb-2">
+            <MudItem xs="12" md="6">
+                <MudPaper Elevation="0" Outlined="true" Class="pa-3 h-100">
+                    <div class="seccion-titulo mb-2">
+                        <MudIcon Icon="@Icons.Material.Filled.Badge" Size="Size.Small" Class="mr-1" />
+                        Datos del Cliente
+                    </div>
+                    @Campo("ID", c.IdCliente.ToString())
+                    @Campo("Nombre", c.NombreCompleto)
+                    @Campo("Tel. fijo", c.TelefonoPrincipal)
+                    @Campo("Tel. celular", Mostrar(c.TelefonoSecundario))
+                    @Campo("Correo", Mostrar(c.Email))
+                    @Campo("Vendedor", Mostrar(c.VendedorNombre))
+                    <div class="campo-linea">
+                        <span class="campo-etiqueta">Clasificación</span>
+                        <span class="campo-valor">
+                            <MudChip T="string" Size="Size.Small" Variant="Variant.Text" Class="chip-compacto"
+                                     Color="@(RiesgoClienteRegla.Resaltar(c.IdClasificacion) ? Color.Error : Color.Secondary)">
+                                @(string.IsNullOrWhiteSpace(c.ClasificacionNombre) ? "Sin clasificación" : c.ClasificacionNombre)
+                            </MudChip>
+                        </span>
+                    </div>
+                    <div class="campo-linea">
+                        <span class="campo-etiqueta">Estatus</span>
+                        <span class="campo-valor">
+                            <MudChip T="string" Size="Size.Small" Variant="Variant.Filled" Class="chip-compacto"
+                                     Color="@(c.Estatus == 1 ? Color.Success : Color.Default)">
+                                @(c.Estatus == 1 ? "Activo" : "Inactivo")
+                            </MudChip>
+                        </span>
+                    </div>
+                    @Campo("Observaciones", Mostrar(c.Observaciones))
+                </MudPaper>
+            </MudItem>
+
+            <MudItem xs="12" md="6">
+                <MudPaper Elevation="0" Outlined="true" Class="pa-3 h-100">
+                    <div class="seccion-titulo mb-2">
+                        <MudIcon Icon="@Icons.Material.Filled.Home" Size="Size.Small" Class="mr-1" />
+                        Domicilio del Cliente
+                    </div>
+                    @Campo("Dirección", c.Direccion)
+                    @Campo("Código postal", Mostrar(c.CodigoPostal))
+                    @Campo("Ruta", string.IsNullOrWhiteSpace(c.Ruta) ? "Sin ruta" : c.Ruta!)
+                    @Campo("Zona", _estadoCuenta?.Zona ?? "—")
+                    @Campo("Referencia", Mostrar(c.ReferenciaUbicacion))
+                </MudPaper>
+            </MudItem>
+        </MudGrid>
+
+        <!-- Información del Crédito (banda compacta horizontal) -->
+        <MudPaper Elevation="0" Outlined="true" Class="pa-3 mb-2 panel-credito">
+            <div class="seccion-titulo mb-2">
+                <MudIcon Icon="@Icons.Material.Filled.AccountBalanceWallet" Size="Size.Small" Class="mr-1" />
+                Información del Crédito
+            </div>
+            @if (_estadoCuenta is null)
+            {
+                <MudText Typo="Typo.body2" Color="Color.Secondary">Sin información de crédito disponible.</MudText>
+            }
+            else
+            {
+                <div class="credito-banda">
+                    @Metrica("Total vendido", _estadoCuenta.TotalVendido, Color.Default)
+                    @Metrica("Total pagado", _estadoCuenta.TotalPagado, Color.Success)
+                    @Metrica("Saldo total", _estadoCuenta.SaldoTotal, _estadoCuenta.SaldoTotal > 0 ? Color.Error : Color.Success)
+                    <div class="credito-item">
+                        <span class="credito-etiqueta">Pedidos</span>
+                        <span class="credito-valor">@_estadoCuenta.Ventas.Count</span>
+                    </div>
+                </div>
+            }
+        </MudPaper>
+
+        <!-- Historial de Pedidos -->
+        <MudPaper Elevation="0" Outlined="true" Class="pa-3">
+            <div class="seccion-titulo mb-2">
+                <MudIcon Icon="@Icons.Material.Filled.ReceiptLong" Size="Size.Small" Class="mr-1" />
+                Historial de Pedidos
+            </div>
+
+            <MudTable Items="@(_estadoCuenta?.Ventas ?? (IReadOnlyList<EstadoCuentaVentaDto>)Array.Empty<EstadoCuentaVentaDto>())"
+                      Hover="true" Dense="true" Breakpoint="Breakpoint.Sm" Elevation="0"
+                      RowsPerPage="10" T="EstadoCuentaVentaDto">
+                <HeaderContent>
+                    <MudTh Style="width:9%;">Pedido</MudTh>
+                    <MudTh>Código</MudTh>
+                    <MudTh>Fecha</MudTh>
+                    <MudTh>Estado</MudTh>
+                    <MudTh Style="text-align:right;">Total</MudTh>
+                    <MudTh Style="text-align:right;">Enganche</MudTh>
+                    <MudTh Style="text-align:right;">Abonos</MudTh>
+                    <MudTh Style="text-align:right;">Saldo</MudTh>
+                    <MudTh>Último pago</MudTh>
+                    <MudTh Style="text-align:center;">Acciones</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Pedido">@context.IdVenta</MudTd>
+                    <MudTd DataLabel="Código"><b>@(context.CodigoVenta ?? "—")</b></MudTd>
+                    <MudTd DataLabel="Fecha">@context.FechaCompra.EnZonaProyecto().DateTime.ToString("dd/MM/yyyy")</MudTd>
+                    <MudTd DataLabel="Estado">
+                        <MudChip T="string" Size="Size.Small" Variant="Variant.Text" Color="Color.Primary" Class="chip-compacto">
+                            @(context.Estado ?? "—")
+                        </MudChip>
+                    </MudTd>
+                    <MudTd DataLabel="Total" Style="text-align:right;">@context.TotalFinal.ToString("C2")</MudTd>
+                    <MudTd DataLabel="Enganche" Style="text-align:right;">@context.Enganche.ToString("C2")</MudTd>
+                    <MudTd DataLabel="Abonos" Style="text-align:right;">@context.TotalAbonos.ToString("C2")</MudTd>
+                    <MudTd DataLabel="Saldo" Style="text-align:right;">
+                        <b class="@(context.Saldo > 0 ? "saldo-pendiente" : "saldo-liquidado")">@context.Saldo.ToString("C2")</b>
+                    </MudTd>
+                    <MudTd DataLabel="Último pago">
+                        @(context.FechaUltimoPago is null ? "—" : context.FechaUltimoPago.Value.EnZonaProyecto().DateTime.ToString("dd/MM/yyyy"))
+                    </MudTd>
+                    <MudTd DataLabel="Acciones" Style="text-align:center;">
+                        <div class="d-flex justify-center gap-1 flex-wrap mb-1">
+                            <MudTooltip Text="Ver detalle">
+                                <MudIconButton Icon="@Icons.Material.Filled.ReceiptLong"
+                                               Size="Size.Small" Variant="Variant.Outlined"
+                                               OnClick="@(() => VerDetalleVenta(context))" />
+                            </MudTooltip>
+                            @if (context.Saldo > 0)
+                            {
+                                <MudTooltip Text="Renovar cuenta">
+                                    <MudIconButton Icon="@Icons.Material.Filled.Autorenew"
+                                                   Size="Size.Small" Color="Color.Primary" Variant="Variant.Filled"
+                                                   Disabled="@(_renovando || _ventaBloqueada)"
+                                                   OnClick="@(() => RenovarCuenta(context))" />
+                                </MudTooltip>
+                            }
+                        </div>
+
+                        @if (context.TotalAbonos == 0)
+                        {
+                            <div class="d-flex justify-center gap-1">
+                                <MudTooltip Text="Editar venta">
+                                    <MudIconButton Icon="@Icons.Material.Filled.Edit"
+                                                   Color="Color.Primary"
+                                                   Size="Size.Small"
+                                                   Disabled="_ventaBloqueada"
+                                                   OnClick="@(() => EditarVenta(context))" />
+                                </MudTooltip>
+                                <MudTooltip Text="Cancelar venta">
+                                    <MudIconButton Icon="@Icons.Material.Filled.Cancel"
+                                                   Color="Color.Error"
+                                                   Size="Size.Small"
+                                                   Disabled="_ventaBloqueada"
+                                                   OnClick="@(() => CancelarVenta(context))" />
+                                </MudTooltip>
+                            </div>
+                        }
+                        else
+                        {
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">—</MudText>
+                        }
+                    </MudTd>
+                </RowTemplate>
+                <NoRecordsContent>
+                    <div class="pa-4 text-center">
+                        <MudIcon Icon="@Icons.Material.Filled.Inbox" Color="Color.Secondary" />
+                        <MudText Color="Color.Secondary" Typo="Typo.body2" Class="mt-1">Sin pedidos registrados.</MudText>
+                    </div>
+                </NoRecordsContent>
+                <PagerContent>
+                    <MudTablePager InfoFormat="{first_item}-{last_item} de {all_items}" RowsPerPageString="Filas:" />
+                </PagerContent>
+            </MudTable>
+        </MudPaper>
+    }
+</div>
+
+@{
+    // Campo compacto: etiqueta a la izquierda, valor a la derecha, en una sola línea.
+    RenderFragment Campo(string etiqueta, string valor) => __builder =>
+    {
+        <div class="campo-linea">
+            <span class="campo-etiqueta">@etiqueta</span>
+            <span class="campo-valor">@valor</span>
+        </div>
+    };
+
+    // Métrica monetaria compacta para la banda de crédito.
+    RenderFragment Metrica(string etiqueta, decimal monto, Color color) => __builder =>
+    {
+        <div class="credito-item">
+            <span class="credito-etiqueta">@etiqueta</span>
+            <MudText Typo="Typo.subtitle1" Color="@color" Class="credito-valor">@monto.ToString("C2")</MudText>
+        </div>
+    };
+}
+
+<style>
+    .encabezado-detalle {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        flex-wrap: wrap;
+    }
+
+    .titulo-detalle { font-weight: 800; }
+
+    .seccion-titulo {
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        font-size: 0.95rem;
+        color: var(--mud-palette-primary);
+    }
+
+    /* Campo etiqueta/valor en una sola línea compacta. */
+    .campo-linea {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 2px 0;
+        border-bottom: 1px dashed var(--mud-palette-divider);
+    }
+    .campo-linea:last-child { border-bottom: none; }
+
+    .campo-etiqueta {
+        color: var(--mud-palette-text-secondary);
+        font-size: 0.8rem;
+        white-space: nowrap;
+    }
+    .campo-valor {
+        font-size: 0.85rem;
+        font-weight: 500;
+        text-align: right;
+        word-break: break-word;
+    }
+
+    .chip-compacto { height: 20px; }
+
+    /* Banda horizontal de crédito. */
+    .panel-credito { background-color: var(--mud-palette-background-grey); }
+    .credito-banda {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 24px;
+    }
+    .credito-item { display: flex; flex-direction: column; }
+    .credito-etiqueta { font-size: 0.75rem; color: var(--mud-palette-text-secondary); }
+    .credito-valor { font-weight: 700; line-height: 1.2; }
+
+    .saldo-pendiente { color: var(--mud-palette-error); }
+    .saldo-liquidado { color: var(--mud-palette-success); }
+
+    .h-100 { height: 100%; }
+</style>
+
+@code {
+    [Parameter] public long IdCliente { get; set; }
+
+    private ClienteDto? _cliente;
+    private EstadoCuentaResponse? _estadoCuenta;
+    private bool _cargando;
+
+    // Riesgo por clasificación del cliente actual.
+    private NivelRiesgoCliente _riesgo = NivelRiesgoCliente.Ninguno;
+    private bool _ventaBloqueada;          // MALO/MOROSO: bloquea asignar/editar/cancelar/renovar.
+    private bool _advertenciaPendiente;    // Hay que mostrar el modal informativo al renderizar.
+    private long _advertenciaMostradaPara; // IdCliente para el que ya se mostró el modal (una sola vez).
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await CargarAsync();
+    }
+
+    private async Task CargarAsync()
+    {
+        _cargando = true;
+        _cliente = null;
+        _estadoCuenta = null;
+
+        var (cliente, errorCliente) = await Api.ObtenerClienteAsync(IdCliente);
+        if (errorCliente is not null) _snackbar.Add(errorCliente, Severity.Error);
+        _cliente = cliente;
+
+        if (_cliente is not null)
+        {
+            // El estado de cuenta aporta la información de crédito y el historial de pedidos.
+            var (estado, errorEstado) = await Api.EstadoCuentaAsync(IdCliente);
+            if (errorEstado is not null) _snackbar.Add(errorEstado, Severity.Warning);
+            _estadoCuenta = estado;
+        }
+
+        // Evaluamos el riesgo y marcamos si debe mostrarse el modal informativo al abrir.
+        _riesgo = RiesgoClienteRegla.Evaluar(_cliente?.IdClasificacion);
+        _ventaBloqueada = _riesgo == NivelRiesgoCliente.Bloqueado;
+        if (_cliente is not null && _riesgo != NivelRiesgoCliente.Ninguno && _advertenciaMostradaPara != _cliente.IdCliente)
+            _advertenciaPendiente = true;
+
+        _cargando = false;
+    }
+
+    // Muestra el modal informativo una sola vez por cliente, tras el primer render con datos.
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_advertenciaPendiente && _cliente is not null)
+        {
+            _advertenciaPendiente = false;
+            _advertenciaMostradaPara = _cliente.IdCliente;
+            await MostrarAdvertenciaRiesgoAsync();
+        }
+    }
+
+    // Modal informativo de riesgo (amarillo REGULAR / rojo MALO-MOROSO). Solo informa, no decide nada.
+    private async Task MostrarAdvertenciaRiesgoAsync()
+    {
+        if (_cliente is null || _riesgo == NivelRiesgoCliente.Ninguno) return;
+
+        var bloqueado = _riesgo == NivelRiesgoCliente.Bloqueado;
+        var parametros = new DialogParameters<DialogoAdvertenciaCliente>
+        {
+            { x => x.Titulo, bloqueado ? "Cliente bloqueado por deudas" : "Cliente que requiere precaución" },
+            { x => x.Mensaje, RiesgoClienteRegla.MensajeAdvertencia(_cliente.IdClasificacion, _cliente.ClasificacionNombre) ?? "" },
+            { x => x.Bloqueado, bloqueado }
+        };
+        await _dialogo.ShowAsync<DialogoAdvertenciaCliente>(
+            bloqueado ? "Cliente bloqueado" : "Advertencia",
+            parametros,
+            new DialogOptions { MaxWidth = MaxWidth.ExtraSmall, FullWidth = true });
+    }
+
+    private static string Mostrar(string? valor) => string.IsNullOrWhiteSpace(valor) ? "—" : valor!;
+
+    private void Regresar() => _nav.NavigateTo("/clientes");
+
+    // Tras una venta exitosa espera 5 s (para ver el resultado / terminar la impresión en móvil)
+    // y regresa automáticamente a la búsqueda de clientes.
+    private async Task ProgramarRegresoBusquedaAsync()
+    {
+        _snackbar.Add("Regresando a la búsqueda de clientes en 5 segundos…", Severity.Info);
+        await Task.Delay(TimeSpan.FromSeconds(5));
+        Regresar();
+    }
+
+    private bool _renovando;
+
+    private async Task VerDetalleVenta(EstadoCuentaVentaDto venta)
+    {
+        var parametros = new DialogParameters<DialogoDetalleVenta> { { x => x.IdVenta, venta.IdVenta } };
+        await _dialogo.ShowAsync<DialogoDetalleVenta>($"Detalle {venta.CodigoVenta ?? $"#{venta.IdVenta}"}", parametros,
+            new DialogOptions { FullScreen = EsEntornoMovil, FullWidth = true, MaxWidth = MaxWidth.Large, CloseButton = true });
+    }
+
+    private async Task RenovarCuenta(EstadoCuentaVentaDto fila)
+    {
+        if (_cliente is null || fila.Saldo <= 0 || _renovando) return;
+        _renovando = true;
+        try
+        {
+            // Volver a consultar antes de cotizar: el saldo del historial puede haber cambiado.
+            var (origen, errorOrigen) = await Api.ObtenerVentaAdminAsync(fila.IdVenta);
+            if (errorOrigen is not null || origen is null || origen.SaldoPendiente <= 0
+                || origen.IdCliente != IdCliente || origen.IdEstatusVenta == SistemaCobranzaApp.Domain.Constantes.EstatusVentaIds.Cancelada)
+            {
+                _snackbar.Add(errorOrigen ?? "La cuenta ya no está disponible para renovación.", Severity.Warning);
+                await CargarAsync();
+                return;
+            }
+            var parametros = new DialogParameters<DialogoNuevaVenta>
+            {
+                { x => x.Cliente, _cliente },
+                { x => x.CodigoVenta, string.Empty },
+                { x => x.IdVendedor, _cliente.IdVendedor ?? 0 },
+                { x => x.IdZona, _cliente.IdZona ?? 0 },
+                { x => x.IdVentaVieja, (long?)origen.IdVenta },
+                { x => x.CodigoVentaVieja, origen.CodigoVenta },
+                { x => x.SaldoArrastre, (decimal?)origen.SaldoPendiente }
+            };
+            var dialogo = await _dialogo.ShowAsync<DialogoNuevaVenta>("Renovar cuenta", parametros,
+                new DialogOptions { FullScreen = EsEntornoMovil, FullWidth = true, MaxWidth = MaxWidth.Large, CloseButton = true });
+            var resultado = await dialogo.Result;
+            if (resultado is not { Canceled: false, Data: ResultadoDialogoVenta cotizacion }) return;
+
+            // Adjuntamos el saldo con el que se cotizó la renovación para que el servidor
+            // detecte si el saldo de la cuenta de origen cambió en central antes de absorberlo
+            // (misma protección anti doble-cobro que usa el flujo offline).
+            var solicitud = cotizacion.Request with { SaldoRenovacionEsperado = origen.SaldoPendiente };
+
+            var (nueva, error) = await Api.RenovarVentaAdminAsync(origen.IdVenta, solicitud);
+            if (error is not null || nueva is null)
+            {
+                _snackbar.Add(error ?? "No se recibió confirmación de la renovación.", Severity.Error);
+                return;
+            }
+            _snackbar.Add($"Cuenta '{origen.CodigoVenta}' liquidada. Nueva cuenta '{nueva.CodigoVenta}'.", Severity.Success);
+            await CargarAsync();
+        }
+        finally { _renovando = false; }
+    }
+
+    // Cancela de forma lógica una venta que todavía no tiene abonos registrados.
+    private async Task CancelarVenta(EstadoCuentaVentaDto venta)
+    {
+        // Guardamos solo las ventas sin abonos: pedimos confirmación explícita antes de cancelar.
+        var codigo = venta.CodigoVenta ?? $"#{venta.IdVenta}";
+
+        var confirmado = await ConfirmarDialogo(
+            "Cancelar venta",
+            $"¿Deseas cancelar la venta '{codigo}'? Esta acción no se puede deshacer.",
+            "Sí, cancelar",
+            Color.Error);
+
+        if (!confirmado)
+            return;
+
+        var (datos, error) = await Api.CancelarVentaAdminAsync(venta.IdVenta);
+
+        if (error is not null)
+        {
+            _snackbar.Add(error, Severity.Error);
+            return;
+        }
+
+        _snackbar.Add($"Venta '{codigo}' cancelada correctamente.", Severity.Success);
+
+        // Refrescamos el estado de cuenta para reflejar la cancelación en el historial.
+        await CargarAsync();
+    }
+
+    // Diálogo de confirmación reutilizable (mismo patrón que el resto de la app).
+    private async Task<bool> ConfirmarDialogo(string titulo, string mensaje, string textoAceptar, Color color)
+    {
+        var opciones = new DialogOptions { MaxWidth = MaxWidth.ExtraSmall, FullWidth = true };
+        var parametros = new DialogParameters<DialogoConfirmacion>
+        {
+            { x => x.Titulo, titulo },
+            { x => x.Mensaje, mensaje },
+            { x => x.TextoAceptar, textoAceptar },
+            { x => x.ColorAceptar, color },
+            { x => x.Icono, Icons.Material.Filled.Warning },
+            { x => x.ColorIcono, color }
+        };
+        var dialogo = await _dialogo.ShowAsync<DialogoConfirmacion>(titulo, parametros, opciones);
+        var resultado = await dialogo.Result;
+        return resultado is { Canceled: false, Data: true };
+    }
+
+    // Edita una venta sin abonos: carga su detalle, abre el diálogo precargado y persiste los cambios.
+    private async Task EditarVenta(EstadoCuentaVentaDto venta)
+    {
+        if (_cliente is null)
+            return;
+
+        var codigo = venta.CodigoVenta ?? $"#{venta.IdVenta}";
+
+        // Traemos la radiografía completa de la venta (detalles, planes, cuotas).
+        var (ventaCompleta, errorObtener) = await Api.ObtenerVentaAdminAsync(venta.IdVenta);
+        if (errorObtener is not null)
+        {
+            _snackbar.Add(errorObtener, Severity.Error);
+            return;
+        }
+        if (ventaCompleta is null)
+        {
+            _snackbar.Add($"No se encontró la venta '{codigo}'.", Severity.Error);
+            return;
+        }
+
+        var resultado = await MostrarDialogoNuevaVenta(_cliente, ventaCompleta);
+        if (resultado is null)
+            return;
+
+        // Construimos el request de actualización a partir del request capturado.
+        var req = resultado.Request;
+        var actualizar = new ActualizarVentaRequest(
+            IdVendedor: req.IdVendedor,
+            IdCondicion: req.IdCondicion,
+            Subtotal: req.Subtotal,
+            DescuentoGlobal: req.DescuentoGlobal,
+            TotalFinal: req.TotalFinal,
+            Enganche: req.Enganche,
+            IdFrecuenciaPago: req.IdFrecuenciaPago,
+            NumeroCuotas: req.NumeroCuotas,
+            MontoCuotaFija: req.MontoCuotaFija,
+            TasaInteres: req.TasaInteres,
+            FechaPrimerVence: req.FechaPrimerVence,
+            Observaciones: req.Observaciones,
+            Detalles: req.Detalles,
+            PlanesPromocionales: req.PlanesPromocionales);
+
+        var (actualizada, error) = await Api.EditarVentaAdminAsync(venta.IdVenta, actualizar);
+        if (error is not null)
+        {
+            _snackbar.Add(error, Severity.Error);
+            return;
+        }
+
+        _snackbar.Add($"Venta '{actualizada?.CodigoVenta ?? codigo}' actualizada correctamente.", Severity.Success);
+
+        // Refrescamos el estado de cuenta para reflejar los cambios.
+        await CargarAsync();
+    }
+
+    // Abre el diálogo de alta de venta a crédito para el cliente y persiste la venta en el servidor.
+    /*private async Task AsignarVenta()
+    {
+        if (_cliente is null) return;
+
+        var req = await MostrarDialogoNuevaVenta(_cliente);
+        if (req is null) return;
+
+        var (venta, error) = await Api.CrearVentaAdminAsync(req);
+        if (error is not null) { _snackbar.Add(error, Severity.Error); return; }
+
+        _snackbar.Add($"Venta '{venta?.CodigoVenta ?? "nueva"}' registrada para '{_cliente.NombreCompleto}'.", Severity.Success);
+
+        // Refrescamos el estado de cuenta para que la venta recién creada aparezca en el historial.
+        await CargarAsync();
+    }*/
+    private async Task AsignarVenta()
+    {
+        if (_cliente is null)
+            return;
+
+        // Clientes MALO/MOROSO no pueden recibir ventas (el botón está deshabilitado; doble barrera aquí).
+        if (_ventaBloqueada)
+            return;
+
+        var resultado = await MostrarDialogoNuevaVenta(_cliente);
+
+        if (resultado is null)
+            return;
+
+        var req = resultado.Request;
+
+        // Primero guardamos la venta.
+        var (venta, error) = await Api.CrearVentaAdminAsync(req);
+
+        if (error is not null)
+        {
+            _snackbar.Add(error, Severity.Error);
+            return;
+        }
+
+        var codigoVenta = venta?.CodigoVenta ?? "nueva";
+
+        _snackbar.Add(
+            $"Venta '{codigoVenta}' registrada para '{_cliente.NombreCompleto}'.",
+            Severity.Success);
+
+        // La venta ya está guardada.
+        // Ahora ofrecemos imprimir el ticket únicamente en móvil.
+        if (EsEntornoMovil)
+        {
+            await PreguntarImprimirTicket(req, codigoVenta);
+        }
+
+        // Refrescamos el estado de cuenta.
+        await CargarAsync();
+
+        // Tras terminar la venta (y cerrar la impresión del ticket en móvil, o confirmar en web),
+        // esperamos 5 s y regresamos a la búsqueda de clientes para agilizar el siguiente registro.
+        await ProgramarRegresoBusquedaAsync();
+    }
+    // ===================== Helpers de diálogo =====================
+
+    private async Task<ResultadoDialogoVenta?> MostrarDialogoNuevaVenta(ClienteDto cliente, VentaDto? ventaExistente = null)
+    {
+        // En móvil el formulario de venta ocupa toda la pantalla; en escritorio es un diálogo grande centrado.
+        var opciones = EsEntornoMovil
+            ? new DialogOptions { FullScreen = true, CloseButton = true }
+            : new DialogOptions { MaxWidth = MaxWidth.Large, FullWidth = true, CloseButton = true };
+        var parametros = new DialogParameters<DialogoNuevaVenta>
+        {
+            { x => x.Cliente, cliente },
+            { x => x.CodigoVenta, ventaExistente?.CodigoVenta ?? string.Empty }, // El servidor genera el folio cuando viene vacío.
+            { x => x.IdVendedor, cliente.IdVendedor ?? 0 },
+            { x => x.IdZona, cliente.IdZona ?? 0 },
+            { x => x.VentaExistente, ventaExistente }
+        };
+        var titulo = ventaExistente is null ? "Nueva venta" : $"Editar venta {ventaExistente.CodigoVenta}";
+        var dialogo = await _dialogo.ShowAsync<DialogoNuevaVenta>(titulo, parametros, opciones);
+        var resultado = await dialogo.Result;
+        return resultado is { Canceled: false, Data: ResultadoDialogoVenta datos } ? datos : null;
+    }
+
+    // Determina si la app corre en un entorno móvil (no Web ni Desktop) para adaptar el diálogo.
+    private bool EsEntornoMovil
+    {
+        get
+        {
+            var ff = _formFactor.GetFormFactor();
+            return !ff.Equals("Web", StringComparison.OrdinalIgnoreCase)
+                   && !ff.Equals("Desktop", StringComparison.OrdinalIgnoreCase);
+        }
+    }
+private async Task PreguntarImprimirTicket(
+    CrearVentaRequest req,
+    string codigoVenta)
+{
+    if (_cliente is null)
+        return;
+
+    await AbrirImpresoraBluetooth(req, codigoVenta);
+}
+
+private async Task AbrirImpresoraBluetooth(
+    CrearVentaRequest req,
+    string codigoVenta)
+{
+    if (_cliente is null)
+        return;
+
+    var ticket = await ConstruirTicketAsync(req, codigoVenta);
+
+    var opciones = new DialogOptions
+    {
+        FullScreen = EsEntornoMovil,
+        CloseButton = true,
+        FullWidth = true,
+        MaxWidth = MaxWidth.Small
+    };
+
+    var dialogo = await _dialogo.ShowAsync<ImpresoraBluetoothDialog>(
+        "Imprimir ticket",
+        opciones);
+
+    var resultado = await dialogo.Result;
+
+    if (resultado.Canceled)
+        return;
+
+    if (resultado.Data is not ImpresoraBluetoothDto impresora)
+        return;
+
+    try
+    {
+        var impreso = await _impresionTicket.ImprimirAsync(
+            impresora,
+            ticket);
+
+        if (impreso)
+        {
+            _snackbar.Add(
+                "Ticket impreso correctamente.",
+                Severity.Success);
+        }
+        else
+        {
+            _snackbar.Add(
+                "La venta se registró, pero no fue posible imprimir el ticket.",
+                Severity.Warning);
+        }
+    }
+    catch (Exception ex)
+    {
+        _snackbar.Add(
+            $"La venta se registró, pero ocurrió un error al imprimir: {ex.Message}",
+            Severity.Warning);
+    }
+}
+
+private TicketVentaDto ConstruirTicket(
+    CrearVentaRequest req,
+    string codigoVenta)
+{
+    var detalles = req.Detalles
+        .Select(d => new TicketDetalleDto(
+            Descripcion: $"Producto #{d.IdProducto}",
+            Cantidad: d.Cantidad,
+            Precio: d.PrecioCobrado,
+            Importe: d.Cantidad * d.PrecioCobrado))
+        .ToList();
+
+    var planes = (req.PlanesPromocionales ?? new List<CrearVentaPlanRequest>())
+        .Select(p => new TicketPlanDto(
+            NumeroMeses: p.NumeroMeses,
+            MontoLiquidacion: p.MontoLiquidacion))
+        .ToList();
+    string nombreCorto = EmpresaGlobal.Info?.NombreCorto;
+    
+    return new TicketVentaDto(
+        NombreNegocio : string.IsNullOrWhiteSpace(nombreCorto) ? "Sistema de Cobranza" : nombreCorto,
+        CodigoVenta: codigoVenta,
+        Fecha: FechaProyecto.Ahora.DateTime,
+
+        Cliente: new ClienteTicketDto(
+            NombreCompleto: _cliente!.NombreCompleto,
+            Telefono: _cliente.TelefonoPrincipal,
+            Direccion: _cliente.Direccion,
+            Ruta: _cliente.Ruta,
+            Zona: _estadoCuenta?.Zona),
+
+        Detalles: detalles,
+
+        Subtotal: req.Subtotal,
+        Descuento: req.DescuentoGlobal,
+        Total: req.TotalFinal,
+        Enganche: req.Enganche,
+        MontoFinanciado: req.TotalFinal - req.Enganche,
+
+        FrecuenciaPago: null,
+        CuotaFija: req.MontoCuotaFija ?? 0m,
+        NumeroCuotas: req.NumeroCuotas ?? 0,
+        FechaPrimerVence: req.FechaPrimerVence,
+
+        PlanesPromocionales: planes);
+}
+
+private async Task<TicketVentaDto> ConstruirTicketAsync(
+    CrearVentaRequest req,
+    string codigoVenta)
+{
+    var productos = await Api.ProductosActivosAsync();
+
+    var productosPorId = productos
+        .ToDictionary(p => p.Id, p => p);
+
+    var detalles = req.Detalles
+        .Select(d =>
+        {
+            var descripcion = productosPorId.TryGetValue(
+                d.IdProducto,
+                out var producto)
+                ? producto.Descripcion
+                : $"Producto #{d.IdProducto}";
+
+            return new TicketDetalleDto(
+                Descripcion: descripcion,
+                Cantidad: d.Cantidad,
+                Precio: d.PrecioCobrado,
+                Importe: d.Cantidad * d.PrecioCobrado);
+        })
+        .ToList();
+
+    var planes = (req.PlanesPromocionales ?? new List<CrearVentaPlanRequest>())
+        .Select(p => new TicketPlanDto(
+            NumeroMeses: p.NumeroMeses,
+            MontoLiquidacion: p.MontoLiquidacion))
+        .ToList();
+
+    // Descripción de la frecuencia de pago (SEMANAL, QUINCENAL, …) para el plan de pago del ticket.
+    string? frecuencia = null;
+    if (req.IdFrecuenciaPago is { } idFrecuencia)
+    {
+        var (frecuencias, _) = await Api.ListarFrecuenciasPagoOperativasAsync();
+        frecuencia = frecuencias?.FirstOrDefault(f => f.Id == idFrecuencia)?.Descripcion;
+    }
+
+    // Nombre comercial corto de la empresa (con fallback a la identidad del login y, por último, genérico).
+    var nombreCorto = EmpresaGlobal.Info?.NombreCorto ?? EmpresaGlobal.Identidad?.NombreCorto;
+    var negocio = string.IsNullOrWhiteSpace(nombreCorto) ? "Sistema de Cobranza" : nombreCorto;
+
+    return new TicketVentaDto(
+        NombreNegocio: negocio,
+        CodigoVenta: codigoVenta,
+        Fecha: FechaProyecto.Ahora.DateTime,
+
+        Cliente: new ClienteTicketDto(
+            NombreCompleto: _cliente!.NombreCompleto,
+            Telefono: _cliente.TelefonoPrincipal,
+            Direccion: _cliente.Direccion,
+            Ruta: _cliente.Ruta,
+            Zona: _estadoCuenta?.Zona),
+
+        Detalles: detalles,
+
+        Subtotal: req.Subtotal,
+        Descuento: req.DescuentoGlobal,
+        Total: req.TotalFinal,
+        Enganche: req.Enganche,
+        MontoFinanciado: req.TotalFinal - req.Enganche,
+
+        FrecuenciaPago: frecuencia,
+        CuotaFija: req.MontoCuotaFija ?? 0m,
+        NumeroCuotas: req.NumeroCuotas ?? 0,
+        FechaPrimerVence: req.FechaPrimerVence,
+
+        PlanesPromocionales: planes);
+}
+}

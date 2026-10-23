@@ -1,0 +1,232 @@
+@using MudBlazor
+@using SistemaCobranzaApp.Shared.Dtos
+
+<MudDialog Class="@ClaseDialogo">
+    <TitleContent>
+        <MudText Typo="Typo.h6" Style="font-weight: 600;">
+            <MudIcon Icon="@Icono" Class="mr-2" Style="vertical-align: middle;" />
+            @Titulo
+        </MudText>
+    </TitleContent>
+
+    <DialogContent>
+        <MudForm @ref="_form" @bind-IsValid="@_formValido">
+            <MudGrid>
+                <MudItem xs="12" sm="4">
+                    <MudTextField T="string"
+                                  Label="Código / Clave"
+                                  @bind-Value="Modelo.CodigoClave"
+                                  Required="true"
+                                  RequiredError="El código es obligatorio."
+                                  Variant="Variant.Outlined"
+                                  Margin="Margin.Dense" />
+                </MudItem>
+
+                <MudItem xs="12" sm="8">
+                    <MudTextField T="string"
+                                  Label="Descripción"
+                                  @bind-Value="Modelo.Descripcion"
+                                  Required="true"
+                                  RequiredError="La descripción es obligatoria."
+                                  Variant="Variant.Outlined"
+                                  Margin="Margin.Dense" />
+                </MudItem>
+
+                <MudItem xs="12" sm="6">
+                    <MudSelect T="long?"
+                               Label="Categoría"
+                               @bind-Value="Modelo.IdCategoria"
+                               Required="true"
+                               RequiredError="La categoría es obligatoria."
+                               Variant="Variant.Outlined"
+                               Margin="Margin.Dense"
+                              >
+                        @foreach (var c in Categorias)
+                        {
+                            <MudSelectItem T="long?" Value="@c.Id">@c.Descripcion</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+
+                <MudItem xs="12" sm="6">
+                    <MudSelect T="long?"
+                               Label="Marca"
+                               @bind-Value="Modelo.IdMarca"
+                               Required="true"
+                               RequiredError="La marca es obligatoria."
+                               Variant="Variant.Outlined"
+                               Margin="Margin.Dense"
+                              >
+                        @foreach (var m in Marcas)
+                        {
+                            <MudSelectItem T="long?" Value="@m.Id">@m.Descripcion</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+
+                <MudItem xs="12" sm="6">
+                    <MudSelect T="long?"
+                               Label="Color (opcional)"
+                               @bind-Value="Modelo.IdColor"
+                               Variant="Variant.Outlined"
+                               Margin="Margin.Dense"
+                               Clearable="true"
+                              >
+                        @foreach (var c in Colores)
+                        {
+                            <MudSelectItem T="long?" Value="@c.Id">@c.Descripcion</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+
+                <MudItem xs="12" sm="6">
+                    <MudSelect T="long?"
+                               Label="Talla (opcional)"
+                               @bind-Value="Modelo.IdTalla"
+                               Variant="Variant.Outlined"
+                               Margin="Margin.Dense"
+                               Clearable="true"
+                              >
+                        @foreach (var t in Tallas)
+                        {
+                            <MudSelectItem T="long?" Value="@t.Id">@t.Descripcion (@t.Tipo)</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+
+                <MudItem xs="12">
+                    <MudSelect T="long?" Label="Esquema de comisión" @bind-Value="Modelo.IdCatalogoComision"
+                               Required="true" RequiredError="Selecciona un esquema de comisión."
+                               Variant="Variant.Outlined" Margin="Margin.Dense">
+                        @if (!EsNuevo && Modelo.IdCatalogoComision is long idActual && !Comisiones.Any(c => c.Id == idActual))
+                        {
+                            <MudSelectItem T="long?" Value="@idActual" Disabled="true">@Modelo.NombreComisionActual (inactivo)</MudSelectItem>
+                        }
+                        @foreach (var comision in Comisiones)
+                        {
+                            <MudSelectItem T="long?" Value="@comision.Id">@comision.NombreEsquema</MudSelectItem>
+                        }
+                    </MudSelect>
+                    @if (Comisiones.FirstOrDefault(c => c.Id == Modelo.IdCatalogoComision) is { } seleccionada)
+                    {
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">
+                            @(seleccionada.TipoCalculo == "PORCENTAJE" ? "Porcentaje" : "Monto fijo"):
+                            contado @FormatearComision(seleccionada.ComisionContado, seleccionada.TipoCalculo)
+                            · crédito @FormatearComision(seleccionada.ComisionCredito, seleccionada.TipoCalculo)
+                        </MudText>
+                    }
+                </MudItem>
+
+                <MudItem xs="12" sm="4">
+                    <MudNumericField T="decimal"
+                                     Label="Costo"
+                                     @bind-Value="Modelo.Costo"
+                                     Min="0"
+                                     Format="N2"
+                                     Variant="Variant.Outlined"
+                                     Margin="Margin.Dense"
+                                     Adornment="Adornment.Start"
+                                     AdornmentText="$" />
+                </MudItem>
+
+                <MudItem xs="12" sm="4">
+                    <MudNumericField T="decimal"
+                                     Label="Precio sugerido"
+                                     @bind-Value="Modelo.PrecioSugerido"
+                                     Min="0"
+                                     Format="N2"
+                                     Variant="Variant.Outlined"
+                                     Margin="Margin.Dense"
+                                     Adornment="Adornment.Start"
+                                     AdornmentText="$" />
+                </MudItem>
+
+                <MudItem xs="12" sm="4">
+                    <MudNumericField T="decimal"
+                                     Label="Precio mínimo"
+                                     @bind-Value="Modelo.PrecioMinimo"
+                                     Min="0"
+                                     Format="N2"
+                                     Variant="Variant.Outlined"
+                                     Margin="Margin.Dense"
+                                     Adornment="Adornment.Start"
+                                     AdornmentText="$" />
+                </MudItem>
+
+                <MudItem xs="12" sm="4">
+                    <MudNumericField T="int"
+                                     Label="Stock mínimo"
+                                     @bind-Value="Modelo.StockMini"
+                                     Min="0"
+                                     Variant="Variant.Outlined"
+                                     Margin="Margin.Dense" />
+                </MudItem>
+
+                <MudItem xs="12" Class="d-flex align-center">
+                    <MudSwitch T="bool"
+                               @bind-Value="Modelo.Activo"
+                               Color="Color.Primary"
+                               Label="@(Modelo.Activo ? "Estatus: Activo" : "Estatus: Inactivo")" />
+                </MudItem>
+            </MudGrid>
+        </MudForm>
+    </DialogContent>
+
+    <DialogActions>
+        <MudButton OnClick="Cancelar" Variant="Variant.Text" Color="Color.Default">Cancelar</MudButton>
+        <MudButton OnClick="Guardar" Variant="Variant.Filled" Color="Color.Primary" Disabled="@(!_formValido)">
+            Guardar
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter] public string Titulo { get; set; } = "Gestionar producto";
+    [Parameter] public string Icono { get; set; } = Icons.Material.Filled.Inventory2;
+    [Parameter] public bool EsNuevo { get; set; }
+    [Parameter] public FormModel Modelo { get; set; } = new();
+
+    /// <summary>Clase CSS extra aplicada al contenedor del diálogo (p. ej. safe-area en móvil a pantalla completa).</summary>
+    [Parameter] public string? ClaseDialogo { get; set; }
+
+    [Parameter] public IReadOnlyList<CategoriaDto> Categorias { get; set; } = new List<CategoriaDto>();
+    [Parameter] public IReadOnlyList<MarcaDto> Marcas { get; set; } = new List<MarcaDto>();
+    [Parameter] public IReadOnlyList<ColorDto> Colores { get; set; } = new List<ColorDto>();
+    [Parameter] public IReadOnlyList<TallaDto> Tallas { get; set; } = new List<TallaDto>();
+
+    [Parameter] public IReadOnlyList<CatalogoComisionDto> Comisiones { get; set; } = new List<CatalogoComisionDto>();
+
+    private static string FormatearComision(decimal valor, string tipoCalculo)
+        => tipoCalculo == "PORCENTAJE" ? $"{valor:N2} %" : valor.ToString("C2");
+
+    private MudForm _form = null!;
+    private bool _formValido;
+
+    private void Cancelar() => MudDialog.Cancel();
+
+    private async Task Guardar()
+    {
+        await _form.ValidateAsync();
+        if (_formValido)
+            MudDialog.Close(DialogResult.Ok(Modelo));
+    }
+
+    public class FormModel
+    {
+        public string CodigoClave { get; set; } = string.Empty;
+        public string Descripcion { get; set; } = string.Empty;
+        public decimal Costo { get; set; }
+        public decimal PrecioSugerido { get; set; }
+        public decimal PrecioMinimo { get; set; }
+        public int StockMini { get; set; }
+        public long? IdCategoria { get; set; }
+        public long? IdMarca { get; set; }
+        public long? IdColor { get; set; }
+        public long? IdTalla { get; set; }
+        public long? IdCatalogoComision { get; set; }
+        public string NombreComisionActual { get; set; } = string.Empty;
+        public bool Activo { get; set; } = true;
+    }
+}

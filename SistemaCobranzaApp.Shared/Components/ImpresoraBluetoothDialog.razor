@@ -1,0 +1,176 @@
+@using MudBlazor
+@using SistemaCobranzaApp.Shared.Services
+
+@inject ServicioImpresionTicket Impresion
+@inject ISnackbar Snackbar
+
+<MudDialog>
+
+    <TitleContent>
+        <MudStack Row="true"
+                  AlignItems="AlignItems.Center"
+                  Spacing="2">
+
+            <MudIcon Icon="@Icons.Material.Filled.Print"
+                     Color="Color.Primary" />
+
+            <MudText Typo="Typo.h6">
+                Impresora de tickets
+            </MudText>
+
+        </MudStack>
+    </TitleContent>
+
+    <DialogContent>
+
+        @if (_cargando)
+        {
+            <MudStack AlignItems="AlignItems.Center"
+                      Class="pa-6">
+
+                <MudProgressCircular Indeterminate="true"
+                                     Color="Color.Primary" />
+
+                <MudText Typo="Typo.body2"
+                         Class="mt-3">
+                    Buscando impresoras Bluetooth...
+                </MudText>
+
+            </MudStack>
+        }
+        else if (!_impresoras.Any())
+        {
+            <MudAlert Severity="Severity.Warning"
+                      Variant="Variant.Outlined">
+
+                No se encontraron impresoras Bluetooth
+                vinculadas al dispositivo.
+
+            </MudAlert>
+
+            <MudText Typo="Typo.caption"
+                     Color="Color.Secondary"
+                     Class="d-block mt-3">
+
+                Primero vincula la impresora desde los ajustes
+                Bluetooth de Android y después vuelve a intentar.
+
+            </MudText>
+        }
+        else
+        {
+            <MudText Typo="Typo.body2"
+                     Class="mb-3">
+
+                Selecciona la impresora donde deseas imprimir
+                el ticket.
+
+            </MudText>
+
+            <MudRadioGroup T="string"
+                           @bind-Value="_direccionSeleccionada">
+
+                @foreach (var impresora in _impresoras)
+                {
+                    <MudPaper Class="pa-3 mb-2"
+                              Elevation="1">
+
+                        <MudRadio T="string"
+                                  Value="@impresora.Direccion">
+
+                            <MudStack>
+                                <MudText>
+                                    <b>@impresora.Nombre</b>
+                                </MudText>
+
+                                <MudText Typo="Typo.caption"
+                                         Color="Color.Secondary">
+                                    @impresora.Direccion
+                                </MudText>
+                            </MudStack>
+
+                        </MudRadio>
+
+                    </MudPaper>
+                }
+
+            </MudRadioGroup>
+        }
+
+    </DialogContent>
+
+    <DialogActions>
+
+        <MudButton OnClick="Cancelar"
+                   Variant="Variant.Text">
+            Cancelar
+        </MudButton>
+
+        <MudButton Color="Color.Primary"
+                   Variant="Variant.Filled"
+                   Disabled="@(_direccionSeleccionada is null)"
+                   OnClick="Aceptar">
+
+            <MudIcon Icon="@Icons.Material.Filled.Print"
+                     Class="mr-2" />
+
+            Imprimir
+
+        </MudButton>
+
+    </DialogActions>
+
+</MudDialog>
+
+@code {
+
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    private List<ImpresoraBluetoothDto> _impresoras = new();
+
+    private string? _direccionSeleccionada;
+
+    private bool _cargando = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _impresoras =
+                (await Impresion.ObtenerImpresorasAsync())
+                .ToList();
+        }
+        catch (Exception ex)
+        {
+            // Mostramos el motivo real (permisos denegados, Bluetooth apagado, etc.)
+            // en lugar de ocultarlo tras un genérico "no se encontraron impresoras".
+            _impresoras = new();
+            Snackbar.Add(ex.Message, Severity.Warning);
+        }
+        finally
+        {
+            _cargando = false;
+        }
+    }
+
+    private void Aceptar()
+    {
+        if (_direccionSeleccionada is null)
+            return;
+
+        var impresora = _impresoras.FirstOrDefault(
+            x => x.Direccion == _direccionSeleccionada);
+
+        if (impresora is null)
+            return;
+
+        MudDialog.Close(
+            DialogResult.Ok(impresora));
+    }
+
+    private void Cancelar()
+    {
+        MudDialog.Cancel();
+    }
+}

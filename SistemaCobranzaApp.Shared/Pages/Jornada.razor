@@ -1,0 +1,155 @@
+@page "/jornada"
+@implements IDisposable
+@using MudBlazor
+@using SistemaCobranzaApp.Shared.Dtos
+@using SistemaCobranzaApp.Shared.Services
+@using SistemaCobranzaApp.Shared.Components
+@inject ApiCliente Api
+@inject ServicioJornadaLocal Local
+@inject EstadoEmpresaGlobal Empresa
+@inject NavigationManager Nav
+@inject IDialogService Dialogos
+@inject ISnackbar Snackbar
+
+<MudPaper Class="pa-4 ma-2">
+    <MudText Typo="Typo.h5">Mi jornada</MudText>
+    @if (!_lista)
+    {
+        <MudProgressLinear Indeterminate="true" Class="my-4" />
+    }
+    else if (!Local.Disponible)
+    {
+        <MudAlert Severity="Severity.Info">La jornada sin conexión está disponible en Android.</MudAlert>
+    }
+    else if (!Local.EsUsuarioCampo)
+    {
+        <MudAlert Severity="Severity.Warning">Esta pantalla requiere un usuario Vendedor o Cobrador.</MudAlert>
+    }
+    else
+    {
+        <div class="my-3">
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; width:100%;">
+                <MudChip T="string" Color="@(Local.ConInternet ? Color.Success : Color.Warning)" Class="ma-0" Style="width:100%; justify-content:center;">
+                    @(Local.ConInternet ? "Con conexión" : "Sin conexión")
+                </MudChip>
+                <MudChip T="string" Color="Color.Primary" Class="ma-0" Style="width:100%; justify-content:center;">Pendientes: @Local.Pendientes</MudChip>
+            </div>
+            <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Sincronizar" FullWidth="true" Class="mt-3"
+                       Disabled="@(_ocupada || Local.Sincronizando || !Local.ConInternet || Local.Estado.Descarga is null)">
+                @(Local.Sincronizando ? "Sincronizando..." : "Sincronizar con central")
+            </MudButton>
+        </div>
+        @if (Local.UltimoError is { } error)
+        {
+            <MudAlert Severity="Severity.Warning" Class="mb-3">@error</MudAlert>
+        }
+        @if (Api.Sesion is { } sesion && sesion.Expira <= DateTimeOffset.UtcNow)
+        {
+            <MudButton Href="/login" Color="Color.Primary" Variant="Variant.Outlined">Renovar sesión para sincronizar</MudButton>
+        }
+        @if (Local.Estado.Descarga is { } d)
+        {
+            <MudText Typo="Typo.subtitle1"><b>Zona: @d.Asignacion.Ruta</b> · @Api.Sesion?.NombreCompleto</MudText>
+            <MudText Typo="Typo.caption">Descargada: @d.DescargadaEn.EnZonaProyecto().ToString("dd/MM/yyyy HH:mm")</MudText>
+            <MudAlert Severity="Severity.Info" Class="my-3">
+                Los registros se guardan primero en este dispositivo. Central confirma los saldos, existencias y folios definitivos al sincronizar.
+            </MudAlert>
+        }
+
+        <MudExpansionPanels Class="my-3">
+            <MudExpansionPanel Text="Descargar zona al inicio de la jornada" Expanded="@(Local.Estado.Descarga is null)">
+                <MudText>Zona: @(Api.Sesion?.Zona ?? "Sin zona en la sesión")</MudText>
+                @if (_errorZona is not null)
+                {
+                    <MudAlert Severity="Severity.Warning" Class="my-2">@_errorZona</MudAlert>
+                }
+                <MudText>Se descargarán los clientes y cuentas de todas las rutas de tu zona.</MudText>
+                <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Descargar" FullWidth="true" Class="mt-3"
+                           Disabled="@(_ocupada || Local.Sincronizando || !Local.ConInternet || Local.Pendientes > 0)">
+                    Descargar jornada completa
+                </MudButton>
+                <MudText Typo="Typo.caption" Class="mt-2">Requiere internet. Sincroniza todos los pendientes antes de reemplazar la jornada descargada.</MudText>
+            </MudExpansionPanel>
+        </MudExpansionPanels>
+
+        @if (Local.Estado.Descarga is { } jornada)
+        {
+            <MudGrid Class="my-3">
+                <MudItem xs="12" sm="4"><MudPaper Outlined="true" Class="pa-3"><MudText>Clientes disponibles</MudText><MudText Typo="Typo.h5">@Local.ClientesDisponibles().Count</MudText></MudPaper></MudItem>
+                <MudItem xs="12" sm="4"><MudPaper Outlined="true" Class="pa-3"><MudText>Ventas capturadas</MudText><MudText Typo="Typo.h5">@Local.Estado.Operaciones.Where(o => o.Venta is not null).Sum(o => o.Venta!.TotalFinal).ToString("C2")</MudText></MudPaper></MudItem>
+                <MudItem xs="12" sm="4"><MudPaper Outlined="true" Class="pa-3"><MudText>Abonos recibidos</MudText><MudText Typo="Typo.h5">@Local.Estado.Operaciones.Where(o => o.Pago is not null).Sum(o => o.Pago!.MontoAbona).ToString("C2")</MudText></MudPaper></MudItem>
+            </MudGrid>
+            <MudText>Confirmadas: @Local.Estado.Operaciones.Count(o => o.Aplicada) · Pendientes: @Local.Pendientes · Con error: @Local.Estado.Operaciones.Count(o => !o.Aplicada && o.Error is not null)</MudText>
+
+
+            <MudText Typo="Typo.h6" Class="mt-4">Operaciones de la jornada</MudText>
+            <MudTable Items="Local.Estado.Operaciones.OrderByDescending(o => o.FechaCaptura)" Dense="true" Breakpoint="Breakpoint.Sm">
+                <HeaderContent><MudTh>Referencia</MudTh><MudTh>Operación</MudTh><MudTh>Monto</MudTh><MudTh>Estado</MudTh></HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Referencia">@Referencia(context)</MudTd>
+                    <MudTd DataLabel="Operación">@(context.Cliente is not null ? "Cliente nuevo" : context.Venta is null ? "Abono" : "Venta") · @NombreCliente(context)</MudTd>
+                    <MudTd DataLabel="Monto">@((context.Venta?.TotalFinal ?? context.Pago?.MontoAbona ?? 0).ToString("C2"))</MudTd>
+                    <MudTd DataLabel="Estado">
+                        <MudText Color="@(context.Aplicada ? Color.Success : context.Error is null ? Color.Warning : Color.Error)">
+                            @(context.Aplicada ? "Confirmada por central" : context.Error ?? "Guardada en dispositivo · pendiente")
+                        </MudText>
+                        @if (context.Venta is not null || context.Pago is not null)
+                        {
+                            <MudButton StartIcon="@Icons.Material.Filled.Print" OnClick="@(() => _impresion!.ImprimirAsync(context.Uuid))">Imprimir ticket</MudButton>
+                        }
+                    </MudTd>
+                </RowTemplate>
+                <NoRecordsContent><MudText Class="pa-3">Todavía no hay operaciones capturadas en esta jornada.</MudText></NoRecordsContent>
+            </MudTable>
+        }
+    }
+</MudPaper>
+
+<ImpresionJornada @ref="_impresion" />
+
+@code {
+    private ImpresionJornada? _impresion;
+    private bool _lista, _ocupada;
+    private string? _errorZona;
+    protected override async Task OnInitializedAsync()
+    {
+        await Api.CargarSesionDesdeAlmacenamientoAsync();
+        if (!Api.Autenticado) { Nav.NavigateTo("/login"); return; }
+        Local.Cambio += AlCambiar;
+        await Ejecutar(async () =>
+        {
+            await Local.CargarAsync();
+            if (Local.Disponible && Local.EsUsuarioCampo && Local.ConInternet)
+            {
+                _errorZona = await Api.ActualizarZonaJornadaAsync();
+                if (_errorZona is null && Local.Estado.Descarga is not null) await Local.SincronizarAsync();
+            }
+        });
+        _lista = true;
+    }
+
+    private void AlCambiar() => _ = InvokeAsync(StateHasChanged);
+    private Task Sincronizar() => Ejecutar(Local.SincronizarAsync);
+    private Task Descargar() => Ejecutar(async () =>
+    {
+        await Local.DescargarAsync(0);
+        Snackbar.Add("Zona completa guardada en este dispositivo. Ya puedes trabajar sin conexión.", Severity.Success);
+    });
+    private string NombreCliente(OperacionJornadaLocal o)
+    {
+        if (o.ClienteLocal is { } c) return c.NombreCompleto;
+        var id = o.Venta?.IdCliente ?? Local.Estado.Descarga?.Ventas.FirstOrDefault(v => v.IdVenta == o.Pago?.IdVenta)?.IdCliente;
+        return Local.ClientesDisponibles().FirstOrDefault(c => c.IdCliente == id)?.NombreCompleto ?? "";
+    }
+    private static string Referencia(OperacionJornadaLocal o) => o.PagoCentral?.FolioPago ?? o.VentaCentral?.CodigoVenta ?? o.Uuid.ToString("N");
+
+    private async Task Ejecutar(Func<Task> accion)
+    {
+        if (_ocupada) return;
+        _ocupada = true;
+        try { await accion(); }
+        catch (Exception ex) { Snackbar.Add(ex.Message, Severity.Error); }
+        finally { _ocupada = false; }
+    }
+    public void Dispose() => Local.Cambio -= AlCambiar;
+}

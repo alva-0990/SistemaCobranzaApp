@@ -12,7 +12,10 @@ public record PropuestaDetalleDto(
     long IdPropuestaDetalle,
     long IdProducto,
     string? Producto,
-    int Cantidad);
+    int Cantidad,
+    string? CodigoClave = null,
+    string? Marca = null,
+    string? Categoria = null);
 
 public record PropuestaDto(
     long IdPropuesta,

@@ -1,0 +1,273 @@
+@page "/jornada/ventas"
+@implements IDisposable
+@inject ServicioJornadaLocal Jornada
+
+@using MudBlazor
+@using SistemaCobranzaApp.Shared.Components
+@using SistemaCobranzaApp.Shared.Dtos
+@using SistemaCobranzaApp.Shared.Services
+@using SistemaCobranzaApp.Domain.Constantes
+@inject ApiCliente Api
+@inject IDialogService _dialogo
+@inject ISnackbar _snackbar
+@inject IFormFactor _formFactor
+@inject NavigationManager _nav
+
+@if (_idCliente is { } id)
+{
+    <DetalleClienteOffline IdCliente="id" OnRegresar="RegresarABuscador" />
+}
+else
+{
+<MudPaper Elevation="2" Rounded="true" Class="ma-2 pa-4">
+    <div class="barra-acciones">
+        <MudTextField T="string"
+                      @ref="_campoBusqueda"
+                      Value="_busqueda"
+                      ValueChanged="OnBuscarChanged"
+                      Immediate="true"
+                      DebounceInterval="400"
+                      Placeholder="Buscar cliente por nombre, teléfono, ruta o zona..."
+                      Variant="Variant.Outlined"
+                      Adornment="Adornment.Start"
+                      AdornmentIcon="@Icons.Material.Filled.Search"
+                      AdornmentColor="Color.Primary"
+                      Clearable="true"
+                      Class="buscador-remarcado" />
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.PersonAddAlt"
+                   OnClick="AbrirModalNuevoCliente"
+                   Class="boton-nuevo">
+            <span class="d-inline d-sm-none">Nuevo</span>
+            <span class="d-none d-sm-inline">Nuevo cliente</span>
+        </MudButton>
+    </div>
+
+    @if (_cargando)
+    {
+        <div class="d-flex justify-center pa-8">
+            <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+        </div>
+    }
+    else if (!_haBuscado)
+    {
+        @EstadoInicial()
+    }
+    else
+    {
+        <MudTable Items="_clientes" Hover="true" Dense="true"
+                  Breakpoint="Breakpoint.Sm" Elevation="0" RowsPerPage="10"
+                  T="ClienteDto"
+                  OnRowClick="@((TableRowClickEventArgs<ClienteDto> e) => AbrirDetalle(e.Item))"
+                  RowClass="fila-clicable">
+            <HeaderContent>
+                <MudTh Style="width:8%;">ID</MudTh>
+                <MudTh>Nombre</MudTh>
+                <MudTh Style="width:14%;">Vendedor</MudTh>
+                <MudTh Style="width:11%;">Ruta</MudTh>
+                <MudTh Style="width:11%;">Zona</MudTh>
+                <MudTh>Dirección</MudTh>
+                <MudTh>Referencia</MudTh>
+                <MudTh Style="width:13%;">Clasificación</MudTh>
+                <MudTh Style="width:10%; text-align:right;">Acciones</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="ID">@context.IdCliente</MudTd>
+                <MudTd DataLabel="Nombre"><b>@context.NombreCompleto</b></MudTd>
+                <MudTd DataLabel="Vendedor">@(string.IsNullOrWhiteSpace(context.VendedorNombre) ? "—" : context.VendedorNombre)</MudTd>
+                <MudTd DataLabel="Ruta">
+                    <MudChip T="string" Size="Size.Small" Variant="Variant.Text" Color="Color.Primary">
+                        @(string.IsNullOrWhiteSpace(context.Ruta) ? "Sin ruta" : context.Ruta)
+                    </MudChip>
+                </MudTd>
+                <MudTd DataLabel="Zona">@NombreZona(context.IdZona)</MudTd>
+                <MudTd DataLabel="Dirección">@context.Direccion</MudTd>
+                <MudTd DataLabel="Referencia">@(string.IsNullOrWhiteSpace(context.ReferenciaUbicacion) ? "—" : context.ReferenciaUbicacion)</MudTd>
+                <MudTd DataLabel="Clasificación">
+                    <MudChip T="string" Size="Size.Small" Variant="Variant.Text"
+                             Color="@(RiesgoClienteRegla.Resaltar(context.IdClasificacion) ? Color.Error : Color.Secondary)">
+                        @(string.IsNullOrWhiteSpace(context.ClasificacionNombre) ? "Sin clasificación" : context.ClasificacionNombre)
+                    </MudChip>
+                </MudTd>
+                <MudTd DataLabel="Acciones" Style="text-align:right;">
+                    @AccionesFila(context)
+                </MudTd>
+            </RowTemplate>
+            <NoRecordsContent>@SinResultados()</NoRecordsContent>
+            <PagerContent>
+                <MudTablePager InfoFormat="{first_item}-{last_item} de {all_items}" RowsPerPageString="Filas:" />
+            </PagerContent>
+        </MudTable>
+    }
+</MudPaper>
+
+}
+
+@{
+    RenderFragment AccionesFila(ClienteDto c) => __builder =>
+    {
+        <span @onclick:stopPropagation="true">
+            <MudIconButton Icon="@Icons.Material.Filled.Visibility" Size="Size.Small" Color="Color.Primary"
+                           Title="Ver información" OnClick="@(() => AbrirDetalle(c))" />
+        </span>
+    };
+
+    // Estado inicial: aún no se ha buscado nada; invita a usar el buscador.
+    RenderFragment EstadoInicial() => __builder =>
+    {
+        <div class="pa-8 text-center">
+            <MudIcon Icon="@Icons.Material.Filled.Search" Size="Size.Large" Color="Color.Secondary" />
+            <MudText Typo="Typo.h6" Class="mt-2">Busca un cliente para comenzar</MudText>
+            <MudText Color="Color.Secondary">
+                Escribe un nombre, teléfono, ruta o zona en el buscador de arriba.
+            </MudText>
+        </div>
+    };
+
+    // Estado "sin resultados": invita a dar de alta un cliente o a iniciar una nueva búsqueda.
+    RenderFragment SinResultados() => __builder =>
+    {
+        <div class="pa-8 text-center">
+            <MudIcon Icon="@Icons.Material.Filled.PersonSearch" Size="Size.Large" Color="Color.Secondary" />
+            <MudText Typo="Typo.h6" Class="mt-2">
+                @(string.IsNullOrWhiteSpace(_busqueda)
+                    ? "No hay clientes registrados."
+                    : $"No se encontró ningún cliente para \"{_busqueda}\".")
+            </MudText>
+            <MudText Color="Color.Secondary" Class="mb-4">
+                ¿Es un cliente nuevo? Puedes darlo de alta ahora mismo.
+            </MudText>
+            <div class="d-flex justify-center gap-2 flex-wrap">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Large"
+                           StartIcon="@Icons.Material.Filled.PersonAddAlt"
+                           OnClick="AbrirModalNuevoCliente"
+                           Class="boton-alta-grande">
+                    Dar de alta cliente
+                </MudButton>
+                <MudButton Variant="Variant.Outlined" Color="Color.Default" Size="Size.Large"
+                           StartIcon="@Icons.Material.Filled.Search"
+                           OnClick="NuevaBusqueda">
+                    Nueva búsqueda
+                </MudButton>
+            </div>
+        </div>
+    };
+}
+
+<style>
+    .barra-acciones {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 16px;
+    }
+
+    .barra-acciones .buscador-remarcado { flex: 1 1 auto; min-width: 0; }
+    .boton-nuevo { white-space: nowrap; flex: 0 0 auto; }
+    .buscador-remarcado .mud-input-outlined-border { border-width: 2px; }
+
+    /* En móvil: input arriba y botón "Nuevo cliente" grande debajo, ocupando el ancho. */
+    @@media (max-width: 600px) {
+        .barra-acciones {
+            flex-direction: column;
+            align-items: stretch;
+        }
+        .barra-acciones .boton-nuevo {
+            width: 100%;
+            height: 48px;
+        }
+    }
+
+    /* Filas de clientes clicables: indican que abren el detalle. */
+    .fila-clicable { cursor: pointer; }
+    .boton-alta-grande { padding-left: 32px; padding-right: 32px; }
+
+    .dialogo-cliente-fullscreen {
+        box-sizing: border-box;
+        padding-bottom: env(safe-area-inset-bottom);
+        padding-left: env(safe-area-inset-left);
+        padding-right: env(safe-area-inset-right);
+    }
+
+    .dialogo-cliente-fullscreen .mud-dialog-close-button {
+        top: calc(env(safe-area-inset-top) + 8px);
+        right: calc(env(safe-area-inset-right) + 8px);
+    }
+
+    .dialogo-cliente-fullscreen .mud-dialog-title {
+        padding-top: env(safe-area-inset-top);
+    }
+</style>
+
+@code {
+    private List<ClienteDto> _clientes = new();
+    private bool _cargando = true;
+    private bool _haBuscado;
+    private string _busqueda = "";
+    private MudTextField<string>? _campoBusqueda;
+    private long? _idCliente;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Api.CargarSesionDesdeAlmacenamientoAsync();
+        if (!Api.Autenticado) { _nav.NavigateTo("/login"); return; }
+        await Jornada.CargarAsync();
+        if (!Jornada.Disponible || Api.Sesion?.IdRol != 3 || Jornada.Estado.Descarga is null)
+        { _nav.NavigateTo("/jornada"); return; }
+        Jornada.Cambio += AlCambiar;
+        _cargando = false;
+    }
+    private void AlCambiar() => _ = InvokeAsync(() => { if (_haBuscado) _clientes = Jornada.BuscarClientes(_busqueda); StateHasChanged(); });
+    private Task OnBuscarChanged(string valor)
+    {
+        _busqueda = valor;
+        _haBuscado = !string.IsNullOrWhiteSpace(valor);
+        _clientes = _haBuscado ? Jornada.BuscarClientes(valor) : new();
+        return Task.CompletedTask;
+    }
+    private async Task NuevaBusqueda()
+    {
+        await OnBuscarChanged("");
+        if (_campoBusqueda is not null) await _campoBusqueda.FocusAsync();
+    }
+
+    // Vuelve del detalle al buscador dejándolo LIMPIO: cierra el detalle y resetea el texto
+    // y los resultados de la búsqueda anterior (evita que al regresar siga la búsqueda previa).
+    private async Task RegresarABuscador()
+    {
+        _idCliente = null;
+        await OnBuscarChanged("");
+    }
+    private void AbrirDetalle(ClienteDto? c) { if (c is not null) _idCliente = c.IdCliente; }
+    private string NombreZona(long? id) => Api.Sesion?.Zona ?? "—";
+    private async Task AbrirModalNuevoCliente()
+    {
+        if (Jornada.Estado.Descarga is not { } d) return;
+        var modelo = new DialogoCliente.FormModel { Activo = true, IdRuta = d.Rutas.Count == 1 ? d.Rutas[0].IdRuta : null,
+            IdVendedor = d.Asignacion.IdVendedor };
+        var parametros = new DialogParameters<DialogoCliente>
+        {
+            { x => x.Titulo, "Dar de alta cliente sin conexión" }, { x => x.EsNuevo, true }, { x => x.Modelo, modelo },
+            { x => x.Zonas, new List<ZonaDto> { new(d.Asignacion.IdZona, Api.Sesion?.Zona ?? d.Asignacion.Ruta, true) } },
+            { x => x.Rutas, d.Rutas.Select(r => new RutaAdminDto(r.IdRuta, r.Ruta, r.IdZona, Api.Sesion?.Zona, true)).ToList() },
+            { x => x.Vendedores, new List<VendedorDto> { new(d.Asignacion.IdVendedor!.Value, Api.Sesion!.NombreCompleto,
+                d.Asignacion.IdZona, Api.Sesion.Zona, Api.Sesion.IdUsuario, Api.Sesion.Usuario, true) } },
+            { x => x.Clasificaciones, d.Clasificaciones }
+        };
+        var dialogo = await _dialogo.ShowAsync<DialogoCliente>("Nuevo cliente", parametros,
+            new DialogOptions { FullScreen = true, CloseButton = true });
+        if (await dialogo.Result is not { Canceled: false, Data: DialogoCliente.FormModel m }) return;
+        try
+        {
+            var c = await Jornada.GuardarClienteAsync(new(m.Nombre.Trim(), m.ApPaterno, m.ApMaterno,
+                m.TelefonoPrincipal.Trim(), m.TelefonoSecundario, m.Email, m.Direccion.Trim(), m.CodigoPostal,
+                m.ReferenciaUbicacion, m.Latitud, m.Longitud, m.IdRuta ?? 0, d.Asignacion.IdVendedor,
+                m.IdClasificacion, m.Observaciones, Api.Sesion!.IdUsuario));
+            _snackbar.Add("Cliente guardado en dispositivo. Ya puedes registrar su venta.", Severity.Success);
+            _idCliente = c.IdCliente;
+        }
+        catch (Exception ex) { _snackbar.Add(ex.Message, Severity.Error); }
+    }
+    public void Dispose() => Jornada.Cambio -= AlCambiar;
+}

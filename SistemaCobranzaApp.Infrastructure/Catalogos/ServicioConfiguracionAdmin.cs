@@ -142,68 +142,8 @@ public abstract class ServicioCatalogoConfigBase<TEntity> where TEntity : class,
     }
 }
 
-// ===================== Clasificaciones de cliente =====================
-public class ServicioClasificacionesAdmin : ServicioCatalogoConfigBase<CatalogoClasificacion>
-{
-    public ServicioClasificacionesAdmin(CobranzaDbContext db) : base(db) { }
-    protected override DbSet<CatalogoClasificacion> Set => Db.Clasificaciones;
-    protected override long GetId(CatalogoClasificacion e) => e.IdClasificacion;
-    protected override string GetDescripcion(CatalogoClasificacion e) => e.Descripcion;
-    protected override void SetDescripcion(CatalogoClasificacion e, string v) => e.Descripcion = v;
-    protected override Estatus GetEstatus(CatalogoClasificacion e) => e.Estatus;
-    protected override void SetEstatus(CatalogoClasificacion e, Estatus v) => e.Estatus = v;
-    protected override string NombreSingular => "la clasificación";
-}
 
-// ===================== Condiciones de crédito =====================
-public class ServicioCondicionesAdmin : ServicioCatalogoConfigBase<CatalogoCondicion>
-{
-    public ServicioCondicionesAdmin(CobranzaDbContext db) : base(db) { }
-    protected override DbSet<CatalogoCondicion> Set => Db.Condiciones;
-    protected override long GetId(CatalogoCondicion e) => e.IdCondicion;
-    protected override string GetDescripcion(CatalogoCondicion e) => e.Descripcion;
-    protected override void SetDescripcion(CatalogoCondicion e, string v) => e.Descripcion = v;
-    protected override Estatus GetEstatus(CatalogoCondicion e) => e.Estatus;
-    protected override void SetEstatus(CatalogoCondicion e, Estatus v) => e.Estatus = v;
-    protected override string NombreSingular => "la condición";
-}
 
-// ===================== Estatus de venta =====================
-public class ServicioEstatusVentaAdmin : ServicioCatalogoConfigBase<CatalogoEstatusVenta>
-{
-    private static readonly IReadOnlySet<long> Protegidos = new HashSet<long>
-    {
-        EstatusVentaIds.Pendiente, EstatusVentaIds.Abonando,
-        EstatusVentaIds.Pagada, EstatusVentaIds.Cancelada
-    };
 
-    public ServicioEstatusVentaAdmin(CobranzaDbContext db) : base(db) { }
-    protected override DbSet<CatalogoEstatusVenta> Set => Db.EstatusVenta;
-    protected override long GetId(CatalogoEstatusVenta e) => e.IdEstatusVenta;
-    protected override string GetDescripcion(CatalogoEstatusVenta e) => e.Descripcion;
-    protected override void SetDescripcion(CatalogoEstatusVenta e, string v) => e.Descripcion = v;
-    protected override Estatus GetEstatus(CatalogoEstatusVenta e) => e.Estatus;
-    protected override void SetEstatus(CatalogoEstatusVenta e, Estatus v) => e.Estatus = v;
-    protected override string NombreSingular => "el estatus de venta";
-    protected override IReadOnlySet<long> IdsProtegidos => Protegidos;
-}
 
-// ===================== Movimientos / tipos de pago =====================
-public class ServicioMovimientosAdmin : ServicioCatalogoConfigBase<CatalogoMovimientos>
-{
-    private static readonly IReadOnlySet<long> Protegidos = new HashSet<long>
-    {
-        MovimientoIds.Abono, MovimientoIds.Enganche, MovimientoIds.PagoCompleto,
-        MovimientoIds.Descuento, MovimientoIds.Ajuste
-    };
 
-    public ServicioMovimientosAdmin(CobranzaDbContext db) : base(db) { }
-    protected override DbSet<CatalogoMovimientos> Set => Db.Movimientos;
-    protected override long GetId(CatalogoMovimientos e) => e.IdMovimiento;
-    protected override string GetDescripcion(CatalogoMovimientos e) => e.Descripcion;
-    protected override void SetDescripcion(CatalogoMovimientos e, string v) => e.Descripcion = v;
-    protected override Estatus GetEstatus(CatalogoMovimientos e) => e.Estatus;
-    protected override void SetEstatus(CatalogoMovimientos e, Estatus v) => e.Estatus = v;
-    protected override string NombreSingular => "el tipo de movimiento";
-    protected override IReadOnlySet<long> IdsProtegidos => Protegidos;
-}

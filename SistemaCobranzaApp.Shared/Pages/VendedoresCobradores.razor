@@ -1,314 +1,406 @@
-@page "/personas-cobranza"
+@page "/vendedores-cobradores"
+
 @using MudBlazor
+@using SistemaCobranzaApp.Shared.Components
+@using SistemaCobranzaApp.Shared.Dtos
+@using SistemaCobranzaApp.Shared.Services
+@inject ApiCliente Api
 
-@inject ISnackbar Snackbar
+<MudTabs Elevation="2" Rounded="true" Color="Color.Primary" ApplyEffectsToContainer="true"
+         PanelClass="pa-0 pt-4" SliderColor="Color.Warning" Class="ma-2 tabs-remarcados">
 
-<MudText Typo="Typo.h5" Class="pa-4 pb-0"><b>Personal de Operaciones (Muebles / Zapatos)</b></MudText>
+    <!-- ===================== COBRADORES ===================== -->
+    <MudTabPanel Text="Cobradores" Icon="@Icons.Material.Filled.Groups">
+        <MudPaper Elevation="0" Class="pa-4">
+            <div class="barra-acciones">
+                <MudTextField T="string"
+                              Value="_busquedaCobradores"
+                              ValueChanged="@(v => { _busquedaCobradores = v; FiltrarCobradores(); })"
+                              Immediate="true"
+                              Placeholder="Buscar cobrador por nombre, zona o usuario..."
+                              Variant="Variant.Outlined"
+                              Adornment="Adornment.Start"
+                              AdornmentIcon="@Icons.Material.Filled.Search"
+                              AdornmentColor="Color.Primary"
+                              Clearable="true"
+                              Class="buscador-remarcado" />
+                <MudButton Variant="Variant.Filled"
+                           Color="Color.Primary"
+                           StartIcon="@Icons.Material.Filled.PersonAdd"
+                           OnClick="AbrirModalNuevoCobrador"
+                           Class="boton-nuevo">
+                    Nuevo
+                </MudButton>
+            </div>
 
-<!-- CONTENEDOR DE PESTAÑAS ESTÁNDAR -->
-<MudTabs Elevation="3" Rounded="true" Color="Color.Primary" PanelClass="pa-4" SliderColor="Color.Secondary" Class="m-2">
-    
-    <!-- PESTAÑA 1: COBRADORES -->
-    <MudTabPanel Text="👥 Cobradores en Campo">
-        <div class="d-flex align-center justify-space-between mb-4">
-            <MudText Typo="Typo.h6" Color="Color.Primary"><b>Plantilla de Cobradores</b></MudText>
-            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.PersonAdd" OnClick="AbrirModalNuevoCobrador" Class="py-2">
-                Nuevo Cobrador
-            </MudButton>
-        </div>
-
-        <MudTable Items="@_cobradores" Hover="true" Dense="true" Breakpoint="Breakpoint.Sm">
-            <HeaderContent>
-                <MudTh Style="width: 15%;">ID Cobrador</MudTh>
-                <MudTh>Nombre Completo</MudTh>
-                <MudTh>Zona de Cobro Asignada (FK)</MudTh>
-                <MudTh Style="width: 20%;">Estatus</MudTh>
-                <MudTh Style="width: 15%; text-align: right;">Acciones</MudTh>
-            </HeaderContent>
-            <RowTemplate>
-                <MudTd DataLabel="ID">@context.IdCobrador</MudTd>
-                <MudTd DataLabel="Nombre"><b>@context.Nombre</b></MudTd>
-                <MudTd DataLabel="Zona Asignada">
-                    <MudChip T="string" Size="Size.Small" Variant="Variant.Text" Color="Color.Primary">
-                        @ObtenerNombreZona(context.IdZona)
-                    </MudChip>
-                </MudTd>
-                <MudTd DataLabel="Estatus">
-                    <MudChip T="string" Size="Size.Small" Variant="Variant.Filled" Color="@(context.Estatus == 1 ? Color.Success : Color.Error)">
-                        @(context.Estatus == 1 ? "Activo" : "Inactivo")
-                    </MudChip>
-                </MudTd>
-                <MudTd DataLabel="Acciones" Style="text-align: right;">
-                    <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" Color="Color.Info" OnClick="() => AbrirModalEditarCobrador(context)" />
-                    <MudIconButton Icon="@Icons.Material.Filled.PowerSettingsNew" Size="Size.Small" Color="Color.Warning" OnClick="() => AlternarEstatusCobrador(context)" />
-                </MudTd>
-            </RowTemplate>
-            <PagerContent>
-                <MudTablePager InfoFormat="{first_item}-{last_item} de {all_items}" RowsPerPageString="Filas:" />
-            </PagerContent>
-        </MudTable>
+            @if (_cargandoCobradores)
+            {
+                <div class="d-flex justify-center pa-8">
+                    <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+                </div>
+            }
+            else
+            {
+                <MudTable Items="_cobradoresFiltrados" Hover="true" Dense="true"
+                          Breakpoint="Breakpoint.Sm" Elevation="0" RowsPerPage="10">
+                    <HeaderContent>
+                        <MudTh Style="width:10%;">ID</MudTh>
+                        <MudTh>Nombre</MudTh>
+                        <MudTh>Zona asignada</MudTh>
+                        <MudTh>Usuario</MudTh>
+                        <MudTh Style="width:15%;">Estatus</MudTh>
+                        <MudTh Style="width:15%; text-align:right;">Acciones</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd DataLabel="ID">@context.IdCobrador</MudTd>
+                        <MudTd DataLabel="Nombre"><b>@context.Nombre</b></MudTd>
+                        <MudTd DataLabel="Zona">
+                            <MudChip T="string" Size="Size.Small" Variant="Variant.Text" Color="Color.Primary">
+                                @(string.IsNullOrWhiteSpace(context.Zona) ? "Sin zona" : context.Zona)
+                            </MudChip>
+                        </MudTd>
+                        <MudTd DataLabel="Usuario">@(context.Usuario ?? "Sin usuario")</MudTd>
+                        <MudTd DataLabel="Estatus">@ChipEstatus(context.Activo)</MudTd>
+                        <MudTd DataLabel="Acciones" Style="text-align:right;">
+                            @AccionesFila(() => AbrirModalEditarCobrador(context),
+                                () => AlternarEstatusCobrador(context), context.Activo)
+                        </MudTd>
+                    </RowTemplate>
+                    <NoRecordsContent>
+                        @EstadoVacio("No hay cobradores que coincidan.")
+                    </NoRecordsContent>
+                    <PagerContent>
+                        <MudTablePager InfoFormat="{first_item}-{last_item} de {all_items}" RowsPerPageString="Filas:" />
+                    </PagerContent>
+                </MudTable>
+            }
+        </MudPaper>
     </MudTabPanel>
 
-    <!-- PESTAÑA 2: VENDEDORES -->
-    <MudTabPanel Text="💼 Vendedores / Promotores">
-        <div class="d-flex align-center justify-space-between mb-4">
-            <MudText Typo="Typo.h6" Color="Color.Success"><b>Plantilla de Vendedores</b></MudText>
-            <MudButton Variant="Variant.Filled" Color="Color.Success" StartIcon="@Icons.Material.Filled.PersonAdd" OnClick="AbrirModalNuevoVendedor" Class="py-2">
-                Nuevo Vendedor
-            </MudButton>
-        </div>
+    <!-- ===================== VENDEDORES ===================== -->
+    <MudTabPanel Text="Vendedores" Icon="@Icons.Material.Filled.Badge">
+        <MudPaper Elevation="0" Class="pa-4">
+            <div class="barra-acciones">
+                <MudTextField T="string"
+                              Value="_busquedaVendedores"
+                              ValueChanged="@(v => { _busquedaVendedores = v; FiltrarVendedores(); })"
+                              Immediate="true"
+                              Placeholder="Buscar vendedor por nombre, zona o usuario..."
+                              Variant="Variant.Outlined"
+                              Adornment="Adornment.Start"
+                              AdornmentIcon="@Icons.Material.Filled.Search"
+                              AdornmentColor="Color.Secondary"
+                              Clearable="true"
+                              Class="buscador-remarcado" />
+                <MudButton Variant="Variant.Filled"
+                           Color="Color.Secondary"
+                           StartIcon="@Icons.Material.Filled.PersonAdd"
+                           OnClick="AbrirModalNuevoVendedor"
+                           Class="boton-nuevo">
+                    Nuevo
+                </MudButton>
+            </div>
 
-        <MudTable Items="@_vendedores" Hover="true" Dense="true" Breakpoint="Breakpoint.Sm">
-            <HeaderContent>
-                <MudTh Style="width: 15%;">ID Vendedor</MudTh>
-                <MudTh>Nombre Completo</MudTh>
-                <MudTh>Zona de Venta Asignada (FK)</MudTh>
-                <MudTh Style="width: 20%;">Estatus</MudTh>
-                <MudTh Style="width: 15%; text-align: right;">Acciones</MudTh>
-            </HeaderContent>
-            <RowTemplate>
-                <MudTd DataLabel="ID">@context.IdVendedor</MudTd>
-                <MudTd DataLabel="Nombre"><b>@context.Nombre</b></MudTd>
-                <MudTd DataLabel="Zona Asignada">
-                    <MudChip T="string" Size="Size.Small" Variant="Variant.Text" Color="Color.Success">
-                        @ObtenerNombreZona(context.IdZona)
-                    </MudChip>
-                </MudTd>
-                <MudTd DataLabel="Estatus">
-                    <MudChip T="string" Size="Size.Small" Variant="Variant.Filled" Color="@(context.Estatus == 1 ? Color.Success : Color.Error)">
-                        @(context.Estatus == 1 ? "Activo" : "Inactivo")
-                    </MudChip>
-                </MudTd>
-                <MudTd DataLabel="Acciones" Style="text-align: right;">
-                    <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" Color="Color.Info" OnClick="() => AbrirModalEditarVendedor(context)" />
-                    <MudIconButton Icon="@Icons.Material.Filled.PowerSettingsNew" Size="Size.Small" Color="Color.Warning" OnClick="() => AlternarEstatusVendedor(context)" />
-                </MudTd>
-            </RowTemplate>
-            <PagerContent>
-                <MudTablePager InfoFormat="{first_item}-{last_item} de {all_items}" RowsPerPageString="Filas:" />
-            </PagerContent>
-        </MudTable>
+            @if (_cargandoVendedores)
+            {
+                <div class="d-flex justify-center pa-8">
+                    <MudProgressCircular Indeterminate="true" Color="Color.Secondary" />
+                </div>
+            }
+            else
+            {
+                <MudTable Items="_vendedoresFiltrados" Hover="true" Dense="true"
+                          Breakpoint="Breakpoint.Sm" Elevation="0" RowsPerPage="10">
+                    <HeaderContent>
+                        <MudTh Style="width:10%;">ID</MudTh>
+                        <MudTh>Nombre</MudTh>
+                        <MudTh>Zona asignada</MudTh>
+                        <MudTh>Usuario</MudTh>
+                        <MudTh Style="width:15%;">Estatus</MudTh>
+                        <MudTh Style="width:15%; text-align:right;">Acciones</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd DataLabel="ID">@context.IdVendedor</MudTd>
+                        <MudTd DataLabel="Nombre"><b>@context.Nombre</b></MudTd>
+                        <MudTd DataLabel="Zona">
+                            <MudChip T="string" Size="Size.Small" Variant="Variant.Text" Color="Color.Secondary">
+                                @(string.IsNullOrWhiteSpace(context.Zona) ? "Sin zona" : context.Zona)
+                            </MudChip>
+                        </MudTd>
+                        <MudTd DataLabel="Usuario">@(context.Usuario ?? "Sin usuario")</MudTd>
+                        <MudTd DataLabel="Estatus">@ChipEstatus(context.Activo)</MudTd>
+                        <MudTd DataLabel="Acciones" Style="text-align:right;">
+                            @AccionesFila(() => AbrirModalEditarVendedor(context),
+                                () => AlternarEstatusVendedor(context), context.Activo)
+                        </MudTd>
+                    </RowTemplate>
+                    <NoRecordsContent>
+                        @EstadoVacio("No hay vendedores que coincidan.")
+                    </NoRecordsContent>
+                    <PagerContent>
+                        <MudTablePager InfoFormat="{first_item}-{last_item} de {all_items}" RowsPerPageString="Filas:" />
+                    </PagerContent>
+                </MudTable>
+            }
+        </MudPaper>
     </MudTabPanel>
-
 </MudTabs>
 
-<!-- MODAL EN LÍNEA 1: GESTIÓN DE COBRADORES -->
-<MudDialog @bind-Visible="_modalCobradorVisible" Options="_opcionesResponsivasModal" Style="border-radius:12px;">
-    <TitleContent>
-        <div class="d-flex align-center">
-            <MudIcon Icon="@Icons.Material.Filled.Badge" Color="Color.Primary" Class="mr-2" />
-            <MudText Typo="Typo.h6"><b>@_tituloFormularioCobrador</b></MudText>
-        </div>
-    </TitleContent>
-    <DialogContent>
-        <MudForm @ref="_formCobrador" @bind-IsValid="_formCobradorValido">
-            <MudGrid>
-                <MudItem XS="12">
-                    <MudTextField Value="@TextoIdCobrador" Label="ID Cobrador (IDENTITY)" ReadOnly="true" Variant="Variant.Outlined" />
-                </MudItem>
-                <MudItem XS="12">
-                    <MudTextField @bind-Value="_cobradorEnEdicion.Nombre" Label="Nombre Completo del Cobrador" 
-                                  Required="true" RequiredError="El nombre es obligatorio" 
-                                  Variant="Variant.Outlined" Clearable="true" Immediate="true" />
-                </MudItem>
-                <MudItem XS="12">
-                    <MudSelect T="long" Label="Asignar Zona Geográfica (FOREIGN KEY)" @bind-Value="_cobradorEnEdicion.IdZona" Variant="Variant.Outlined" Required="true">
-                        @foreach (var z in _zonasCat)
-                        {
-                            <MudSelectItem Value="@z.IdZona">@z.Descripcion</MudSelectItem>
-                        }
-                    </MudSelect>
-                </MudItem>
-            </MudGrid>
-        </MudForm>
-    </DialogContent>
-    <DialogActions>
-        <MudButton OnClick="() => _modalCobradorVisible = false" Color="Color.Default" Class="px-4">Cancelar</MudButton>
-        <MudButton OnClick="GuardarCobrador" Color="Color.Primary" Variant="Variant.Filled" Disabled="@(!_formCobradorValido)" Class="px-4">
-            Guardar Cobrador
-        </MudButton>
-    </DialogActions>
-</MudDialog>
+@{
+    RenderFragment ChipEstatus(bool activo) => __builder =>
+    {
+        <MudChip T="string" Size="Size.Small" Variant="Variant.Filled"
+                 Color="@(activo ? Color.Success : Color.Default)">
+            @(activo ? "Activo" : "Inactivo")
+        </MudChip>
+    };
 
-<!-- MODAL EN LÍNEA 2: GESTIÓN DE VENDEDORES -->
-<MudDialog @bind-Visible="_modalVendedorVisible" Options="_opcionesResponsivasModal" Style="border-radius:12px;">
-    <TitleContent>
-        <div class="d-flex align-center">
-            <MudIcon Icon="@Icons.Material.Filled.ContactEmergency" Color="Color.Success" Class="mr-2" />
-            <MudText Typo="Typo.h6"><b>@_tituloFormularioVendedor</b></MudText>
+    // Acciones de fila: Editar + alternar Baja/Reactivar según el estatus.
+    RenderFragment AccionesFila(Func<Task> onEditar, Func<Task> onAlternar, bool activo) => __builder =>
+    {
+        <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" Color="Color.Info"
+                       Title="Editar" OnClick="@(async () => await onEditar())" />
+        @if (activo)
+        {
+            <MudIconButton Icon="@Icons.Material.Filled.Block" Size="Size.Small" Color="Color.Error"
+                           Title="Dar de baja" OnClick="@(async () => await onAlternar())" />
+        }
+        else
+        {
+            <MudIconButton Icon="@Icons.Material.Filled.CheckCircle" Size="Size.Small" Color="Color.Success"
+                           Title="Reactivar" OnClick="@(async () => await onAlternar())" />
+        }
+    };
+
+    RenderFragment EstadoVacio(string mensaje) => __builder =>
+    {
+        <div class="pa-8 text-center">
+            <MudIcon Icon="@Icons.Material.Filled.SearchOff" Size="Size.Large" Color="Color.Secondary" />
+            <MudText Color="Color.Secondary" Class="mt-2">@mensaje</MudText>
         </div>
-    </TitleContent>
-    <DialogContent>
-        <MudForm @ref="_formVendedor" @bind-IsValid="_formVendedorValido">
-            <MudGrid>
-                <MudItem XS="12">
-                    <MudTextField Value="@TextoIdVendedor" Label="ID Vendedor (IDENTITY)" ReadOnly="true" Variant="Variant.Outlined" />
-                </MudItem>
-                <MudItem XS="12">
-                    <MudTextField @bind-Value="_vendedorEnEdicion.Nombre" Label="Nombre Completo del Vendedor" 
-                                  Required="true" RequiredError="El nombre es obligatorio" 
-                                  Variant="Variant.Outlined" Clearable="true" Immediate="true" />
-                </MudItem>
-                <MudItem XS="12">
-                    <MudSelect T="long" Label="Asignar Zona Geográfica (FOREIGN KEY)" @bind-Value="_vendedorEnEdicion.IdZona" Variant="Variant.Outlined" Required="true">
-                        @foreach (var z in _zonasCat)
-                        {
-                            <MudSelectItem Value="@z.IdZona">@z.Descripcion</MudSelectItem>
-                        }
-                    </MudSelect>
-                </MudItem>
-            </MudGrid>
-        </MudForm>
-    </DialogContent>
-    <DialogActions>
-        <MudButton OnClick="() => _modalVendedorVisible = false" Color="Color.Default" Class="px-4">Cancelar</MudButton>
-        <MudButton OnClick="GuardarVendedor" Color="Color.Success" Variant="Variant.Filled" Disabled="@(!_formVendedorValido)" Class="px-4">
-            Guardar Vendedor
-        </MudButton>
-    </DialogActions>
-</MudDialog>
+    };
+}
+
+<style>
+    .barra-acciones {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 16px;
+    }
+
+    .barra-acciones .buscador-remarcado { flex: 1 1 auto; min-width: 0; }
+    .boton-nuevo { white-space: nowrap; flex: 0 0 auto; }
+
+    /* Buscador remarcado */
+    .buscador-remarcado .mud-input-outlined-border { border-width: 2px; }
+
+    /* ===== Tabs: resaltar claramente el seleccionado ===== */
+    /* Tabs inactivos: atenuados para contraste. */
+    .tabs-remarcados .mud-tab {
+        opacity: 0.65;
+        font-weight: 500;
+        transition: opacity 0.15s ease, background-color 0.15s ease;
+    }
+
+    /* Tab activo: totalmente opaco, en negrita y con fondo sutil. */
+    .tabs-remarcados .mud-tab.mud-tab-active {
+        opacity: 1;
+        font-weight: 800;
+        background-color: rgba(255, 255, 255, 0.18);
+        border-radius: 8px 8px 0 0;
+    }
+
+    /* Subrayado (slider) del tab activo más grueso y visible. */
+    .tabs-remarcados .mud-tab-slider {
+        height: 4px;
+    }
+</style>
 
 @code {
-    private bool _modalCobradorVisible = false;
-    private bool _modalVendedorVisible = false;
-    private string _tituloFormularioCobrador = "";
-    private string _tituloFormularioVendedor = "";
+    [Inject] private IDialogService _dialogo { get; set; } = null!;
+    [Inject] private ISnackbar _snackbar { get; set; } = null!;
 
-    private MudForm _formCobrador = null!;
-    private bool _formCobradorValido;
-    private MudForm _formVendedor = null!;
-    private bool _formVendedorValido;
+    private string _busquedaCobradores = "";
+    private string _busquedaVendedores = "";
+    private bool _cargandoCobradores;
+    private bool _cargandoVendedores;
 
-    private FilaCobrador _cobradorEnEdicion = new FilaCobrador();
-    private FilaVendedor _vendedorEnEdicion = new FilaVendedor();
+    private List<CobradorDto> _cobradoresTodo = new();
+    private List<CobradorDto> _cobradoresFiltrados = new();
+    private List<VendedorDto> _vendedoresTodo = new();
+    private List<VendedorDto> _vendedoresFiltrados = new();
+    private List<ZonaDto> _zonas = new();
+    private List<UsuarioDto> _usuarios = new();
 
-    private string TextoIdCobrador => _cobradorEnEdicion.IdCobrador == 0 ? "NUEVA ALTA" : _cobradorEnEdicion.IdCobrador.ToString();
-    private string TextoIdVendedor => _vendedorEnEdicion.IdVendedor == 0 ? "NUEVA ALTA" : _vendedorEnEdicion.IdVendedor.ToString();
-
-    private readonly DialogOptions _opcionesResponsivasModal = new DialogOptions 
-    { 
-        CloseOnEscapeKey = true, 
-        MaxWidth = MaxWidth.Small, 
-        FullWidth = true,
-        FullScreen = true 
-    };
-
-    // MODELADO DE ESTRUCTURAS SQL (Cobradores y Vendedores)
-    public class FilaCobrador {
-        public long IdCobrador { get; set; } = 0;
-        public string Nombre { get; set; } = "";
-        public long IdZona { get; set; } = 0;
-        public short Estatus { get; set; } = 1;
+    protected override async Task OnInitializedAsync()
+    {
+        await CargarZonas();
+        await CargarCobradores();
+        await CargarVendedores();
     }
 
-    public class FilaVendedor {
-        public long IdVendedor { get; set; } = 0;
-        public string Nombre { get; set; } = "";
-        public long IdZona { get; set; } = 0;
-        public short Estatus { get; set; } = 1;
+    private async Task CargarZonas()
+    {
+        var (datos, _) = await Api.ListarZonasOperativasAsync();
+        _zonas = datos ?? new();
     }
 
-    public class FilaZonaAux {
-        public long IdZona { get; set; }
-        public string Descripcion { get; set; } = "";
+    private async Task CargarCobradores()
+    {
+        _cargandoCobradores = true;
+        var (datos, error) = await Api.ListarCobradoresAdminAsync(incluirInactivos: true);
+        if (error is not null) _snackbar.Add(error, Severity.Error);
+        _cobradoresTodo = datos ?? new();
+        FiltrarCobradores();
+        _cargandoCobradores = false;
     }
 
-    // CATÁLOGO DE ZONAS AUXILIAR (Para simular la relación de llave foránea)
-    private List<FilaZonaAux> _zonasCat = new List<FilaZonaAux>() {
-        new FilaZonaAux { IdZona = 1, Descripcion = "ZONA NORTE (CENTRO)" },
-        new FilaZonaAux { IdZona = 2, Descripcion = "ZONA SUR (PERIFERIA)" },
-        new FilaZonaAux { IdZona = 3, Descripcion = "ZONA ORIENTE" }
-    };
-
-    // DATOS HARDCODEADOS DE COBRADORES
-    private List<FilaCobrador> _cobradores = new List<FilaCobrador>() {
-        new FilaCobrador { IdCobrador = 1, Nombre = "Juan Pérez López", IdZona = 1, Estatus = 1 },
-        new FilaCobrador { IdCobrador = 2, Nombre = "Marcos Torres Gómez", IdZona = 2, Estatus = 1 },
-        new FilaCobrador { IdCobrador = 3, Nombre = "Eduardo Ríos Huerta", IdZona = 1, Estatus = 0 }
-    };
-
-    // DATOS HARDCODEADOS DE VENDEDORES
-    private List<FilaVendedor> _vendedores = new List<FilaVendedor>() {
-        new FilaVendedor { IdVendedor = 1, Nombre = "Ana María Casillas", IdZona = 1, Estatus = 1 },
-        new FilaVendedor { IdVendedor = 2, Nombre = "Sofía Luna Benítez", IdZona = 3, Estatus = 1 }
-    };
-
-    private string ObtenerNombreZona(long idZona) {
-        var zona = _zonasCat.FirstOrDefault(z => z.IdZona == idZona);
-        return zona != null ? zona.Descripcion : "Sin Zona";
+    private async Task CargarVendedores()
+    {
+        _cargandoVendedores = true;
+        var (datos, error) = await Api.ListarVendedoresAdminAsync(incluirInactivos: true);
+        if (error is not null) _snackbar.Add(error, Severity.Error);
+        _vendedoresTodo = datos ?? new();
+        FiltrarVendedores();
+        _cargandoVendedores = false;
     }
 
-    // --- MÉTODOS COBRADORES ---
-    private void AbrirModalNuevoCobrador() {
-        _tituloFormularioCobrador = "Alta de Cobrador";
-        long idDefecto = _zonasCat.Any() ? _zonasCat.First().IdZona : 0;
-        _cobradorEnEdicion = new FilaCobrador { IdCobrador = 0, Nombre = "", IdZona = idDefecto, Estatus = 1 };
-        _modalCobradorVisible = true;
+    private void FiltrarCobradores()
+    {
+        var q = _busquedaCobradores?.Trim() ?? "";
+        _cobradoresFiltrados = string.IsNullOrEmpty(q)
+            ? _cobradoresTodo
+            : _cobradoresTodo.Where(c =>
+                (c.Nombre?.Contains(q, StringComparison.OrdinalIgnoreCase) ?? false)
+                || (c.Zona?.Contains(q, StringComparison.OrdinalIgnoreCase) ?? false)
+                || (c.Usuario?.Contains(q, StringComparison.OrdinalIgnoreCase) ?? false)).ToList();
     }
 
-    private void AbrirModalEditarCobrador(FilaCobrador cobrador) {
-        _tituloFormularioCobrador = "Editar Perfil de Cobrador";
-        _cobradorEnEdicion = new FilaCobrador { IdCobrador = cobrador.IdCobrador, Nombre = cobrador.Nombre, IdZona = cobrador.IdZona, Estatus = cobrador.Estatus };
-        _modalCobradorVisible = true;
+    private void FiltrarVendedores()
+    {
+        var q = _busquedaVendedores?.Trim() ?? "";
+        _vendedoresFiltrados = string.IsNullOrEmpty(q)
+            ? _vendedoresTodo
+            : _vendedoresTodo.Where(v =>
+                (v.Nombre?.Contains(q, StringComparison.OrdinalIgnoreCase) ?? false)
+                || (v.Zona?.Contains(q, StringComparison.OrdinalIgnoreCase) ?? false)
+                || (v.Usuario?.Contains(q, StringComparison.OrdinalIgnoreCase) ?? false)).ToList();
     }
 
-    private void GuardarCobrador() {
-        if (string.IsNullOrWhiteSpace(_cobradorEnEdicion.Nombre)) return;
+    // ===================== Cobradores =====================
 
-        if (_cobradorEnEdicion.IdCobrador == 0) {
-            long nuevoId = _cobradores.Any() ? _cobradores.Max(x => x.IdCobrador) + 1 : 1;
-            _cobradores.Add(new FilaCobrador { IdCobrador = nuevoId, Nombre = _cobradorEnEdicion.Nombre.ToUpper(), IdZona = _cobradorEnEdicion.IdZona, Estatus = 1 });
-            Snackbar.Add("Cobrador dado de alta correctamente.", Severity.Success);
-        } else {
-            var reg = _cobradores.FirstOrDefault(x => x.IdCobrador == _cobradorEnEdicion.IdCobrador);
-            if (reg != null) {
-                reg.Nombre = _cobradorEnEdicion.Nombre.ToUpper();
-                reg.IdZona = _cobradorEnEdicion.IdZona;
-                Snackbar.Add("Datos del cobrador actualizados.", Severity.Info);
-            }
+    private async Task AbrirModalNuevoCobrador()
+    {
+        var modelo = new DialogoPersona.FormModel { Activo = true };
+        var m = await MostrarDialogo("Dar de alta cobrador", Icons.Material.Filled.PersonAdd, "Nombre del cobrador", modelo);
+        if (m is null) return;
+
+        var (_, error) = await Api.CrearCobradorAsync(m.Nombre, m.IdZona, idUsuario: m.IdUsuario);
+        Notificar(error, $"Cobrador '{m.Nombre}' registrado.");
+        if (error is null) await CargarCobradores();
+    }
+
+    private async Task AbrirModalEditarCobrador(CobradorDto c)
+    {
+        var modelo = new DialogoPersona.FormModel { Nombre = c.Nombre, IdZona = c.IdZona, IdUsuario = c.IdUsuario, Activo = c.Activo };
+        var m = await MostrarDialogo("Modificar cobrador", Icons.Material.Filled.Badge, "Nombre del cobrador", modelo);
+        if (m is null) return;
+
+        var (_, error) = await Api.ActualizarCobradorAsync(c.IdCobrador, m.Nombre, m.IdZona, m.Activo, idUsuario: m.IdUsuario);
+        Notificar(error, $"Cobrador '{m.Nombre}' actualizado.");
+        if (error is null) await CargarCobradores();
+    }
+
+    // Alterna estatus: si está activo lo da de baja; si está inactivo lo reactiva.
+    private async Task AlternarEstatusCobrador(CobradorDto c)
+    {
+        if (c.Activo)
+        {
+            var (_, error) = await Api.DarDeBajaCobradorAsync(c.IdCobrador);
+            Notificar(error, $"Cobrador '{c.Nombre}' dado de baja.");
+            if (error is null) await CargarCobradores();
         }
-        _modalCobradorVisible = false;
-    }
-
-    private void AlternarEstatusCobrador(FilaCobrador cobrador) {
-        cobrador.Estatus = (short)(cobrador.Estatus == 1 ? 0 : 1);
-        Snackbar.Add($"Estatus modificado para el cobrador ID {cobrador.IdCobrador}.", Severity.Warning);
-    }
-
-    // --- MÉTODOS VENDEDORES ---
-    private void AbrirModalNuevoVendedor() {
-        _tituloFormularioVendedor = "Alta de Vendedor";
-        long idDefecto = _zonasCat.Any() ? _zonasCat.First().IdZona : 0;
-        _vendedorEnEdicion = new FilaVendedor { IdVendedor = 0, Nombre = "", IdZona = idDefecto, Estatus = 1 };
-        _modalVendedorVisible = true;
-    }
-
-    private void AbrirModalEditarVendedor(FilaVendedor vendedor) {
-        _tituloFormularioVendedor = "Editar Perfil de Vendedor";
-        _vendedorEnEdicion = new FilaVendedor { IdVendedor = vendedor.IdVendedor, Nombre = vendedor.Nombre, IdZona = vendedor.IdZona, Estatus = vendedor.Estatus };
-        _modalVendedorVisible = true;
-    }
-
-    private void GuardarVendedor() {
-        if (string.IsNullOrWhiteSpace(_vendedorEnEdicion.Nombre)) return;
-
-        if (_vendedorEnEdicion.IdVendedor == 0) {
-            long nuevoId = _vendedores.Any() ? _vendedores.Max(x => x.IdVendedor) + 1 : 1;
-            _vendedores.Add(new FilaVendedor { IdVendedor = nuevoId, Nombre = _vendedorEnEdicion.Nombre.ToUpper(), IdZona = _vendedorEnEdicion.IdZona, Estatus = 1 });
-            Snackbar.Add("Vendedor dado de alta correctamente.", Severity.Success);
-        } else {
-            var reg = _vendedores.FirstOrDefault(x => x.IdVendedor == _vendedorEnEdicion.IdVendedor);
-            if (reg != null) {
-                reg.Nombre = _vendedorEnEdicion.Nombre.ToUpper();
-                reg.IdZona = _vendedorEnEdicion.IdZona;
-                Snackbar.Add("Datos del vendedor actualizados.", Severity.Info);
-            }
+        else
+        {
+            // Reactivar: actualizamos conservando nombre/zona y marcando activo.
+            var (_, error) = await Api.ActualizarCobradorAsync(c.IdCobrador, c.Nombre, c.IdZona, true, idUsuario: c.IdUsuario);
+            Notificar(error, $"Cobrador '{c.Nombre}' reactivado.");
+            if (error is null) await CargarCobradores();
         }
-        _modalVendedorVisible = false;
     }
 
-    private void AlternarEstatusVendedor(FilaVendedor vendedor) {
-        vendedor.Estatus = (short)(vendedor.Estatus == 1 ? 0 : 1);
-        Snackbar.Add($"Estatus modificado para el vendedor ID {vendedor.IdVendedor}.", Severity.Warning);
+    // ===================== Vendedores =====================
+
+    private async Task AbrirModalNuevoVendedor()
+    {
+        var modelo = new DialogoPersona.FormModel { Activo = true };
+        var m = await MostrarDialogo("Dar de alta vendedor", Icons.Material.Filled.GroupAdd, "Nombre del vendedor", modelo);
+        if (m is null) return;
+
+        var (_, error) = await Api.CrearVendedorAsync(m.Nombre, m.IdZona, idUsuario: m.IdUsuario);
+        Notificar(error, $"Vendedor '{m.Nombre}' registrado.");
+        if (error is null) await CargarVendedores();
+    }
+
+    private async Task AbrirModalEditarVendedor(VendedorDto v)
+    {
+        var modelo = new DialogoPersona.FormModel { Nombre = v.Nombre, IdZona = v.IdZona, IdUsuario = v.IdUsuario, Activo = v.Activo };
+        var m = await MostrarDialogo("Modificar vendedor", Icons.Material.Filled.ManageAccounts, "Nombre del vendedor", modelo);
+        if (m is null) return;
+
+        var (_, error) = await Api.ActualizarVendedorAsync(v.IdVendedor, m.Nombre, m.IdZona, m.Activo, idUsuario: m.IdUsuario);
+        Notificar(error, $"Vendedor '{m.Nombre}' actualizado.");
+        if (error is null) await CargarVendedores();
+    }
+
+    private async Task AlternarEstatusVendedor(VendedorDto v)
+    {
+        if (v.Activo)
+        {
+            var (_, error) = await Api.DarDeBajaVendedorAsync(v.IdVendedor);
+            Notificar(error, $"Vendedor '{v.Nombre}' dado de baja.");
+            if (error is null) await CargarVendedores();
+        }
+        else
+        {
+            var (_, error) = await Api.ActualizarVendedorAsync(v.IdVendedor, v.Nombre, v.IdZona, true, idUsuario: v.IdUsuario);
+            Notificar(error, $"Vendedor '{v.Nombre}' reactivado.");
+            if (error is null) await CargarVendedores();
+        }
+    }
+
+    // ===================== Helpers =====================
+
+    private async Task<DialogoPersona.FormModel?> MostrarDialogo(
+        string titulo, string icono, string labelNombre, DialogoPersona.FormModel modelo)
+    {
+        var (usuarios, errorUsuarios) = await Api.ListarUsuariosAsync(incluirInactivos: true);
+        if (errorUsuarios is not null)
+        {
+            _snackbar.Add(errorUsuarios, Severity.Error);
+            return null;
+        }
+        _usuarios = usuarios ?? new();
+        var opciones = new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true, CloseButton = true };
+        var parametros = new DialogParameters<DialogoPersona>
+        {
+            { x => x.Titulo, titulo },
+            { x => x.Icono, icono },
+            { x => x.LabelNombre, labelNombre },
+            { x => x.Modelo, modelo },
+            { x => x.Zonas, _zonas },
+            { x => x.MostrarUsuario, true },
+            { x => x.Usuarios, _usuarios.Where(u => u.Activo || u.IdUsuario == modelo.IdUsuario).OrderBy(u => u.Usuario).ToList() }
+        };
+        var dialogo = await _dialogo.ShowAsync<DialogoPersona>(titulo, parametros, opciones);
+        var resultado = await dialogo.Result;
+        return resultado is { Canceled: false, Data: DialogoPersona.FormModel datos } ? datos : null;
+    }
+
+    private void Notificar(string? error, string exito)
+    {
+        if (error is null) _snackbar.Add(exito, Severity.Success);
+        else _snackbar.Add(error, Severity.Error);
     }
 }

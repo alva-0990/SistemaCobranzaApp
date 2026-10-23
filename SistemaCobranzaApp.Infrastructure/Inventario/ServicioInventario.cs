@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using SistemaCobranzaApp.Domain.Constantes;
 using SistemaCobranzaApp.Domain.Entidades;
 using SistemaCobranzaApp.Domain.Inventario;
 using SistemaCobranzaApp.Infrastructure.Persistencia;
@@ -35,6 +36,14 @@ public class ServicioInventario
         var filas = await (from p in _db.Productos.AsNoTracking()
                            join ic in _db.InventarioCentral.AsNoTracking() on p.IdProducto equals ic.IdProducto into icj
                            from ic in icj.DefaultIfEmpty()
+                           join mc in _db.CatalogoMarcas.AsNoTracking() on p.IdMarca equals mc.IdMarca into mcj
+                           from mc in mcj.DefaultIfEmpty()
+                           join cat in _db.CatalogoCategorias.AsNoTracking() on p.IdCategoria equals cat.IdCategoria into catj
+                           from cat in catj.DefaultIfEmpty()
+                           join col in _db.CatalogoColores.AsNoTracking() on p.IdColor equals col.IdColor into colj
+                           from col in colj.DefaultIfEmpty()
+                           join tl in _db.CatalogoTallas.AsNoTracking() on p.IdTalla equals tl.IdTalla into tlj
+                           from tl in tlj.DefaultIfEmpty()
                            select new
                            {
                                p.IdProducto,
@@ -42,7 +51,11 @@ public class ServicioInventario
                                p.Descripcion,
                                p.StockMini,
                                Cantidad = ic != null ? ic.Cantidad : 0,
-                               FechaActualizacion = ic != null ? ic.FechaActualizacion : (DateTimeOffset?)null
+                               FechaActualizacion = ic != null ? ic.FechaActualizacion : (DateTimeOffset?)null,
+                               Marca = mc != null ? mc.Descripcion : null,
+                               Categoria = cat != null ? cat.Descripcion : null,
+                               Color = col != null ? col.Descripcion : null,
+                               Talla = tl != null ? tl.Descripcion : null
                            })
             .ToListAsync(ct);
 
@@ -54,7 +67,8 @@ public class ServicioInventario
                 return new ExistenciaCentralDto(
                     p.IdProducto, p.CodigoClave, p.Descripcion,
                     g.Sum(x => x.Cantidad), p.StockMini,
-                    g.Max(x => x.FechaActualizacion));
+                    g.Max(x => x.FechaActualizacion),
+                    p.Marca, p.Categoria, p.Color, p.Talla);
             })
             .OrderBy(x => x.Descripcion)
             .ToList();
@@ -65,6 +79,14 @@ public class ServicioInventario
         var filas = await (from iz in _db.InventarioZona.AsNoTracking()
                            where iz.IdZona == idZona
                            join p in _db.Productos.AsNoTracking() on iz.IdProducto equals p.IdProducto
+                           join mc in _db.CatalogoMarcas.AsNoTracking() on p.IdMarca equals mc.IdMarca into mcj
+                           from mc in mcj.DefaultIfEmpty()
+                           join cat in _db.CatalogoCategorias.AsNoTracking() on p.IdCategoria equals cat.IdCategoria into catj
+                           from cat in catj.DefaultIfEmpty()
+                           join col in _db.CatalogoColores.AsNoTracking() on p.IdColor equals col.IdColor into colj
+                           from col in colj.DefaultIfEmpty()
+                           join tl in _db.CatalogoTallas.AsNoTracking() on p.IdTalla equals tl.IdTalla into tlj
+                           from tl in tlj.DefaultIfEmpty()
                            select new
                            {
                                iz.IdZona,
@@ -72,7 +94,11 @@ public class ServicioInventario
                                p.CodigoClave,
                                p.Descripcion,
                                iz.Cantidad,
-                               iz.FechaActualizacion
+                               iz.FechaActualizacion,
+                               Marca = mc != null ? mc.Descripcion : null,
+                               Categoria = cat != null ? cat.Descripcion : null,
+                               Color = col != null ? col.Descripcion : null,
+                               Talla = tl != null ? tl.Descripcion : null
                            })
             .ToListAsync(ct);
 
@@ -83,7 +109,8 @@ public class ServicioInventario
                 var p = g.First();
                 return new ExistenciaZonaDto(
                     p.IdZona, p.IdProducto, p.CodigoClave, p.Descripcion,
-                    g.Sum(x => x.Cantidad), g.Max(x => x.FechaActualizacion));
+                    g.Sum(x => x.Cantidad), g.Max(x => x.FechaActualizacion),
+                    p.Marca, p.Categoria, p.Color, p.Talla);
             })
             .OrderBy(x => x.Descripcion)
             .ToList();
@@ -206,16 +233,101 @@ public class ServicioInventario
 
     // ---------------- Historial ----------------
 
-    public Task<List<MovimientoInventarioDto>> HistorialAsync(long idProducto, int max, CancellationToken ct = default)
+    public async Task<List<MovimientoInventarioDto>> HistorialAsync(long idProducto, int max, CancellationToken ct = default)
     {
         max = max is < 1 or > 500 ? 100 : max;
-        return _db.InventarioMovimientos.AsNoTracking()
+    
+        // Proyectamos directamente en la base de datos para transferir solo las propiedades necesarias por red
+        return await _db.InventarioMovimientos.AsNoTracking()
             .Where(m => m.IdProducto == idProducto)
             .OrderByDescending(m => m.IdMovimientoInv)
             .Take(max)
-            .Select(m => Map(m))
+            .Select(m => new MovimientoInventarioDto(
+                m.IdMovimientoInv, 
+                m.IdProducto, 
+                m.TipoMovimiento, 
+                m.Cantidad,
+                m.ExistenciaAnterior, 
+                m.ExistenciaNueva, 
+                m.IdZonaOrigen, 
+                m.IdZonaDestino, 
+                m.FechaMovimiento
+            ))
             .ToListAsync(ct);
     }
+
+    /// <summary>
+    /// Historial global de movimientos de inventario con filtros opcionales.
+    /// - tipos: lista de TipoMovimiento a incluir (null/vacía = todos).
+    /// - idZona: filtra por la zona afectada (origen o destino).
+    /// - desde/hasta: rango de fechas (inclusive). 'hasta' se amplía al final del día.
+    /// Enriquece cada renglón con clave/descripción del producto, nombre de la zona
+    /// afectada y usuario que lo registró.
+    /// </summary>
+    public async Task<List<MovimientoHistorialDto>> HistorialGlobalAsync(
+        IReadOnlyList<string>? tipos, long? idZona,
+        DateTimeOffset? desde, DateTimeOffset? hasta,
+        int max = 500, CancellationToken ct = default)
+    {
+        max = max is < 1 or > 2000 ? 500 : max;
+
+        var q = _db.InventarioMovimientos.AsNoTracking().AsQueryable();
+
+        if (tipos is { Count: > 0 })
+            q = q.Where(m => tipos.Contains(m.TipoMovimiento));
+
+        if (idZona is { } z)
+            q = q.Where(m => m.IdZonaOrigen == z || m.IdZonaDestino == z);
+
+        if (desde is { } d)
+        {
+            var inicioUtc = d.ToUniversalTime();
+            q = q.Where(m => m.FechaMovimiento >= inicioUtc);
+        }
+
+        if (hasta is { } h)
+        {
+            // Incluir todo el día indicado en 'hasta'.
+            var finDiaOffset = SistemaCobranzaApp.Domain.Comun.FechaProyecto.FinDiaUtc(
+                SistemaCobranzaApp.Domain.Comun.FechaProyecto.EnZonaProyecto(h).Date);
+            q = q.Where(m => m.FechaMovimiento <= finDiaOffset);
+        }
+
+        return await (from m in q
+                      join p in _db.Productos.AsNoTracking() on m.IdProducto equals p.IdProducto into pj
+                      from p in pj.DefaultIfEmpty()
+                      join mc in _db.CatalogoMarcas.AsNoTracking() on (p != null ? p.IdMarca : (long?)null) equals mc.IdMarca into mcj
+                      from mc in mcj.DefaultIfEmpty()
+                      join cat in _db.CatalogoCategorias.AsNoTracking() on (p != null ? p.IdCategoria : (long?)null) equals cat.IdCategoria into catj
+                      from cat in catj.DefaultIfEmpty()
+                      // Zona afectada: destino si existe, de lo contrario origen.
+                      join zd in _db.Zonas.AsNoTracking() on m.IdZonaDestino equals zd.IdZona into zdj
+                      from zd in zdj.DefaultIfEmpty()
+                      join zo in _db.Zonas.AsNoTracking() on m.IdZonaOrigen equals zo.IdZona into zoj
+                      from zo in zoj.DefaultIfEmpty()
+                      join u in _db.Usuarios.AsNoTracking() on m.IdUsuarioRegistro equals u.IdUsuario into uj
+                      from u in uj.DefaultIfEmpty()
+                      orderby m.IdMovimientoInv descending
+                      select new MovimientoHistorialDto(
+                          m.IdMovimientoInv,
+                          m.FechaMovimiento,
+                          m.TipoMovimiento,
+                          m.IdProducto,
+                          p != null ? p.CodigoClave : string.Empty,
+                          p != null ? p.Descripcion : string.Empty,
+                          m.Cantidad,
+                          m.ExistenciaAnterior,
+                          m.ExistenciaNueva,
+                          m.IdZonaDestino ?? m.IdZonaOrigen,
+                          zd != null ? zd.Descripcion : (zo != null ? zo.Descripcion : null),
+                          u != null ? u.NombreCompleto : null,
+                          m.Observaciones,
+                          mc != null ? mc.Descripcion : null,
+                          cat != null ? cat.Descripcion : null))
+            .Take(max)
+            .ToListAsync(ct);
+    }
+
 
     private static MovimientoInventarioDto Map(InventarioMovimiento m) => new(
         m.IdMovimientoInv, m.IdProducto, m.TipoMovimiento, m.Cantidad,
@@ -236,7 +348,7 @@ public class ServicioInventario
     /// cliente. Pensado para llamarse dentro de la transacción del alta de venta,
     /// por eso NO abre transacción propia (usa la del contexto llamante) ni
     /// llama SaveChanges: el llamador confirma.
-    /// La existencia nunca queda negativa (piso 0), igual que la app WPF.
+    /// Bloquea las existencias y rechaza la venta si otro dispositivo agotó el stock.
     /// </summary>
     public async Task DescontarPorVentaAsync(
         long idVenta, long idZona,
@@ -245,26 +357,21 @@ public class ServicioInventario
     {
         var ahora = DateTimeOffset.UtcNow;
 
-        foreach (var (idProducto, cantidad) in lineas)
+        foreach (var (idProducto, cantidad) in lineas.OrderBy(l => l.IdProducto))
         {
             if (cantidad <= 0) continue;
 
-            var inv = await _db.InventarioZona.FirstOrDefaultAsync(
-                x => x.IdZona == idZona && x.IdProducto == idProducto, ct);
+            var inv = await _db.InventarioZona.FromSqlInterpolated(
+                $"SELECT * FROM inventariozona WHERE idzona = {idZona} AND idproducto = {idProducto} FOR UPDATE")
+                .FirstOrDefaultAsync(ct);
+            if (inv is not null) await _db.Entry(inv).ReloadAsync(ct);
             var anterior = inv?.Cantidad ?? 0;
+            if (inv is null || anterior < cantidad)
+                throw new InvalidOperationException($"Inventario insuficiente para el producto #{idProducto}. Disponible en central: {anterior}.");
             var nueva = CalculoInventario.CalcularSalida(anterior, cantidad);
 
-            if (inv is null)
-            {
-                inv = new Domain.Entidades.InventarioZona
-                { IdZona = idZona, IdProducto = idProducto, Cantidad = nueva, FechaActualizacion = ahora };
-                _db.InventarioZona.Add(inv);
-            }
-            else
-            {
-                inv.Cantidad = nueva;
-                inv.FechaActualizacion = ahora;
-            }
+            inv.Cantidad = nueva;
+            inv.FechaActualizacion = ahora;
 
             _db.InventarioMovimientos.Add(new Domain.Entidades.InventarioMovimiento
             {
@@ -280,4 +387,83 @@ public class ServicioInventario
             });
         }
     }
+    
+    /// <summary>
+/// Devuelve al inventario de una zona las cantidades correspondientes a una venta
+/// cancelada.
+///
+/// IMPORTANTE:
+/// - No abre una transacción propia.
+/// - No ejecuta SaveChangesAsync.
+/// - Debe ejecutarse dentro de la transacción de la operación que cancela la venta.
+/// - Registra el movimiento asociado a la venta mediante IdVenta.
+/// </summary>
+public async Task RestaurarPorVentaAsync(
+    long idVenta,
+    long idZona,
+    IReadOnlyList<(long IdProducto, int Cantidad)> lineas,
+    long? idUsuario,
+    CancellationToken ct = default)
+{
+    var ahora = DateTimeOffset.UtcNow;
+
+    foreach (var (idProducto, cantidad) in lineas)
+    {
+        if (cantidad <= 0)
+            continue;
+
+        var inv = await _db.InventarioZona
+            .FirstOrDefaultAsync(
+                x => x.IdZona == idZona &&
+                     x.IdProducto == idProducto,
+                ct);
+
+        var anterior = inv?.Cantidad ?? 0;
+        var nueva = checked(anterior + cantidad);
+
+        if (inv is null)
+        {
+            inv = new Domain.Entidades.InventarioZona
+            {
+                IdZona = idZona,
+                IdProducto = idProducto,
+                Cantidad = nueva,
+                FechaActualizacion = ahora
+            };
+
+            _db.InventarioZona.Add(inv);
+        }
+        else
+        {
+            inv.Cantidad = nueva;
+            inv.FechaActualizacion = ahora;
+        }
+
+        _db.InventarioMovimientos.Add(
+            new Domain.Entidades.InventarioMovimiento
+            {
+                IdProducto = idProducto,
+
+                TipoMovimiento =
+                    TipoMovimientoInventario.DevolucionVenta,
+
+                Cantidad = cantidad,
+
+                ExistenciaAnterior = anterior,
+
+                ExistenciaNueva = nueva,
+
+                IdZonaDestino = idZona,
+
+                IdVenta = idVenta,
+
+                IdUsuarioRegistro = idUsuario,
+
+                Observaciones =
+                    $"Devolución de inventario por cancelación de venta #{idVenta}.",
+
+                FechaMovimiento = ahora
+            });
+    }
+}
 }

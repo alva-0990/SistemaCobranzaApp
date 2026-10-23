@@ -1,0 +1,359 @@
+@page "/zonas-rutas"
+
+@using MudBlazor
+@using SistemaCobranzaApp.Shared.Components
+@using SistemaCobranzaApp.Shared.Dtos
+@using SistemaCobranzaApp.Shared.Services
+@inject ApiCliente Api
+@inject IDialogService _dialogo
+@inject ISnackbar _snackbar
+
+<MudTabs Elevation="2" Rounded="true" Color="Color.Primary" ApplyEffectsToContainer="true"
+         PanelClass="pa-0 pt-4" SliderColor="Color.Warning" Class="ma-2 tabs-remarcados">
+
+    <!-- ===================== ZONAS ===================== -->
+    <MudTabPanel Text="Zonas" Icon="@Icons.Material.Filled.Place">
+        <MudPaper Elevation="0" Class="pa-4">
+            <div class="barra-acciones">
+                <MudTextField T="string"
+                              Value="_busquedaZona"
+                              ValueChanged="@(v => { _busquedaZona = v; })"
+                              Immediate="true"
+                              Placeholder="Buscar zona por nombre o ID..."
+                              Variant="Variant.Outlined"
+                              Adornment="Adornment.Start"
+                              AdornmentIcon="@Icons.Material.Filled.Search"
+                              AdornmentColor="Color.Primary"
+                              Clearable="true"
+                              Class="buscador-remarcado" />
+                <MudButton Variant="Variant.Filled"
+                           Color="Color.Primary"
+                           StartIcon="@Icons.Material.Filled.Add"
+                           OnClick="AbrirModalNuevaZona"
+                           Class="boton-nuevo">
+                    Nueva zona
+                </MudButton>
+            </div>
+
+            @if (_cargandoZonas)
+            {
+                <div class="d-flex justify-center pa-8">
+                    <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+                </div>
+            }
+            else
+            {
+                <MudTable Items="ZonasFiltradas" Hover="true" Dense="true"
+                          Breakpoint="Breakpoint.Sm" Elevation="0" RowsPerPage="10">
+                    <HeaderContent>
+                        <MudTh Style="width:10%;">ID</MudTh>
+                        <MudTh>Descripción / Región</MudTh>
+                        <MudTh Style="width:15%;">Estatus</MudTh>
+                        <MudTh Style="width:15%; text-align:right;">Acciones</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd DataLabel="ID">@context.IdZona</MudTd>
+                        <MudTd DataLabel="Nombre"><b>@context.Descripcion</b></MudTd>
+                        <MudTd DataLabel="Estatus">@ChipEstatus(context.Activo)</MudTd>
+                        <MudTd DataLabel="Acciones" Style="text-align:right;">
+                            @AccionesFila(() => AbrirModalEditarZona(context),
+                                () => AlternarEstatusZona(context), context.Activo)
+                        </MudTd>
+                    </RowTemplate>
+                    <NoRecordsContent>@EstadoVacio("No hay zonas que coincidan.")</NoRecordsContent>
+                    <PagerContent>
+                        <MudTablePager InfoFormat="{first_item}-{last_item} de {all_items}" RowsPerPageString="Filas:" />
+                    </PagerContent>
+                </MudTable>
+            }
+        </MudPaper>
+    </MudTabPanel>
+
+    <!-- ===================== RUTAS ===================== -->
+    <MudTabPanel Text="Rutas" Icon="@Icons.Material.Filled.AltRoute">
+        <MudPaper Elevation="0" Class="pa-4">
+            <div class="barra-acciones">
+                <MudTextField T="string"
+                              Value="_busquedaRuta"
+                              ValueChanged="@(v => { _busquedaRuta = v; })"
+                              Immediate="true"
+                              Placeholder="Buscar ruta por nombre, ID o zona..."
+                              Variant="Variant.Outlined"
+                              Adornment="Adornment.Start"
+                              AdornmentIcon="@Icons.Material.Filled.Search"
+                              AdornmentColor="Color.Secondary"
+                              Clearable="true"
+                              Class="buscador-remarcado" />
+                <MudButton Variant="Variant.Filled"
+                           Color="Color.Secondary"
+                           StartIcon="@Icons.Material.Filled.Add"
+                           OnClick="AbrirModalNuevaRuta"
+                           Class="boton-nuevo">
+                    Nueva ruta
+                </MudButton>
+            </div>
+
+            @if (_cargandoRutas)
+            {
+                <div class="d-flex justify-center pa-8">
+                    <MudProgressCircular Indeterminate="true" Color="Color.Secondary" />
+                </div>
+            }
+            else
+            {
+                <MudTable Items="RutasFiltradas" Hover="true" Dense="true"
+                          Breakpoint="Breakpoint.Sm" Elevation="0" RowsPerPage="10">
+                    <HeaderContent>
+                        <MudTh Style="width:10%;">ID</MudTh>
+                        <MudTh>Nombre / Cobertura</MudTh>
+                        <MudTh>Zona</MudTh>
+                        <MudTh Style="width:15%;">Estatus</MudTh>
+                        <MudTh Style="width:15%; text-align:right;">Acciones</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd DataLabel="ID">@context.IdRuta</MudTd>
+                        <MudTd DataLabel="Ruta"><b>@context.Descripcion</b></MudTd>
+                        <MudTd DataLabel="Zona">
+                            <MudChip T="string" Size="Size.Small" Variant="Variant.Text" Color="Color.Secondary">
+                                @(string.IsNullOrWhiteSpace(context.Zona) ? ObtenerNombreZona(context.IdZona) : context.Zona)
+                            </MudChip>
+                        </MudTd>
+                        <MudTd DataLabel="Estatus">@ChipEstatus(context.Activo)</MudTd>
+                        <MudTd DataLabel="Acciones" Style="text-align:right;">
+                            @AccionesFila(() => AbrirModalEditarRuta(context),
+                                () => AlternarEstatusRuta(context), context.Activo)
+                        </MudTd>
+                    </RowTemplate>
+                    <NoRecordsContent>@EstadoVacio("No hay rutas que coincidan.")</NoRecordsContent>
+                    <PagerContent>
+                        <MudTablePager InfoFormat="{first_item}-{last_item} de {all_items}" RowsPerPageString="Filas:" />
+                    </PagerContent>
+                </MudTable>
+            }
+        </MudPaper>
+    </MudTabPanel>
+</MudTabs>
+
+@{
+    RenderFragment ChipEstatus(bool activo) => __builder =>
+    {
+        <MudChip T="string" Size="Size.Small" Variant="Variant.Filled"
+                 Color="@(activo ? Color.Success : Color.Default)">
+            @(activo ? "Activa" : "Inactiva")
+        </MudChip>
+    };
+
+    RenderFragment AccionesFila(Func<Task> onEditar, Func<Task> onAlternar, bool activo) => __builder =>
+    {
+        <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" Color="Color.Info"
+                       Title="Editar" OnClick="@(async () => await onEditar())" />
+        @if (activo)
+        {
+            <MudIconButton Icon="@Icons.Material.Filled.Block" Size="Size.Small" Color="Color.Error"
+                           Title="Desactivar" OnClick="@(async () => await onAlternar())" />
+        }
+        else
+        {
+            <MudIconButton Icon="@Icons.Material.Filled.CheckCircle" Size="Size.Small" Color="Color.Success"
+                           Title="Reactivar" OnClick="@(async () => await onAlternar())" />
+        }
+    };
+
+    RenderFragment EstadoVacio(string mensaje) => __builder =>
+    {
+        <div class="pa-8 text-center">
+            <MudIcon Icon="@Icons.Material.Filled.SearchOff" Size="Size.Large" Color="Color.Secondary" />
+            <MudText Color="Color.Secondary" Class="mt-2">@mensaje</MudText>
+        </div>
+    };
+}
+
+<style>
+    .barra-acciones {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 16px;
+    }
+
+    .barra-acciones .buscador-remarcado { flex: 1 1 auto; min-width: 0; }
+    .boton-nuevo { white-space: nowrap; flex: 0 0 auto; }
+    .buscador-remarcado .mud-input-outlined-border { border-width: 2px; }
+
+    /* Tabs: resaltar el seleccionado */
+    .tabs-remarcados .mud-tab { opacity: 0.65; font-weight: 500; transition: opacity 0.15s ease, background-color 0.15s ease; }
+    .tabs-remarcados .mud-tab.mud-tab-active { opacity: 1; font-weight: 800; background-color: rgba(255,255,255,0.18); border-radius: 8px 8px 0 0; }
+    .tabs-remarcados .mud-tab-slider { height: 4px; }
+</style>
+
+@code {
+    private List<ZonaDto> _zonas = new();
+    private List<RutaAdminDto> _rutas = new();
+    private bool _cargandoZonas;
+    private bool _cargandoRutas;
+    private string _busquedaZona = "";
+    private string _busquedaRuta = "";
+
+    private IEnumerable<ZonaDto> ZonasFiltradas
+    {
+        get
+        {
+            var q = _busquedaZona?.Trim() ?? "";
+            if (string.IsNullOrEmpty(q)) return _zonas;
+            return _zonas.Where(x =>
+                x.IdZona.ToString().Contains(q, StringComparison.OrdinalIgnoreCase)
+                || (x.Descripcion ?? "").Contains(q, StringComparison.OrdinalIgnoreCase));
+        }
+    }
+
+    private IEnumerable<RutaAdminDto> RutasFiltradas
+    {
+        get
+        {
+            var q = _busquedaRuta?.Trim() ?? "";
+            if (string.IsNullOrEmpty(q)) return _rutas;
+            return _rutas.Where(x =>
+                x.IdRuta.ToString().Contains(q, StringComparison.OrdinalIgnoreCase)
+                || (x.Descripcion ?? "").Contains(q, StringComparison.OrdinalIgnoreCase)
+                || (x.Zona ?? "").Contains(q, StringComparison.OrdinalIgnoreCase));
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CargarZonas();
+        await CargarRutas();
+    }
+
+    private async Task CargarZonas()
+    {
+        _cargandoZonas = true;
+        var (datos, error) = await Api.ListarZonasAdminAsync();
+        if (error is not null) _snackbar.Add(error, Severity.Error);
+        _zonas = datos ?? new();
+        _cargandoZonas = false;
+    }
+
+    private async Task CargarRutas()
+    {
+        _cargandoRutas = true;
+        var (datos, error) = await Api.ListarRutasAdminAsync(incluirInactivas: true);
+        if (error is not null) _snackbar.Add(error, Severity.Error);
+        _rutas = datos ?? new();
+        _cargandoRutas = false;
+    }
+
+    private string ObtenerNombreZona(long? idZona)
+        => idZona is null ? "Sin zona"
+           : _zonas.FirstOrDefault(x => x.IdZona == idZona.Value)?.Descripcion ?? "Sin zona";
+
+    // ===================== Zonas =====================
+
+    private async Task AbrirModalNuevaZona()
+    {
+        var modelo = new DialogoPersona.FormModel { Activo = true };
+        var m = await MostrarDialogo("Registrar nueva zona", Icons.Material.Filled.Place, "Nombre de la zona / región", modelo, conZona: false);
+        if (m is null) return;
+
+        var (_, error) = await Api.CrearZonaAsync(m.Nombre.Trim().ToUpperInvariant());
+        Notificar(error, "Zona registrada correctamente.");
+        if (error is null) { await CargarZonas(); await CargarRutas(); }
+    }
+
+    private async Task AbrirModalEditarZona(ZonaDto z)
+    {
+        var modelo = new DialogoPersona.FormModel { Nombre = z.Descripcion, Activo = z.Activo };
+        var m = await MostrarDialogo("Modificar zona", Icons.Material.Filled.Place, "Nombre de la zona / región", modelo, conZona: false);
+        if (m is null) return;
+
+        var (_, error) = await Api.ActualizarZonaAsync(z.IdZona, m.Nombre.Trim().ToUpperInvariant(), m.Activo);
+        Notificar(error, "Zona actualizada correctamente.");
+        if (error is null) { await CargarZonas(); await CargarRutas(); }
+    }
+
+    private async Task AlternarEstatusZona(ZonaDto z)
+    {
+        if (z.Activo)
+        {
+            var (_, error) = await Api.DarDeBajaZonaAsync(z.IdZona);
+            Notificar(error, $"Zona '{z.Descripcion}' desactivada.");
+            if (error is null) { await CargarZonas(); await CargarRutas(); }
+        }
+        else
+        {
+            var (_, error) = await Api.ActualizarZonaAsync(z.IdZona, z.Descripcion, true);
+            Notificar(error, $"Zona '{z.Descripcion}' reactivada.");
+            if (error is null) { await CargarZonas(); await CargarRutas(); }
+        }
+    }
+
+    // ===================== Rutas =====================
+
+    private async Task AbrirModalNuevaRuta()
+    {
+        var modelo = new DialogoPersona.FormModel { Activo = true, IdZona = _zonas.FirstOrDefault(x => x.Activo)?.IdZona };
+        var m = await MostrarDialogo("Registrar nueva ruta", Icons.Material.Filled.AltRoute, "Nombre / cobertura de ruta", modelo, conZona: true);
+        if (m is null) return;
+
+        if (m.IdZona is null) { _snackbar.Add("Debes seleccionar una zona.", Severity.Warning); return; }
+
+        var (_, error) = await Api.CrearRutaAsync(m.Nombre.Trim().ToUpperInvariant(), m.IdZona);
+        Notificar(error, "Ruta registrada correctamente.");
+        if (error is null) await CargarRutas();
+    }
+
+    private async Task AbrirModalEditarRuta(RutaAdminDto r)
+    {
+        var modelo = new DialogoPersona.FormModel { Nombre = r.Descripcion, IdZona = r.IdZona, Activo = r.Activo };
+        var m = await MostrarDialogo("Modificar ruta", Icons.Material.Filled.AltRoute, "Nombre / cobertura de ruta", modelo, conZona: true);
+        if (m is null) return;
+
+        if (m.IdZona is null) { _snackbar.Add("Debes seleccionar una zona.", Severity.Warning); return; }
+
+        var (_, error) = await Api.ActualizarRutaAsync(r.IdRuta, m.Nombre.Trim().ToUpperInvariant(), m.IdZona, m.Activo);
+        Notificar(error, "Ruta actualizada correctamente.");
+        if (error is null) await CargarRutas();
+    }
+
+    private async Task AlternarEstatusRuta(RutaAdminDto r)
+    {
+        if (r.Activo)
+        {
+            var (_, error) = await Api.DarDeBajaRutaAsync(r.IdRuta);
+            Notificar(error, $"Ruta '{r.Descripcion}' desactivada.");
+            if (error is null) await CargarRutas();
+        }
+        else
+        {
+            var (_, error) = await Api.ActualizarRutaAsync(r.IdRuta, r.Descripcion, r.IdZona, true);
+            Notificar(error, $"Ruta '{r.Descripcion}' reactivada.");
+            if (error is null) await CargarRutas();
+        }
+    }
+
+    // ===================== Helpers =====================
+
+    private async Task<DialogoPersona.FormModel?> MostrarDialogo(
+        string titulo, string icono, string labelNombre, DialogoPersona.FormModel modelo, bool conZona)
+    {
+        var opciones = new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true, CloseButton = true };
+        var parametros = new DialogParameters<DialogoPersona>
+        {
+            { x => x.Titulo, titulo },
+            { x => x.Icono, icono },
+            { x => x.LabelNombre, labelNombre },
+            { x => x.Modelo, modelo },
+            { x => x.Zonas, conZona ? _zonas.Where(z => z.Activo).ToList() : new List<ZonaDto>() },
+            { x => x.MostrarZona, conZona }
+        };
+        var dialogo = await _dialogo.ShowAsync<DialogoPersona>(titulo, parametros, opciones);
+        var resultado = await dialogo.Result;
+        return resultado is { Canceled: false, Data: DialogoPersona.FormModel datos } ? datos : null;
+    }
+
+    private void Notificar(string? error, string exito)
+    {
+        if (error is null) _snackbar.Add(exito, Severity.Success);
+        else _snackbar.Add(error, Severity.Error);
+    }
+}

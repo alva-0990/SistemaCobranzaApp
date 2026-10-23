@@ -1,0 +1,437 @@
+@page "/pagos-comisiones"
+
+@using MudBlazor
+@using SistemaCobranzaApp.Shared.Components
+@using SistemaCobranzaApp.Shared.Dtos
+@using SistemaCobranzaApp.Shared.Services
+@inject ApiCliente Api
+@inject IDialogService _dialogo
+@inject ISnackbar _snackbar
+
+<style>
+    .barra-filtros-responsiva {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        width: 100%;
+    }
+    @@media (min-width: 768px) {
+        .barra-filtros-responsiva {
+            flex-direction: row;
+            align-items: center;
+        }
+        .f-item-compacto {
+            flex: 1;
+            min-width: 140px;
+        }
+        .btn-buscar-compacto {
+            min-width: 130px;
+            height: 40px;
+            margin-top: 6px;
+        }
+    }
+</style>
+
+<MudTabs Elevation="2" Rounded="true" Color="Color.Primary" ApplyEffectsToContainer="true"
+         PanelClass="pa-0 pt-4" SliderColor="Color.Warning" Class="ma-2 tabs-remarcados">
+
+    <!-- ============================================================= -->
+    <!-- ================= PESTAÑA 1: LIBERACIÓN MANUAL ================= -->
+    <!-- ============================================================= -->
+    <MudTabPanel Text="Liberar Créditos" Icon="@Icons.Material.Filled.LockOpen">
+        <MudPaper Elevation="0" Class="pa-4">
+            
+            <div class="encabezado-seccion mb-4">
+                <MudIcon Icon="@Icons.Material.Filled.LockOpen" Color="Color.Primary" Size="Size.Large" />
+                <div>
+                    <MudText Typo="Typo.h6" Class="titulo-seccion">Liberación Manual de Comisiones a Crédito</MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">
+                        Seleccione las comisiones de crédito en estatus PENDIENTE y autorice su cambio manual a DISPONIBLE para que pasen a la caja de cobro.
+                    </MudText>
+                </div>
+            </div>
+
+            <div class="barra-filtros-responsiva mb-3">
+                <MudSelect T="long?" Label="Zona" @bind-Value="_fZonaLib" Variant="Variant.Outlined" Clearable="true" Class="f-item-compacto">
+                    @foreach (var z in _zonas)
+                    {
+                        <MudSelectItem T="long?" Value="@z.IdZona">@z.Descripcion</MudSelectItem>
+                    }
+                </MudSelect>
+
+                <MudSelect T="long?" Label="Vendedor" @bind-Value="_fVendedorLib" Variant="Variant.Outlined" Clearable="true" Class="f-item-compacto">
+                    @foreach (var v in _vendedoresFiltradosLib)
+                    {
+                        <MudSelectItem T="long?" Value="@v.IdVendedor">@v.Nombre</MudSelectItem>
+                    }
+                </MudSelect>
+
+                <MudDatePicker Label="Desde" @bind-Date="_fDesdeLib" Variant="Variant.Outlined" Clearable="true" Class="f-item-compacto" />
+                <MudDatePicker Label="Hasta" @bind-Date="_fHastaLib" Variant="Variant.Outlined" Clearable="true" Class="f-item-compacto" />
+
+                <MudButton Variant="Variant.Filled" Color="Color.Success" StartIcon="@Icons.Material.Filled.Search" OnClick="CargarComisionesPendientes" Class="btn-buscar-compacto fw-bold">
+                    Buscar
+                </MudButton>
+            </div>
+
+            @if (_cargandoLib)
+            {
+                <div class="d-flex justify-center pa-8"><MudProgressCircular Indeterminate="true" /></div>
+            }
+            else
+            {
+                <div class="d-flex justify-between align-center mb-3">
+                    <div class="d-flex gap-2">
+                        <MudChip T="string" Color="Color.Secondary" Variant="Variant.Text"><b>Seleccionadas:</b> @_seleccionadasLib.Count</MudChip>
+                        <MudChip T="string" Color="Color.Primary" Variant="Variant.Text"><b>Monto Total:</b> @_montoTotalSeleccionadoLib.ToString("C2")</MudChip>
+                    </div>
+                    <MudButton Variant="Variant.Filled" Color="Color.Success" StartIcon="@Icons.Material.Filled.AssignmentTurnedIn" Disabled="@(!_seleccionadasLib.Any() || _procesandoLib)" OnClick="ProcesarLiberacionManual">
+                        @(_procesandoLib ? "Liberando..." : "Autorizar y Pasar a Disponible")
+                    </MudButton>
+                </div>
+
+                <MudTable Items="_comisionesPendientes" Hover="true" Dense="true" Bordered="true" Striped="true" FixedHeader="true" Height="500px">
+                    <HeaderContent>
+                        <MudTh Style="width: 50px; text-align: center;">
+                            <MudCheckBox T="bool" Value="_todosSeleccionadosLib" ValueChanged="AlternarTodosCheckboxesLib" Color="Color.Primary" Dense="true" />
+                        </MudTh>
+                        <MudTh>Fecha Cálculo</MudTh>
+                        <MudTh>Zona</MudTh>
+                        <MudTh>Vendedor</MudTh>
+                        <MudTh>Folio Venta</MudTh>
+                        <MudTh>Producto</MudTh>
+                        <MudTh Style="text-align:right">Monto Comisión</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd Style="text-align: center;">
+                            <MudCheckBox T="bool" Value="@_seleccionadasLib.Contains(context.IdComision)" ValueChanged="@((bool check) => AlternarSeleccionFilaLib(context.IdComision, check))" Color="Color.Primary" Dense="true" />
+                        </MudTd>
+                        <MudTd DataLabel="Fecha Cálculo">@context.FechaCalculo.EnZonaProyecto().DateTime.ToString("dd/MM/yyyy HH:mm")</MudTd>
+                        <MudTd DataLabel="Zona"><MudChip T="string" Size="Size.Small" Color="Color.Primary" Variant="Variant.Text">@context.NombreZona</MudChip></MudTd>
+                        <MudTd DataLabel="Vendedor"><b>@context.NombreVendedor</b></MudTd>
+                        <MudTd DataLabel="Folio Venta"><code>@context.CodigoVenta</code></MudTd>
+                        <MudTd DataLabel="Producto">@context.DescripcionProducto</MudTd>
+                        <MudTd DataLabel="Monto Comisión" Style="text-align:right; font-weight:bold;" Class="text-primary">@context.MontoComision.ToString("C2")</MudTd>
+                    </RowTemplate>
+                    <NoRecordsContent>
+                        <div class="pa-4 text-center">
+                            <MudText Typo="Typo.body1" Color="Color.Secondary">🚩 No se encontraron comisiones en estatus <b>PENDIENTE</b>.</MudText>
+                        </div>
+                    </NoRecordsContent>
+                </MudTable>
+            }
+        </MudPaper>
+    </MudTabPanel>
+       <!-- ============================================================= -->
+    <!-- ==================== PESTAÑA 2: CAJA / PAGO ==================== -->
+    <!-- ============================================================= -->
+    <MudTabPanel Text="Caja (Pagar Disponibles)" Icon="@Icons.Material.Filled.Payments">
+        <MudPaper Elevation="0" Class="pa-4">
+            
+            <div class="encabezado-seccion mb-4">
+                <MudIcon Icon="@Icons.Material.Filled.Payments" Color="Color.Primary" Size="Size.Large" />
+                <div>
+                    <MudText Typo="Typo.h6" Class="titulo-seccion">Pago Manual de Comisiones Disponibles</MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">
+                        Consulte, audite y liquide las comisiones en estatus DISPONIBLE de los vendedores. Filtre por zona, vendedor o rango de fechas y confirme los pagos masivos de forma segura.
+                    </MudText>
+                </div>
+            </div>
+
+            <div class="barra-filtros-responsiva mb-3">
+                <MudSelect T="long?" Label="Zona" @bind-Value="_fZona" Variant="Variant.Outlined" Clearable="true" Class="f-item-compacto">
+                    @foreach (var z in _zonas)
+                    {
+                        <MudSelectItem T="long?" Value="@z.IdZona">@z.Descripcion</MudSelectItem>
+                    }
+                </MudSelect>
+
+                <MudSelect T="long?" Label="Vendedor" @bind-Value="_fVendedor" Variant="Variant.Outlined" Clearable="true" Class="f-item-compacto">
+                    @foreach (var v in _vendedoresFiltrados)
+                    {
+                        <MudSelectItem T="long?" Value="@v.IdVendedor">@v.Nombre</MudSelectItem>
+                    }
+                </MudSelect>
+
+                <MudDatePicker Label="Desde" @bind-Date="_fDesde" Variant="Variant.Outlined" Clearable="true" Class="f-item-compacto" />
+                <MudDatePicker Label="Hasta" @bind-Date="_fHasta" Variant="Variant.Outlined" Clearable="true" Class="f-item-compacto" />
+
+                <MudButton Variant="Variant.Filled" Color="Color.Success" StartIcon="@Icons.Material.Filled.Search" OnClick="CargarComisiones" Class="btn-buscar-compacto fw-bold">
+                    Buscar
+                </MudButton>
+            </div>
+
+            @if (_cargandoComisiones)
+            {
+                <div class="d-flex justify-center pa-8"><MudProgressCircular Indeterminate="true" /></div>
+            }
+            else
+            {
+                <div class="d-flex justify-between align-center mb-3">
+                    <div class="d-flex gap-2">
+                        <MudChip T="string" Color="Color.Secondary" Variant="Variant.Text"><b>Seleccionadas:</b> @_seleccionadas.Count</MudChip>
+                        <MudChip T="string" Color="Color.Success" Variant="Variant.Text"><b>Monto Total:</b> @_montoTotalSeleccionado.ToString("C2")</MudChip>
+                    </div>
+                    <MudButton Variant="Variant.Filled" Color="Color.Success" StartIcon="@Icons.Material.Filled.PriceCheck" Disabled="@(!_seleccionadas.Any() || _procesandoPago)" OnClick="ProcesarPagoManual">
+                        @(_procesandoPago ? "Procesando..." : "Confirmar Pago de Seleccionadas")
+                    </MudButton>
+                </div>
+
+                <MudTable Items="_comisiones" Hover="true" Dense="true" Bordered="true" Striped="true" FixedHeader="true" Height="500px">
+                    <HeaderContent>
+                        <MudTh Style="width: 50px; text-align: center;">
+                            <MudCheckBox T="bool" Value="_todosSeleccionados" ValueChanged="AlternarTodosCheckboxes" Color="Color.Primary" Dense="true" />
+                        </MudTh>
+                        <MudTh>Fecha Cálculo</MudTh>
+                        <MudTh>Zona</MudTh>
+                        <MudTh>Vendedor</MudTh>
+                        <MudTh>Folio Venta</MudTh>
+                        <MudTh>Producto</MudTh>
+                        <MudTh Style="text-align:right">Monto Comisión</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd Style="text-align: center;">
+                            <MudCheckBox T="bool" Value="@_seleccionadas.Contains(context.IdComision)" ValueChanged="@((bool check) => AlternarSeleccionFila(context.IdComision, check))" Color="Color.Primary" Dense="true" />
+                        </MudTd>
+                        <MudTd DataLabel="Fecha Cálculo">@context.FechaCalculo.EnZonaProyecto().DateTime.ToString("dd/MM/yyyy HH:mm")</MudTd>
+                        <MudTd DataLabel="Zona"><MudChip T="string" Size="Size.Small" Color="Color.Info" Variant="Variant.Text">@context.NombreZona</MudChip></MudTd>
+                        <MudTd DataLabel="Vendedor"><b>@context.NombreVendedor</b></MudTd>
+                        <MudTd DataLabel="Folio Venta"><code>@context.CodigoVenta</code></MudTd>
+                        <MudTd DataLabel="Producto">@context.DescripcionProducto</MudTd>
+                        <MudTd DataLabel="Monto Comisión" Style="text-align:right; font-weight:bold;" Class="text-success">@context.MontoComision.ToString("C2")</MudTd>
+                    </RowTemplate>
+                    <NoRecordsContent>
+                        <div class="pa-4 text-center">
+                            <MudText Typo="Typo.body1" Color="Color.Secondary">🚩 No se encontraron comisiones en estatus <b>DISPONIBLE</b>.</MudText>
+                        </div>
+                    </NoRecordsContent>
+                </MudTable>
+            }
+        </MudPaper>
+    </MudTabPanel>
+    <!-- ============================================================= -->
+    <!-- ==================== PESTAÑA 3: HISTORIAL =================== -->
+    <!-- ============================================================= -->
+    <MudTabPanel Text="Historial de Pagos" Icon="@Icons.Material.Filled.History">
+        <MudPaper Elevation="0" Class="pa-4">
+            
+            <div class="encabezado-seccion mb-4">
+                <MudIcon Icon="@Icons.Material.Filled.History" Color="Color.Primary" Size="Size.Large" />
+                <div>
+                    <MudText Typo="Typo.h6" Class="titulo-seccion">Historial de Comisiones Liquidadas</MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">
+                        Consulte la bitácora histórica de comisiones que ya fueron pagadas en efectivo a los vendedores. Filtre por zona, vendedor y rango de fechas.
+                    </MudText>
+                </div>
+            </div>
+
+            <div class="barra-filtros-responsiva mb-3">
+                <MudSelect T="long?" Label="Zona" @bind-Value="_fZonaHist" Variant="Variant.Outlined" Clearable="true" Class="f-item-compacto">
+                    @foreach (var z in _zonas) 
+                    { 
+                        <MudSelectItem T="long?" Value="@z.IdZona">@z.Descripcion</MudSelectItem> 
+                    }
+                </MudSelect>
+
+                <MudSelect T="long?" Label="Vendedor" @bind-Value="_fVendedorHist" Variant="Variant.Outlined" Clearable="true" Class="f-item-compacto">
+                    @foreach (var v in _vendedoresFiltradosHist) 
+                    { 
+                        <MudSelectItem T="long?" Value="@v.IdVendedor">@v.Nombre</MudSelectItem> 
+                    }
+                </MudSelect>
+
+                <MudDatePicker Label="Desde" @bind-Date="_fDesdeHist" Variant="Variant.Outlined" Clearable="true" Class="f-item-compacto" />
+                <MudDatePicker Label="Hasta" @bind-Date="_fHastaHist" Variant="Variant.Outlined" Clearable="true" Class="f-item-compacto" />
+
+                <MudButton Variant="Variant.Filled" Color="Color.Success" StartIcon="@Icons.Material.Filled.Search" OnClick="CargarHistorialPagadas" Class="btn-buscar-compacto fw-bold">
+                    Buscar
+                </MudButton>
+            </div>
+
+            @if (_cargandoHistorial)
+            {
+                <div class="d-flex justify-center pa-8"><MudProgressCircular Indeterminate="true" /></div>
+            }
+            else
+            {
+                <div class="mb-3">
+                    <MudChip T="string" Color="Color.Success" Variant="Variant.Text">
+                        <b>Total Histórico Pagado:</b> @_montoTotalHistorial.ToString("C2")
+                    </MudChip>
+                </div>
+
+                <MudTable Items="_comisionesHistorial" Hover="true" Dense="true" Bordered="true" Striped="true" FixedHeader="true" Height="500px">
+                    <HeaderContent>
+                        <MudTh>Fecha Pago / Registro</MudTh>
+                        <MudTh>Zona</MudTh>
+                        <MudTh>Vendedor</MudTh>
+                        <MudTh>Folio Venta</MudTh>
+                        <MudTh>Producto</MudTh>
+                        <MudTh Style="text-align:right">Monto Pagado</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd>@context.FechaCalculo.EnZonaProyecto().DateTime.ToString("dd/MM/yyyy HH:mm")</MudTd>
+                        <MudTd><MudChip T="string" Size="Size.Small" Color="Color.Info" Variant="Variant.Text">@context.NombreZona</MudChip></MudTd>
+                        <MudTd><b>@context.NombreVendedor</b></MudTd>
+                        <MudTd><code>@context.CodigoVenta</code></MudTd>
+                        <MudTd>@context.DescripcionProducto</MudTd>
+                        <MudTd Style="text-align:right; font-weight:bold;" Class="text-success">@context.MontoComision.ToString("C2")</MudTd>
+                    </RowTemplate>
+                    <NoRecordsContent>
+                        <div class="pa-4 text-center">
+                            <MudText Typo="Typo.body1" Color="Color.Secondary">🚩 No se encontraron registros de comisiones pagadas.</MudText>
+                        </div>
+                    </NoRecordsContent>
+                </MudTable>
+            }
+        </MudPaper>
+    </MudTabPanel>
+</MudTabs>
+
+@code {
+    private const string ComponenteLog = "PantallaPagosComisiones";
+
+    private List<ZonaDto> _zonas = new();
+    private List<VendedorDto> _vendedoresGlobales = new();
+    
+    // ---- Pestaña 1: Liberaciones (Pendientes) ----
+    private List<ComisionPendientePagoDto> _comisionesPendientes = new();
+    private bool _cargandoLib;
+    private bool _procesandoLib;
+    private long? _fZonaLib;
+    private long? _fVendedorLib;
+    private DateTime? _fDesdeLib;
+    private DateTime? _fHastaLib;
+    private HashSet<long> _seleccionadasLib = new();
+    private decimal _montoTotalSeleccionadoLib => _comisionesPendientes.Where(c => _seleccionadasLib.Contains(c.IdComision)).Sum(c => c.MontoComision);
+    private bool _todosSeleccionadosLib => _comisionesPendientes.Any() && _seleccionadasLib.Count == _comisionesPendientes.Count;
+    private List<VendedorDto> _vendedoresFiltradosLib => _fZonaLib.HasValue ? _vendedoresGlobales.Where(v => v.IdZona == _fZonaLib.Value).ToList() : _vendedoresGlobales;
+
+    // ---- Pestaña 2: Caja (Disponibles) ----
+    private List<ComisionPendientePagoDto> _comisiones = new();
+    private bool _cargandoComisiones;
+    private bool _procesandoPago;
+    private long? _fZona;
+    private long? _fVendedor;
+    private DateTime? _fDesde;
+    private DateTime? _fHasta;
+    private HashSet<long> _seleccionadas = new();
+    private decimal _montoTotalSeleccionado => _comisiones.Where(c => _seleccionadas.Contains(c.IdComision)).Sum(c => c.MontoComision);
+    private bool _todosSeleccionados => _comisiones.Any() && _seleccionadas.Count == _comisiones.Count;
+    private List<VendedorDto> _vendedoresFiltrados => _fZona.HasValue ? _vendedoresGlobales.Where(v => v.IdZona == _fZona.Value).ToList() : _vendedoresGlobales;
+
+    // ---- Pestaña 3: Historial de Pagos ----
+    private List<ComisionPendientePagoDto> _comisionesHistorial = new();
+    private bool _cargandoHistorial;
+    private long? _fZonaHist;
+    private long? _fVendedorHist;
+    private DateTime? _fDesdeHist = FechaProyecto.Hoy.AddMonths(-1);
+    private DateTime? _fHastaHist = FechaProyecto.Hoy;
+    private decimal _montoTotalHistorial => _comisionesHistorial.Sum(c => c.MontoComision);
+    private List<VendedorDto> _vendedoresFiltradosHist => _fZonaHist.HasValue ? _vendedoresGlobales.Where(v => v.IdZona == _fZonaHist.Value).ToList() : _vendedoresGlobales;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CargarCatalogos();
+        await Task.WhenAll(CargarComisionesPendientes(), CargarComisiones(), CargarHistorialPagadas());
+    }
+
+    private async Task CargarCatalogos()
+    {
+        var (zonas, _) = await Api.ListarZonasOperativasAsync();
+        _zonas = zonas ?? new();
+
+        var (vend, _) = await Api.ListarVendedoresOperativosAsync();
+        _vendedoresGlobales = vend ?? new();
+    }
+
+    private async Task CargarComisionesPendientes()
+    {
+        _cargandoLib = true;
+        _seleccionadasLib.Clear();
+
+        var filtros = new FiltroComisionesRequest(IdVendedor: _fVendedorLib, IdZona: _fZonaLib, FechaDesde: _fDesdeLib, FechaHasta: _fHastaLib);
+        var (datos, error) = await Api.ListarComisionesPendientesLiberarAsync(filtros);
+        _cargandoLib = false;
+
+        if (error is not null) { _snackbar.Add(error, Severity.Error); return; }
+        _comisionesPendientes = datos ?? new();
+    }
+
+    private async Task CargarComisiones()
+    {
+        _cargandoComisiones = true;
+        _seleccionadas.Clear(); 
+
+        var filtros = new FiltroComisionesRequest(IdVendedor: _fVendedor, IdZona: _fZona, FechaDesde: _fDesde, FechaHasta: _fHasta);
+        var (datos, error) = await Api.ListarComisionesPendientesPagoAsync(filtros);
+        _cargandoComisiones = false;
+
+        if (error is not null) { _snackbar.Add(error, Severity.Error); return; }
+        _comisiones = datos ?? new();
+    }
+
+    private async Task CargarHistorialPagadas()
+    {
+        _cargandoHistorial = true;
+
+        var filtros = new FiltroComisionesRequest(IdVendedor: _fVendedorHist, IdZona: _fZonaHist, FechaDesde: _fDesdeHist, FechaHasta: _fHastaHist);
+        var (datos, error) = await Api.ListarHistorialComisionesPagadasAsync(filtros);
+        _cargandoHistorial = false;
+
+        if (error is not null) { _snackbar.Add(error, Severity.Error); return; }
+        _comisionesHistorial = datos ?? new();
+    }
+
+    // Handlers Pestaña 1
+    private void AlternarSeleccionFilaLib(long id, bool check) => _ = check ? _seleccionadasLib.Add(id) : _seleccionadasLib.Remove(id);
+    private void AlternarTodosCheckboxesLib(bool check) => _seleccionadasLib = check ? _comisionesPendientes.Select(c => c.IdComision).ToHashSet() : new();
+
+    // Handlers Pestaña 2
+    private void AlternarSeleccionFila(long id, bool check) => _ = check ? _seleccionadas.Add(id) : _seleccionadas.Remove(id);
+    private void AlternarTodosCheckboxes(bool check) => _seleccionadas = check ? _comisiones.Select(c => c.IdComision).ToHashSet() : new();
+
+    private async Task ProcesarLiberacionManual()
+    {
+        if (!_seleccionadasLib.Any()) return;
+        var ok = await ConfirmarDialogo("Confirmar Liberación", $"¿Liberar manual {_seleccionadasLib.Count} comisiones por {_montoTotalSeleccionadoLib.ToString("C2")} a estatus DISPONIBLE?", "Liberar Comisiones", Color.Success);
+        if (!ok) return;
+
+        _procesandoLib = true;
+        var (res, error) = await Api.ProcesarLiberacionComisionesAsync(new ProcesarPagoComisionesRequest(_seleccionadasLib.ToList()));
+        _procesandoLib = false;
+
+        if (error is not null) { _snackbar.Add(error, Severity.Error); return; }
+
+        _snackbar.Add($"Se liberaron {res} comisiones correctamente.", Severity.Success);
+        await Task.WhenAll(CargarComisionesPendientes(), CargarComisiones(), CargarHistorialPagadas());
+    }
+
+    private async Task ProcesarPagoManual()
+    {
+        if (!_seleccionadas.Any()) return;
+        var ok = await ConfirmarDialogo("Confirmar liquidación", $"¿Asentar el pago manual de las {_seleccionadas.Count} comisiones por un total de {_montoTotalSeleccionado.ToString("C2")}?", "Liquidar y Pagar", Color.Success);
+        if (!ok) return;
+
+        _procesandoPago = true;
+        var (res, error) = await Api.ProcesarPagoComisionesAsync(new ProcesarPagoComisionesRequest(_seleccionadas.ToList()));
+        _procesandoPago = false;
+
+        if (error is not null) { _snackbar.Add(error, Severity.Error); return; }
+
+        _snackbar.Add($"Se aplicó el pago correctamente para {res} comisiones.", Severity.Success);
+        await Task.WhenAll(CargarComisiones(), CargarHistorialPagadas()); 
+    }
+
+    private async Task<bool> ConfirmarDialogo(string titulo, string mensaje, string textoAceptar, Color color)
+    {
+        var opciones = new DialogOptions { MaxWidth = MaxWidth.ExtraSmall, FullWidth = true };
+        var parametros = new DialogParameters<DialogoConfirmacion>
+        {
+            { x => x.Titulo, titulo }, { x => x.Mensaje, mensaje }, { x => x.TextoAceptar, textoAceptar }, { x => x.ColorAceptar, color }, { x => x.Icono, Icons.Material.Filled.CheckCircle }, { x => x.ColorIcono, color }
+        };
+        var dialogo = await _dialogo.ShowAsync<DialogoConfirmacion>(titulo, parametros, opciones);
+        var resultado = await dialogo.Result;
+        return resultado is { Canceled: false, Data: true };
+    }
+}

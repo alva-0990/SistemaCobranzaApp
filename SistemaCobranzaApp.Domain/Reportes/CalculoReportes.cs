@@ -1,3 +1,5 @@
+using SistemaCobranzaApp.Domain.Comun;
+
 namespace SistemaCobranzaApp.Domain.Reportes;
 
 /// <summary>
@@ -15,14 +17,13 @@ public static class CalculoReportes
     public static (DateTimeOffset desde, DateTimeOffset hasta) NormalizarRango(
         DateTimeOffset? desde, DateTimeOffset? hasta)
     {
-        var d = desde ?? DateTimeOffset.MinValue;
+        var d = desde?.ToUniversalTime() ?? DateTimeOffset.MinValue;
 
         DateTimeOffset h;
         if (hasta is { } hv)
         {
             // Fin del día para incluir toda la jornada.
-            var fin = hv.Date.AddDays(1).AddTicks(-1);
-            h = new DateTimeOffset(fin, hv.Offset);
+            h = FechaProyecto.FinDiaUtc(hv.EnZonaProyecto().Date);
         }
         else
         {

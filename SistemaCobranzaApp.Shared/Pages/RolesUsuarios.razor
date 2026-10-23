@@ -1,0 +1,396 @@
+@page "/roles-usuarios"
+
+@using MudBlazor
+@using SistemaCobranzaApp.Shared.Components
+@using SistemaCobranzaApp.Shared.Dtos
+@using SistemaCobranzaApp.Shared.Services
+@inject ApiCliente Api
+@inject IDialogService _dialogo
+@inject ISnackbar _snackbar
+@inject IFormFactor _formFactor
+
+<MudTabs Elevation="2" Rounded="true" Color="Color.Primary" ApplyEffectsToContainer="true"
+         PanelClass="pa-0 pt-4" SliderColor="Color.Warning" Class="ma-2 tabs-remarcados">
+
+    <!-- ===================== USUARIOS ===================== -->
+    <MudTabPanel Text="Usuarios" Icon="@Icons.Material.Filled.ManageAccounts">
+        <MudPaper Elevation="0" Class="pa-4">
+            <div class="barra-acciones">
+                <MudTextField T="string"
+                              Value="_busquedaUsuario"
+                              ValueChanged="@(v => { _busquedaUsuario = v; })"
+                              Immediate="true"
+                              Placeholder="Buscar usuario por nombre o rol..."
+                              Variant="Variant.Outlined"
+                              Adornment="Adornment.Start"
+                              AdornmentIcon="@Icons.Material.Filled.Search"
+                              AdornmentColor="Color.Primary"
+                              Clearable="true"
+                              Class="buscador-remarcado" />
+                <MudButton Variant="Variant.Filled"
+                           Color="Color.Primary"
+                           StartIcon="@Icons.Material.Filled.PersonAdd"
+                           OnClick="AbrirModalNuevoUsuario"
+                           Class="boton-nuevo">
+                    <!-- En Android muestra 'Nuevo', en Web muestra 'Nuevo usuario' -->
+                    <span class="d-inline d-sm-none">Nuevo</span>
+                    <span class="d-none d-sm-inline">Nuevo usuario</span>
+                </MudButton>
+            </div>
+
+            @if (_cargandoUsuarios)
+            {
+                <div class="d-flex justify-center pa-8">
+                    <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+                </div>
+            }
+            else
+            {
+                <MudTable Items="UsuariosFiltrados" Hover="true" Dense="true"
+                          Breakpoint="Breakpoint.Sm" Elevation="0" RowsPerPage="10">
+                    <HeaderContent>
+                        <MudTh Style="width:8%;">ID</MudTh>
+                        <MudTh>Usuario</MudTh>
+                        <MudTh>Nombre completo</MudTh>
+                        <MudTh>Rol</MudTh>
+                        <MudTh Style="width:12%;">Estatus</MudTh>
+                        <MudTh Style="width:12%; text-align:right;">Acciones</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd DataLabel="ID">@context.IdUsuario</MudTd>
+                        <MudTd DataLabel="Usuario"><b>@context.Usuario</b></MudTd>
+                        <MudTd DataLabel="Nombre">@context.NombreCompleto</MudTd>
+                        <MudTd DataLabel="Rol">
+                            <MudChip T="string" Size="Size.Small" Variant="Variant.Text" Color="Color.Primary">
+                                @(string.IsNullOrWhiteSpace(context.Rol) ? "Sin rol" : context.Rol)
+                            </MudChip>
+                        </MudTd>
+                        <MudTd DataLabel="Estatus">@ChipEstatus(context.Activo)</MudTd>
+                        <MudTd DataLabel="Acciones" Style="text-align:right;">
+                            @AccionesFila(() => AbrirModalEditarUsuario(context),
+                                () => AlternarEstatusUsuario(context), context.Activo)
+                        </MudTd>
+                    </RowTemplate>
+                    <NoRecordsContent>@EstadoVacio("No hay usuarios que coincidan.")</NoRecordsContent>
+                    <PagerContent>
+                        <MudTablePager InfoFormat="{first_item}-{last_item} de {all_items}" RowsPerPageString="Filas:" />
+                    </PagerContent>
+                </MudTable>
+            }
+        </MudPaper>
+    </MudTabPanel>
+
+    <!-- ===================== ROLES ===================== -->
+    <MudTabPanel Text="Roles" Icon="@Icons.Material.Filled.AdminPanelSettings">
+        <MudPaper Elevation="0" Class="pa-4">
+            <div class="barra-acciones">
+                <MudTextField T="string"
+                              Value="_busquedaRol"
+                              ValueChanged="@(v => { _busquedaRol = v; })"
+                              Immediate="true"
+                              Placeholder="Buscar rol por nombre o ID..."
+                              Variant="Variant.Outlined"
+                              Adornment="Adornment.Start"
+                              AdornmentIcon="@Icons.Material.Filled.Search"
+                              AdornmentColor="Color.Secondary"
+                              Clearable="true"
+                              Class="buscador-remarcado" />
+                <MudButton Variant="Variant.Filled"
+                           Color="Color.Secondary"
+                           StartIcon="@Icons.Material.Filled.Add"
+                           OnClick="AbrirModalNuevoRol"
+                           Class="boton-nuevo">
+                    Nuevo rol
+                </MudButton>
+            </div>
+
+            @if (_cargandoRoles)
+            {
+                <div class="d-flex justify-center pa-8">
+                    <MudProgressCircular Indeterminate="true" Color="Color.Secondary" />
+                </div>
+            }
+            else
+            {
+                <MudTable Items="RolesFiltrados" Hover="true" Dense="true"
+                          Breakpoint="Breakpoint.Sm" Elevation="0" RowsPerPage="10">
+                    <HeaderContent>
+                        <MudTh Style="width:10%;">ID</MudTh>
+                        <MudTh>Descripción</MudTh>
+                        <MudTh Style="width:15%;">Estatus</MudTh>
+                        <MudTh Style="width:15%; text-align:right;">Acciones</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd DataLabel="ID">@context.IdRol</MudTd>
+                        <MudTd DataLabel="Descripción"><b>@context.Descripcion</b></MudTd>
+                        <MudTd DataLabel="Estatus">@ChipEstatus(context.Activo)</MudTd>
+                        <MudTd DataLabel="Acciones" Style="text-align:right;">
+                            @AccionesFila(() => AbrirModalEditarRol(context),
+                                () => AlternarEstatusRol(context), context.Activo)
+                        </MudTd>
+                    </RowTemplate>
+                    <NoRecordsContent>@EstadoVacio("No hay roles que coincidan.")</NoRecordsContent>
+                    <PagerContent>
+                        <MudTablePager InfoFormat="{first_item}-{last_item} de {all_items}" RowsPerPageString="Filas:" />
+                    </PagerContent>
+                </MudTable>
+            }
+        </MudPaper>
+    </MudTabPanel>
+</MudTabs>
+
+@{
+    RenderFragment ChipEstatus(bool activo) => __builder =>
+    {
+        <MudChip T="string" Size="Size.Small" Variant="Variant.Filled"
+                 Color="@(activo ? Color.Success : Color.Default)">
+            @(activo ? "Activo" : "Inactivo")
+        </MudChip>
+    };
+
+    RenderFragment AccionesFila(Func<Task> onEditar, Func<Task> onAlternar, bool activo) => __builder =>
+    {
+        <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" Color="Color.Info"
+                       Title="Editar" OnClick="@(async () => await onEditar())" />
+        @if (activo)
+        {
+            <MudIconButton Icon="@Icons.Material.Filled.Block" Size="Size.Small" Color="Color.Error"
+                           Title="Desactivar" OnClick="@(async () => await onAlternar())" />
+        }
+        else
+        {
+            <MudIconButton Icon="@Icons.Material.Filled.CheckCircle" Size="Size.Small" Color="Color.Success"
+                           Title="Reactivar" OnClick="@(async () => await onAlternar())" />
+        }
+    };
+
+    RenderFragment EstadoVacio(string mensaje) => __builder =>
+    {
+        <div class="pa-8 text-center">
+            <MudIcon Icon="@Icons.Material.Filled.SearchOff" Size="Size.Large" Color="Color.Secondary" />
+            <MudText Color="Color.Secondary" Class="mt-2">@mensaje</MudText>
+        </div>
+    };
+}
+
+<style>
+    .barra-acciones {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 16px;
+    }
+
+    .barra-acciones .buscador-remarcado { flex: 1 1 auto; min-width: 0; }
+    .boton-nuevo { white-space: nowrap; flex: 0 0 auto; }
+    .buscador-remarcado .mud-input-outlined-border { border-width: 2px; }
+
+    .tabs-remarcados .mud-tab { opacity: 0.65; font-weight: 500; transition: opacity 0.15s ease, background-color 0.15s ease; }
+    .tabs-remarcados .mud-tab.mud-tab-active { opacity: 1; font-weight: 800; background-color: rgba(255,255,255,0.18); border-radius: 8px 8px 0 0; }
+    .tabs-remarcados .mud-tab-slider { height: 4px; }
+
+</style>
+
+@code {
+    private List<UsuarioDto> _usuarios = new();
+    private List<RolDto> _roles = new();
+    private bool _cargandoUsuarios;
+    private bool _cargandoRoles;
+    private string _busquedaUsuario = "";
+    private string _busquedaRol = "";
+
+    private IEnumerable<UsuarioDto> UsuariosFiltrados
+    {
+        get
+        {
+            var q = _busquedaUsuario?.Trim() ?? "";
+            if (string.IsNullOrEmpty(q)) return _usuarios;
+            return _usuarios.Where(u =>
+                (u.Usuario ?? "").Contains(q, StringComparison.OrdinalIgnoreCase)
+                || (u.NombreCompleto ?? "").Contains(q, StringComparison.OrdinalIgnoreCase)
+                || (u.Rol ?? "").Contains(q, StringComparison.OrdinalIgnoreCase));
+        }
+    }
+
+    private IEnumerable<RolDto> RolesFiltrados
+    {
+        get
+        {
+            var q = _busquedaRol?.Trim() ?? "";
+            if (string.IsNullOrEmpty(q)) return _roles;
+            return _roles.Where(r =>
+                r.IdRol.ToString().Contains(q, StringComparison.OrdinalIgnoreCase)
+                || (r.Descripcion ?? "").Contains(q, StringComparison.OrdinalIgnoreCase));
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CargarRoles();
+        await CargarUsuarios();
+    }
+
+    private async Task CargarRoles()
+    {
+        _cargandoRoles = true;
+        var (datos, error) = await Api.ListarRolesAdminAsync(incluirInactivos: true);
+        if (error is not null) _snackbar.Add(error, Severity.Error);
+        _roles = datos ?? new();
+        _cargandoRoles = false;
+    }
+
+    private async Task CargarUsuarios()
+    {
+        _cargandoUsuarios = true;
+        var (datos, error) = await Api.ListarUsuariosAsync(incluirInactivos: true);
+        if (error is not null) _snackbar.Add(error, Severity.Error);
+        _usuarios = datos ?? new();
+        _cargandoUsuarios = false;
+    }
+
+    // ===================== Usuarios =====================
+
+    private async Task AbrirModalNuevoUsuario()
+    {
+        var modelo = new DialogoUsuario.FormModel { Activo = true };
+        var m = await MostrarDialogoUsuario("Dar de alta usuario", Icons.Material.Filled.PersonAdd, esNuevo: true, modelo);
+        if (m is null) return;
+
+        var req = new CrearUsuarioRequest(m.Usuario.Trim(), m.Password ?? "", m.NombreCompleto.Trim(), m.IdRol);
+        var error = await Api.CrearUsuarioAsync(req);
+        Notificar(error, $"Usuario '{m.Usuario}' registrado.");
+        if (error is null) await CargarUsuarios();
+    }
+
+    private async Task AbrirModalEditarUsuario(UsuarioDto u)
+    {
+        var modelo = new DialogoUsuario.FormModel
+        {
+            Usuario = u.Usuario,
+            NombreCompleto = u.NombreCompleto,
+            IdRol = u.IdRol,
+            Password = "",
+            Activo = u.Activo
+        };
+        var m = await MostrarDialogoUsuario("Modificar usuario", Icons.Material.Filled.ManageAccounts, esNuevo: false, modelo);
+        if (m is null) return;
+
+        var req = new ActualizarUsuarioRequest(m.Usuario.Trim(), m.NombreCompleto.Trim(), m.IdRol,
+            string.IsNullOrWhiteSpace(m.Password) ? null : m.Password, m.Activo);
+        var error = await Api.ActualizarUsuarioAsync(u.IdUsuario, req);
+        Notificar(error, $"Usuario '{m.Usuario}' actualizado.");
+        if (error is null) await CargarUsuarios();
+    }
+
+    private async Task AlternarEstatusUsuario(UsuarioDto u)
+    {
+        if (u.Activo)
+        {
+            var error = await Api.DarDeBajaUsuarioAsync(u.IdUsuario);
+            Notificar(error, $"Usuario '{u.Usuario}' dado de baja.");
+            if (error is null) await CargarUsuarios();
+        }
+        else
+        {
+            var req = new ActualizarUsuarioRequest(u.Usuario, u.NombreCompleto, u.IdRol, null, true);
+            var error = await Api.ActualizarUsuarioAsync(u.IdUsuario, req);
+            Notificar(error, $"Usuario '{u.Usuario}' reactivado.");
+            if (error is null) await CargarUsuarios();
+        }
+    }
+
+    // ===================== Roles =====================
+
+    private async Task AbrirModalNuevoRol()
+    {
+        var modelo = new DialogoPersona.FormModel { Activo = true };
+        var m = await MostrarDialogoRol("Dar de alta rol", modelo);
+        if (m is null) return;
+
+        var (_, error) = await Api.CrearRolAsync(m.Nombre.Trim());
+        Notificar(error, $"Rol '{m.Nombre}' registrado.");
+        if (error is null) await CargarRoles();
+    }
+
+    private async Task AbrirModalEditarRol(RolDto r)
+    {
+        var modelo = new DialogoPersona.FormModel { Nombre = r.Descripcion, Activo = r.Activo };
+        var m = await MostrarDialogoRol("Modificar rol", modelo);
+        if (m is null) return;
+
+        var (_, error) = await Api.ActualizarRolAsync(r.IdRol, m.Nombre.Trim(), m.Activo);
+        Notificar(error, $"Rol '{m.Nombre}' actualizado.");
+        if (error is null) await CargarRoles();
+    }
+
+    private async Task AlternarEstatusRol(RolDto r)
+    {
+        if (r.Activo)
+        {
+            var (_, error) = await Api.DarDeBajaRolAsync(r.IdRol);
+            Notificar(error, $"Rol '{r.Descripcion}' desactivado.");
+            if (error is null) await CargarRoles();
+        }
+        else
+        {
+            var (_, error) = await Api.ActualizarRolAsync(r.IdRol, r.Descripcion, true);
+            Notificar(error, $"Rol '{r.Descripcion}' reactivado.");
+            if (error is null) await CargarRoles();
+        }
+    }
+
+    // ===================== Helpers de diálogo =====================
+
+    private async Task<DialogoUsuario.FormModel?> MostrarDialogoUsuario(
+        string titulo, string icono, bool esNuevo, DialogoUsuario.FormModel modelo)
+    {
+        var opciones = EsEntornoMovil 
+            ? new DialogOptions { FullScreen = true, CloseButton = true }
+            : new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true, CloseButton = true };
+        var parametros = new DialogParameters<DialogoUsuario>
+        {
+            { x => x.Titulo, titulo },
+            { x => x.Icono, icono },
+            { x => x.EsNuevo, esNuevo },
+            { x => x.Modelo, modelo },
+            { x => x.ClaseDialogo, EsEntornoMovil ? "dialogo-usuario-fullscreen" : null },
+            { x => x.Roles, _roles.Where(r => r.Activo).ToList() }
+        };
+        var dialogo = await _dialogo.ShowAsync<DialogoUsuario>(titulo, parametros, opciones);
+        var resultado = await dialogo.Result;
+        return resultado is { Canceled: false, Data: DialogoUsuario.FormModel datos } ? datos : null;
+    }
+
+    private async Task<DialogoPersona.FormModel?> MostrarDialogoRol(string titulo, DialogoPersona.FormModel modelo)
+    {
+        var opciones = new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true, CloseButton = true };
+        var parametros = new DialogParameters<DialogoPersona>
+        {
+            { x => x.Titulo, titulo },
+            { x => x.Icono, Icons.Material.Filled.AdminPanelSettings },
+            { x => x.LabelNombre, "Descripción del rol" },
+            { x => x.Modelo, modelo },
+            { x => x.MostrarZona, false }
+        };
+        var dialogo = await _dialogo.ShowAsync<DialogoPersona>(titulo, parametros, opciones);
+        var resultado = await dialogo.Result;
+        return resultado is { Canceled: false, Data: DialogoPersona.FormModel datos } ? datos : null;
+    }
+
+    private void Notificar(string? error, string exito)
+    {
+        if (error is null) _snackbar.Add(exito, Severity.Success);
+        else _snackbar.Add(error, Severity.Error);
+    }
+    
+    // Detección de entorno móvil (misma lógica que MainLayout): MAUI -> Phone/Tablet; web -> Web; escritorio -> Desktop.
+    private bool EsEntornoMovil
+    {
+        get
+        {
+            var ff = _formFactor.GetFormFactor();
+            return !ff.Equals("Web", StringComparison.OrdinalIgnoreCase)
+                   && !ff.Equals("Desktop", StringComparison.OrdinalIgnoreCase);
+        }
+    }
+}

@@ -1,0 +1,903 @@
+@page "/operaciones-ventas"
+
+@using MudBlazor
+@using SistemaCobranzaApp.Shared.Components
+@using SistemaCobranzaApp.Shared.Dtos
+@using SistemaCobranzaApp.Shared.Services
+@inject ApiCliente Api
+@inject IDialogService _dialogo
+@inject ISnackbar _snackbar
+
+<MudTabs Elevation="2" Rounded="true" Color="Color.Primary" ApplyEffectsToContainer="true"
+         PanelClass="pa-0 pt-4" SliderColor="Color.Warning" Class="ma-2 tabs-remarcados">
+
+    <!-- ===================== CONDICIONES ===================== -->
+    <MudTabPanel Text="Condiciones" Icon="@Icons.Material.Filled.CreditCard">
+        <MudPaper Elevation="0" Class="pa-4">
+            <div class="barra-acciones">
+                <MudTextField T="string"
+                              Value="_busquedaCondicion"
+                              ValueChanged="@(v => { _busquedaCondicion = v; })"
+                              Immediate="true"
+                              Placeholder="Buscar condición por descripción o ID..."
+                              Variant="Variant.Outlined"
+                              Adornment="Adornment.Start"
+                              AdornmentIcon="@Icons.Material.Filled.Search"
+                              AdornmentColor="Color.Primary"
+                              Clearable="true"
+                              Class="buscador-remarcado" />
+                <MudButton Variant="Variant.Filled"
+                           Color="Color.Primary"
+                           StartIcon="@Icons.Material.Filled.Add"
+                           OnClick="AbrirModalNuevaCondicion"
+                           Class="boton-nuevo">
+                    Nueva condición
+                </MudButton>
+            </div>
+
+            @if (_cargandoCondiciones)
+            {
+                <div class="d-flex justify-center pa-8">
+                    <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+                </div>
+            }
+            else
+            {
+                <MudTable Items="CondicionesFiltradas" Hover="true" Dense="true"
+                          Breakpoint="Breakpoint.Sm" Elevation="0" RowsPerPage="10">
+                    <HeaderContent>
+                        <MudTh Style="width:10%;">ID</MudTh>
+                        <MudTh>Descripción</MudTh>
+                        <MudTh Style="width:15%;">Estatus</MudTh>
+                        <MudTh Style="width:15%; text-align:right;">Acciones</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd DataLabel="ID">@context.IdCondicion</MudTd>
+                        <MudTd DataLabel="Descripción"><b>@context.Descripcion</b></MudTd>
+                        <MudTd DataLabel="Estatus">@ChipEstatus(context.Activo)</MudTd>
+                        <MudTd DataLabel="Acciones" Style="text-align:right;">
+                            @AccionesFila(() => AbrirModalEditarCondicion(context),
+                                () => AlternarEstatusCondicion(context), context.Activo)
+                        </MudTd>
+                    </RowTemplate>
+                    <NoRecordsContent>@EstadoVacio("No hay condiciones que coincidan.")</NoRecordsContent>
+                    <PagerContent>
+                        <MudTablePager InfoFormat="{first_item}-{last_item} de {all_items}" RowsPerPageString="Filas:" />
+                    </PagerContent>
+                </MudTable>
+            }
+        </MudPaper>
+    </MudTabPanel>
+
+    <!-- ===================== PLAZOS / MESES ===================== -->
+    <MudTabPanel Text="Plazos / Meses" Icon="@Icons.Material.Filled.CalendarMonth">
+        <MudPaper Elevation="0" Class="pa-4">
+            <div class="barra-acciones">
+                <MudTextField T="string"
+                              Value="_busquedaMes"
+                              ValueChanged="@(v => { _busquedaMes = v; })"
+                              Immediate="true"
+                              Placeholder="Buscar plazo por descripción, meses o ID..."
+                              Variant="Variant.Outlined"
+                              Adornment="Adornment.Start"
+                              AdornmentIcon="@Icons.Material.Filled.Search"
+                              AdornmentColor="Color.Secondary"
+                              Clearable="true"
+                              Class="buscador-remarcado" />
+                <MudButton Variant="Variant.Filled"
+                           Color="Color.Secondary"
+                           StartIcon="@Icons.Material.Filled.Add"
+                           OnClick="AbrirModalNuevoMes"
+                           Class="boton-nuevo">
+                    Nuevo plazo
+                </MudButton>
+            </div>
+
+            @if (_cargandoMeses)
+            {
+                <div class="d-flex justify-center pa-8">
+                    <MudProgressCircular Indeterminate="true" Color="Color.Secondary" />
+                </div>
+            }
+            else
+            {
+                <MudTable Items="MesesFiltrados" Hover="true" Dense="true"
+                          Breakpoint="Breakpoint.Sm" Elevation="0" RowsPerPage="10">
+                    <HeaderContent>
+                        <MudTh Style="width:10%;">ID</MudTh>
+                        <MudTh Style="width:15%;">Meses</MudTh>
+                        <MudTh>Descripción</MudTh>
+                        <MudTh Style="width:15%;">Estatus</MudTh>
+                        <MudTh Style="width:15%; text-align:right;">Acciones</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd DataLabel="ID">@context.Id</MudTd>
+                        <MudTd DataLabel="Meses">
+                            <MudChip T="string" Size="Size.Small" Variant="Variant.Text" Color="Color.Secondary">
+                                @context.NumMeses
+                            </MudChip>
+                        </MudTd>
+                        <MudTd DataLabel="Descripción"><b>@context.Descripcion</b></MudTd>
+                        <MudTd DataLabel="Estatus">@ChipEstatus(context.Activo)</MudTd>
+                        <MudTd DataLabel="Acciones" Style="text-align:right;">
+                            @AccionesFila(() => AbrirModalEditarMes(context),
+                                () => AlternarEstatusMes(context), context.Activo)
+                        </MudTd>
+                    </RowTemplate>
+                    <NoRecordsContent>@EstadoVacio("No hay plazos que coincidan.")</NoRecordsContent>
+                    <PagerContent>
+                        <MudTablePager InfoFormat="{first_item}-{last_item} de {all_items}" RowsPerPageString="Filas:" />
+                    </PagerContent>
+                </MudTable>
+            }
+        </MudPaper>
+    </MudTabPanel>
+
+    <!-- ===================== MOVIMIENTOS ===================== -->
+    <MudTabPanel Text="Movimientos" Icon="@Icons.Material.Filled.SwapHoriz">
+        <MudPaper Elevation="0" Class="pa-4">
+            <div class="barra-acciones">
+                <MudTextField T="string"
+                              Value="_busquedaMovimiento"
+                              ValueChanged="@(v => { _busquedaMovimiento = v; })"
+                              Immediate="true"
+                              Placeholder="Buscar movimiento por descripción o ID..."
+                              Variant="Variant.Outlined"
+                              Adornment="Adornment.Start"
+                              AdornmentIcon="@Icons.Material.Filled.Search"
+                              AdornmentColor="Color.Primary"
+                              Clearable="true"
+                              Class="buscador-remarcado" />
+                <MudButton Variant="Variant.Filled"
+                           Color="Color.Primary"
+                           StartIcon="@Icons.Material.Filled.Add"
+                           OnClick="AbrirModalNuevoMovimiento"
+                           Class="boton-nuevo">
+                    Nuevo movimiento
+                </MudButton>
+            </div>
+
+            @if (_cargandoMovimientos)
+            {
+                <div class="d-flex justify-center pa-8">
+                    <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+                </div>
+            }
+            else
+            {
+                <MudTable Items="MovimientosFiltrados" Hover="true" Dense="true"
+                          Breakpoint="Breakpoint.Sm" Elevation="0" RowsPerPage="10">
+                    <HeaderContent>
+                        <MudTh Style="width:10%;">ID</MudTh>
+                        <MudTh>Descripción</MudTh>
+                        <MudTh Style="width:15%;">Estatus</MudTh>
+                        <MudTh Style="width:15%; text-align:right;">Acciones</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd DataLabel="ID">@context.Id</MudTd>
+                        <MudTd DataLabel="Descripción"><b>@context.Descripcion</b></MudTd>
+                        <MudTd DataLabel="Estatus">@ChipEstatus(context.Activo)</MudTd>
+                        <MudTd DataLabel="Acciones" Style="text-align:right;">
+                            @AccionesFila(() => AbrirModalEditarMovimiento(context),
+                                () => AlternarEstatusMovimiento(context), context.Activo)
+                        </MudTd>
+                    </RowTemplate>
+                    <NoRecordsContent>@EstadoVacio("No hay movimientos que coincidan.")</NoRecordsContent>
+                    <PagerContent>
+                        <MudTablePager InfoFormat="{first_item}-{last_item} de {all_items}" RowsPerPageString="Filas:" />
+                    </PagerContent>
+                </MudTable>
+            }
+        </MudPaper>
+    </MudTabPanel>
+
+    <!-- ===================== ESTATUS VENTA ===================== -->
+    <MudTabPanel Text="Estatus Venta" Icon="@Icons.Material.Filled.FactCheck">
+        <MudPaper Elevation="0" Class="pa-4">
+            <div class="barra-acciones">
+                <MudTextField T="string"
+                              Value="_busquedaEstatus"
+                              ValueChanged="@(v => { _busquedaEstatus = v; })"
+                              Immediate="true"
+                              Placeholder="Buscar estatus por descripción o ID..."
+                              Variant="Variant.Outlined"
+                              Adornment="Adornment.Start"
+                              AdornmentIcon="@Icons.Material.Filled.Search"
+                              AdornmentColor="Color.Secondary"
+                              Clearable="true"
+                              Class="buscador-remarcado" />
+                <MudButton Variant="Variant.Filled"
+                           Color="Color.Secondary"
+                           StartIcon="@Icons.Material.Filled.Add"
+                           OnClick="AbrirModalNuevoEstatus"
+                           Class="boton-nuevo">
+                    Nuevo estatus
+                </MudButton>
+            </div>
+
+            @if (_cargandoEstatus)
+            {
+                <div class="d-flex justify-center pa-8">
+                    <MudProgressCircular Indeterminate="true" Color="Color.Secondary" />
+                </div>
+            }
+            else
+            {
+                <MudTable Items="EstatusFiltrados" Hover="true" Dense="true"
+                          Breakpoint="Breakpoint.Sm" Elevation="0" RowsPerPage="10">
+                    <HeaderContent>
+                        <MudTh Style="width:10%;">ID</MudTh>
+                        <MudTh>Descripción</MudTh>
+                        <MudTh Style="width:15%;">Estatus</MudTh>
+                        <MudTh Style="width:15%; text-align:right;">Acciones</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd DataLabel="ID">@context.Id</MudTd>
+                        <MudTd DataLabel="Descripción"><b>@context.Descripcion</b></MudTd>
+                        <MudTd DataLabel="Estatus">@ChipEstatus(context.Activo)</MudTd>
+                        <MudTd DataLabel="Acciones" Style="text-align:right;">
+                            @AccionesFila(() => AbrirModalEditarEstatus(context),
+                                () => AlternarEstatusEstatus(context), context.Activo)
+                        </MudTd>
+                    </RowTemplate>
+                    <NoRecordsContent>@EstadoVacio("No hay estatus que coincidan.")</NoRecordsContent>
+                    <PagerContent>
+                        <MudTablePager InfoFormat="{first_item}-{last_item} de {all_items}" RowsPerPageString="Filas:" />
+                    </PagerContent>
+                </MudTable>
+            }
+        </MudPaper>
+    </MudTabPanel>
+
+    <!-- ===================== FRECUENCIAS DE PAGO ===================== -->
+    <MudTabPanel Text="Frecuencias de Pago" Icon="@Icons.Material.Filled.EventRepeat">
+        <MudPaper Elevation="0" Class="pa-4">
+            <div class="barra-acciones">
+                <MudTextField T="string"
+                              Value="_busquedaFrecuencia"
+                              ValueChanged="@(v => { _busquedaFrecuencia = v; })"
+                              Immediate="true"
+                              Placeholder="Buscar frecuencia por descripción, días o ID..."
+                              Variant="Variant.Outlined"
+                              Adornment="Adornment.Start"
+                              AdornmentIcon="@Icons.Material.Filled.Search"
+                              AdornmentColor="Color.Primary"
+                              Clearable="true"
+                              Class="buscador-remarcado" />
+                <MudButton Variant="Variant.Filled"
+                           Color="Color.Primary"
+                           StartIcon="@Icons.Material.Filled.Add"
+                           OnClick="AbrirModalNuevaFrecuencia"
+                           Class="boton-nuevo">
+                    Nueva frecuencia
+                </MudButton>
+            </div>
+
+            @if (_cargandoFrecuencias)
+            {
+                <div class="d-flex justify-center pa-8">
+                    <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+                </div>
+            }
+            else
+            {
+                <MudTable Items="FrecuenciasFiltradas" Hover="true" Dense="true"
+                          Breakpoint="Breakpoint.Sm" Elevation="0" RowsPerPage="10">
+                    <HeaderContent>
+                        <MudTh Style="width:10%;">ID</MudTh>
+                        <MudTh Style="width:15%;">Días periodo</MudTh>
+                        <MudTh>Descripción</MudTh>
+                        <MudTh Style="width:15%;">Estatus</MudTh>
+                        <MudTh Style="width:15%; text-align:right;">Acciones</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd DataLabel="ID">@context.Id</MudTd>
+                        <MudTd DataLabel="Días periodo">
+                            <MudChip T="string" Size="Size.Small" Variant="Variant.Text" Color="Color.Primary">
+                                @context.DiasPeriodo
+                            </MudChip>
+                        </MudTd>
+                        <MudTd DataLabel="Descripción"><b>@context.Descripcion</b></MudTd>
+                        <MudTd DataLabel="Estatus">@ChipEstatus(context.Activo)</MudTd>
+                        <MudTd DataLabel="Acciones" Style="text-align:right;">
+                            @AccionesFila(() => AbrirModalEditarFrecuencia(context),
+                                () => AlternarEstatusFrecuencia(context), context.Activo)
+                        </MudTd>
+                    </RowTemplate>
+                    <NoRecordsContent>@EstadoVacio("No hay frecuencias que coincidan.")</NoRecordsContent>
+                    <PagerContent>
+                        <MudTablePager InfoFormat="{first_item}-{last_item} de {all_items}" RowsPerPageString="Filas:" />
+                    </PagerContent>
+                </MudTable>
+            }
+        </MudPaper>
+    </MudTabPanel>
+    <!-- ===================== CATÁLOGO DE COMISIONES ===================== -->
+    <MudTabPanel Text="Catálogo de comisión ventas" Icon="@Icons.Material.Filled.Percent">
+        <MudPaper Elevation="0" Class="pa-4">
+            <div class="barra-acciones">
+                <MudTextField T="string" @bind-Value="_busquedaComision" Immediate="true"
+                              Placeholder="Buscar comisión por nombre, tipo de cálculo o ID..."
+                              Variant="Variant.Outlined" Adornment="Adornment.Start"
+                              AdornmentIcon="@Icons.Material.Filled.Search" AdornmentColor="Color.Primary"
+                              Clearable="true" Class="buscador-remarcado" />
+                <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                           StartIcon="@Icons.Material.Filled.Add" OnClick="AbrirModalNuevaComision"
+                           Class="boton-nuevo">Nueva comisión</MudButton>
+            </div>
+            @if (_cargandoComisiones)
+            {
+                <div class="d-flex justify-center pa-8">
+                    <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+                </div>
+            }
+            else
+            {
+                <MudTable Items="ComisionesFiltradas" Hover="true" Dense="true"
+                          Breakpoint="Breakpoint.Sm" Elevation="0" RowsPerPage="10">
+                    <HeaderContent>
+                        <MudTh>ID</MudTh>
+                        <MudTh>Nombre del esquema</MudTh>
+                        <MudTh>Tipo de cálculo</MudTh>
+                        <MudTh>Comisión contado</MudTh>
+                        <MudTh>Comisión crédito</MudTh>
+                        <MudTh>Estatus</MudTh>
+                        <MudTh Style="text-align:right;">Acciones</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd DataLabel="ID">@context.Id</MudTd>
+                        <MudTd DataLabel="Nombre del esquema"><b>@context.NombreEsquema</b></MudTd>
+                        <MudTd DataLabel="Tipo de cálculo">@(context.TipoCalculo == "PORCENTAJE" ? "Porcentaje" : "Monto fijo")</MudTd>
+                        <MudTd DataLabel="Comisión contado">@FormatearComision(context.ComisionContado, context.TipoCalculo)</MudTd>
+                        <MudTd DataLabel="Comisión crédito">@FormatearComision(context.ComisionCredito, context.TipoCalculo)</MudTd>
+                        <MudTd DataLabel="Estatus">@ChipEstatus(context.Activo)</MudTd>
+                        <MudTd DataLabel="Acciones" Style="text-align:right;">
+                            @AccionesFila(() => AbrirModalEditarComision(context),
+                                () => AlternarEstatusComision(context), context.Activo)
+                        </MudTd>
+                    </RowTemplate>
+                    <NoRecordsContent>@EstadoVacio("No hay comisiones que coincidan.")</NoRecordsContent>
+                    <PagerContent>
+                        <MudTablePager InfoFormat="{first_item}-{last_item} de {all_items}" RowsPerPageString="Filas:" />
+                    </PagerContent>
+                </MudTable>
+            }
+        </MudPaper>
+    </MudTabPanel>
+</MudTabs>
+
+@{
+    RenderFragment ChipEstatus(bool activo) => __builder =>
+    {
+        <MudChip T="string" Size="Size.Small" Variant="Variant.Filled"
+                 Color="@(activo ? Color.Success : Color.Default)">
+            @(activo ? "Activo" : "Inactivo")
+        </MudChip>
+    };
+
+    RenderFragment AccionesFila(Func<Task> onEditar, Func<Task> onAlternar, bool activo) => __builder =>
+    {
+        <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" Color="Color.Info"
+                       Title="Editar" OnClick="@(async () => await onEditar())" />
+        @if (activo)
+        {
+            <MudIconButton Icon="@Icons.Material.Filled.Block" Size="Size.Small" Color="Color.Error"
+                           Title="Desactivar" OnClick="@(async () => await onAlternar())" />
+        }
+        else
+        {
+            <MudIconButton Icon="@Icons.Material.Filled.CheckCircle" Size="Size.Small" Color="Color.Success"
+                           Title="Reactivar" OnClick="@(async () => await onAlternar())" />
+        }
+    };
+
+    RenderFragment EstadoVacio(string mensaje) => __builder =>
+    {
+        <div class="pa-8 text-center">
+            <MudIcon Icon="@Icons.Material.Filled.SearchOff" Size="Size.Large" Color="Color.Secondary" />
+            <MudText Color="Color.Secondary" Class="mt-2">@mensaje</MudText>
+        </div>
+    };
+}
+
+<style>
+    .barra-acciones {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 16px;
+    }
+
+    .barra-acciones .buscador-remarcado { flex: 1 1 auto; min-width: 0; }
+    .boton-nuevo { white-space: nowrap; flex: 0 0 auto; }
+    .buscador-remarcado .mud-input-outlined-border { border-width: 2px; }
+
+    .tabs-remarcados .mud-tab { opacity: 0.65; font-weight: 500; transition: opacity 0.15s ease, background-color 0.15s ease; }
+    .tabs-remarcados .mud-tab.mud-tab-active { opacity: 1; font-weight: 800; background-color: rgba(255,255,255,0.18); border-radius: 8px 8px 0 0; }
+    .tabs-remarcados .mud-tab-slider { height: 4px; }
+</style>
+
+@code {
+    private List<CondicionCreditoDto> _condiciones = new();
+    private List<MesDto> _meses = new();
+    private List<MovimientoDto> _movimientos = new();
+    private List<EstatusVentaDto> _estatus = new();
+    private List<CatalogoFrecuenciaPagoDto> _frecuencias = new();
+
+    private List<CatalogoComisionDto> _comisiones = new();
+    private bool _cargandoComisiones;
+    private string _busquedaComision = "";
+
+    private IEnumerable<CatalogoComisionDto> ComisionesFiltradas
+    {
+        get
+        {
+            var q = _busquedaComision?.Trim() ?? "";
+            return string.IsNullOrEmpty(q) ? _comisiones : _comisiones.Where(x =>
+                x.Id.ToString().Contains(q, StringComparison.OrdinalIgnoreCase)
+                || x.NombreEsquema.Contains(q, StringComparison.OrdinalIgnoreCase)
+                || x.TipoCalculo.Contains(q, StringComparison.OrdinalIgnoreCase)
+                || (x.TipoCalculo == "FIJO" && "Monto fijo".Contains(q, StringComparison.OrdinalIgnoreCase)));
+        }
+    }
+
+    private static string FormatearComision(decimal valor, string tipoCalculo)
+        => tipoCalculo == "PORCENTAJE" ? $"{valor:N2} %" : valor.ToString("C2");
+
+    private bool _cargandoCondiciones;
+    private bool _cargandoMeses;
+    private bool _cargandoMovimientos;
+    private bool _cargandoEstatus;
+    private bool _cargandoFrecuencias;
+
+    private string _busquedaCondicion = "";
+    private string _busquedaMes = "";
+    private string _busquedaMovimiento = "";
+    private string _busquedaEstatus = "";
+    private string _busquedaFrecuencia = "";
+
+    // ===================== Filtros =====================
+
+    private IEnumerable<CondicionCreditoDto> CondicionesFiltradas
+    {
+        get
+        {
+            var q = _busquedaCondicion?.Trim() ?? "";
+            if (string.IsNullOrEmpty(q)) return _condiciones;
+            return _condiciones.Where(x =>
+                x.IdCondicion.ToString().Contains(q, StringComparison.OrdinalIgnoreCase)
+                || (x.Descripcion ?? "").Contains(q, StringComparison.OrdinalIgnoreCase));
+        }
+    }
+
+    private IEnumerable<MesDto> MesesFiltrados
+    {
+        get
+        {
+            var q = _busquedaMes?.Trim() ?? "";
+            if (string.IsNullOrEmpty(q)) return _meses;
+            return _meses.Where(x =>
+                x.Id.ToString().Contains(q, StringComparison.OrdinalIgnoreCase)
+                || x.NumMeses.ToString().Contains(q, StringComparison.OrdinalIgnoreCase)
+                || (x.Descripcion ?? "").Contains(q, StringComparison.OrdinalIgnoreCase));
+        }
+    }
+
+    private IEnumerable<MovimientoDto> MovimientosFiltrados
+    {
+        get
+        {
+            var q = _busquedaMovimiento?.Trim() ?? "";
+            if (string.IsNullOrEmpty(q)) return _movimientos;
+            return _movimientos.Where(x =>
+                x.Id.ToString().Contains(q, StringComparison.OrdinalIgnoreCase)
+                || (x.Descripcion ?? "").Contains(q, StringComparison.OrdinalIgnoreCase));
+        }
+    }
+
+    private IEnumerable<EstatusVentaDto> EstatusFiltrados
+    {
+        get
+        {
+            var q = _busquedaEstatus?.Trim() ?? "";
+            if (string.IsNullOrEmpty(q)) return _estatus;
+            return _estatus.Where(x =>
+                x.Id.ToString().Contains(q, StringComparison.OrdinalIgnoreCase)
+                || (x.Descripcion ?? "").Contains(q, StringComparison.OrdinalIgnoreCase));
+        }
+    }
+
+    private IEnumerable<CatalogoFrecuenciaPagoDto> FrecuenciasFiltradas
+    {
+        get
+        {
+            var q = _busquedaFrecuencia?.Trim() ?? "";
+            if (string.IsNullOrEmpty(q)) return _frecuencias;
+            return _frecuencias.Where(x =>
+                x.Id.ToString().Contains(q, StringComparison.OrdinalIgnoreCase)
+                || x.DiasPeriodo.ToString().Contains(q, StringComparison.OrdinalIgnoreCase)
+                || (x.Descripcion ?? "").Contains(q, StringComparison.OrdinalIgnoreCase));
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CargarCondiciones();
+        await CargarMeses();
+        await CargarMovimientos();
+        await CargarEstatus();
+        await CargarFrecuencias();
+        await CargarComisiones();
+    }
+
+    // ===================== Carga =====================
+
+    private async Task CargarCondiciones()
+    {
+        _cargandoCondiciones = true;
+        var (datos, error) = await Api.ListarCondicionesCreditoAdminAsync();
+        if (error is not null) _snackbar.Add(error, Severity.Error);
+        _condiciones = datos ?? new();
+        _cargandoCondiciones = false;
+    }
+
+    private async Task CargarMeses()
+    {
+        _cargandoMeses = true;
+        var (datos, error) = await Api.ListarMesesAdminAsync();
+        if (error is not null) _snackbar.Add(error, Severity.Error);
+        _meses = datos ?? new();
+        _cargandoMeses = false;
+    }
+
+    private async Task CargarMovimientos()
+    {
+        _cargandoMovimientos = true;
+        var (datos, error) = await Api.ListarMovimientosAdminAsync();
+        if (error is not null) _snackbar.Add(error, Severity.Error);
+        _movimientos = datos ?? new();
+        _cargandoMovimientos = false;
+    }
+
+    private async Task CargarEstatus()
+    {
+        _cargandoEstatus = true;
+        var (datos, error) = await Api.ListarEstatusVentaAdminAsync();
+        if (error is not null) _snackbar.Add(error, Severity.Error);
+        _estatus = datos ?? new();
+        _cargandoEstatus = false;
+    }
+
+    private async Task CargarFrecuencias()
+    {
+        _cargandoFrecuencias = true;
+        var (datos, error) = await Api.ListarFrecuenciasPagoAdminAsync();
+        if (error is not null) _snackbar.Add(error, Severity.Error);
+        _frecuencias = datos ?? new();
+        _cargandoFrecuencias = false;
+    }
+
+    // ===================== Condiciones =====================
+
+    private async Task AbrirModalNuevaCondicion()
+    {
+        var modelo = new DialogoGenerico.FormModel { Activo = true };
+        var m = await MostrarDialogoGenerico("Registrar nueva condición", Icons.Material.Filled.CreditCard, "Descripción de la condición", modelo);
+        if (m is null) return;
+
+        var (_, error) = await Api.CrearCondicionCreditoAsync(m.Nombre.Trim());
+        Notificar(error, $"Condición '{m.Nombre}' registrada.");
+        if (error is null) await CargarCondiciones();
+    }
+
+    private async Task AbrirModalEditarCondicion(CondicionCreditoDto c)
+    {
+        var modelo = new DialogoGenerico.FormModel { Nombre = c.Descripcion, Activo = c.Activo };
+        var m = await MostrarDialogoGenerico("Modificar condición", Icons.Material.Filled.CreditCard, "Descripción de la condición", modelo);
+        if (m is null) return;
+
+        var (_, error) = await Api.ActualizarCondicionCreditoAsync(c.IdCondicion, m.Nombre.Trim(), m.Activo);
+        Notificar(error, $"Condición '{m.Nombre}' actualizada.");
+        if (error is null) await CargarCondiciones();
+    }
+
+    private async Task AlternarEstatusCondicion(CondicionCreditoDto c)
+    {
+        if (c.Activo)
+        {
+            var (_, error) = await Api.DarDeBajaCondicionCreditoAsync(c.IdCondicion);
+            Notificar(error, $"Condición '{c.Descripcion}' desactivada.");
+            if (error is null) await CargarCondiciones();
+        }
+        else
+        {
+            var (_, error) = await Api.ActualizarCondicionCreditoAsync(c.IdCondicion, c.Descripcion, true);
+            Notificar(error, $"Condición '{c.Descripcion}' reactivada.");
+            if (error is null) await CargarCondiciones();
+        }
+    }
+
+    // ===================== Plazos / Meses =====================
+
+    private async Task AbrirModalNuevoMes()
+    {
+        var modelo = new DialogoMes.FormModel { Activo = true, NumMeses = 1 };
+        var m = await MostrarDialogoMes("Registrar nuevo plazo", modelo);
+        if (m is null) return;
+
+        var (_, error) = await Api.CrearMesAsync(m.NumMeses, m.Descripcion.Trim());
+        Notificar(error, $"Plazo '{m.Descripcion}' registrado.");
+        if (error is null) await CargarMeses();
+    }
+
+    private async Task AbrirModalEditarMes(MesDto mes)
+    {
+        var modelo = new DialogoMes.FormModel { NumMeses = mes.NumMeses, Descripcion = mes.Descripcion, Activo = mes.Activo };
+        var m = await MostrarDialogoMes("Modificar plazo", modelo);
+        if (m is null) return;
+
+        var (_, error) = await Api.ActualizarMesAsync(mes.Id, m.NumMeses, m.Descripcion.Trim(), m.Activo);
+        Notificar(error, $"Plazo '{m.Descripcion}' actualizado.");
+        if (error is null) await CargarMeses();
+    }
+
+    private async Task AlternarEstatusMes(MesDto mes)
+    {
+        if (mes.Activo)
+        {
+            var (_, error) = await Api.DarDeBajaMesAsync(mes.Id);
+            Notificar(error, $"Plazo '{mes.Descripcion}' desactivado.");
+            if (error is null) await CargarMeses();
+        }
+        else
+        {
+            var (_, error) = await Api.ActualizarMesAsync(mes.Id, mes.NumMeses, mes.Descripcion, true);
+            Notificar(error, $"Plazo '{mes.Descripcion}' reactivado.");
+            if (error is null) await CargarMeses();
+        }
+    }
+
+    // ===================== Movimientos =====================
+
+    private async Task AbrirModalNuevoMovimiento()
+    {
+        var modelo = new DialogoGenerico.FormModel { Activo = true };
+        var m = await MostrarDialogoGenerico("Registrar nuevo movimiento", Icons.Material.Filled.SwapHoriz, "Descripción del movimiento", modelo);
+        if (m is null) return;
+
+        var (_, error) = await Api.CrearMovimientoAsync(m.Nombre.Trim());
+        Notificar(error, $"Movimiento '{m.Nombre}' registrado.");
+        if (error is null) await CargarMovimientos();
+    }
+
+    private async Task AbrirModalEditarMovimiento(MovimientoDto mov)
+    {
+        var modelo = new DialogoGenerico.FormModel { Nombre = mov.Descripcion, Activo = mov.Activo };
+        var m = await MostrarDialogoGenerico("Modificar movimiento", Icons.Material.Filled.SwapHoriz, "Descripción del movimiento", modelo);
+        if (m is null) return;
+
+        var (_, error) = await Api.ActualizarMovimientoAsync(mov.Id, m.Nombre.Trim(), m.Activo);
+        Notificar(error, $"Movimiento '{m.Nombre}' actualizado.");
+        if (error is null) await CargarMovimientos();
+    }
+
+    private async Task AlternarEstatusMovimiento(MovimientoDto mov)
+    {
+        if (mov.Activo)
+        {
+            var (_, error) = await Api.DarDeBajaMovimientoAsync(mov.Id);
+            Notificar(error, $"Movimiento '{mov.Descripcion}' desactivado.");
+            if (error is null) await CargarMovimientos();
+        }
+        else
+        {
+            var (_, error) = await Api.ActualizarMovimientoAsync(mov.Id, mov.Descripcion, true);
+            Notificar(error, $"Movimiento '{mov.Descripcion}' reactivado.");
+            if (error is null) await CargarMovimientos();
+        }
+    }
+
+    // ===================== Estatus Venta =====================
+
+    private async Task AbrirModalNuevoEstatus()
+    {
+        var modelo = new DialogoGenerico.FormModel { Activo = true };
+        var m = await MostrarDialogoGenerico("Registrar nuevo estatus", Icons.Material.Filled.FactCheck, "Descripción del estatus", modelo);
+        if (m is null) return;
+
+        var (_, error) = await Api.CrearEstatusVentaAsync(m.Nombre.Trim());
+        Notificar(error, $"Estatus '{m.Nombre}' registrado.");
+        if (error is null) await CargarEstatus();
+    }
+
+    private async Task AbrirModalEditarEstatus(EstatusVentaDto e)
+    {
+        var modelo = new DialogoGenerico.FormModel { Nombre = e.Descripcion, Activo = e.Activo };
+        var m = await MostrarDialogoGenerico("Modificar estatus", Icons.Material.Filled.FactCheck, "Descripción del estatus", modelo);
+        if (m is null) return;
+
+        var (_, error) = await Api.ActualizarEstatusVentaAsync(e.Id, m.Nombre.Trim(), m.Activo);
+        Notificar(error, $"Estatus '{m.Nombre}' actualizado.");
+        if (error is null) await CargarEstatus();
+    }
+
+    private async Task AlternarEstatusEstatus(EstatusVentaDto e)
+    {
+        if (e.Activo)
+        {
+            var (_, error) = await Api.DarDeBajaEstatusVentaAsync(e.Id);
+            Notificar(error, $"Estatus '{e.Descripcion}' desactivado.");
+            if (error is null) await CargarEstatus();
+        }
+        else
+        {
+            var (_, error) = await Api.ActualizarEstatusVentaAsync(e.Id, e.Descripcion, true);
+            Notificar(error, $"Estatus '{e.Descripcion}' reactivado.");
+            if (error is null) await CargarEstatus();
+        }
+    }
+
+    // ===================== Frecuencias de Pago =====================
+
+    private async Task AbrirModalNuevaFrecuencia()
+    {
+        var modelo = new DialogoFrecuenciaPago.FormModel { Activo = true, DiasPeriodo = 1 };
+        var m = await MostrarDialogoFrecuencia("Registrar nueva frecuencia", modelo);
+        if (m is null) return;
+
+        var (_, error) = await Api.CrearFrecuenciaPagoAsync(m.Descripcion.Trim(), m.DiasPeriodo);
+        Notificar(error, $"Frecuencia '{m.Descripcion}' registrada.");
+        if (error is null) await CargarFrecuencias();
+    }
+
+    private async Task AbrirModalEditarFrecuencia(CatalogoFrecuenciaPagoDto f)
+    {
+        var modelo = new DialogoFrecuenciaPago.FormModel { DiasPeriodo = f.DiasPeriodo, Descripcion = f.Descripcion, Activo = f.Activo };
+        var m = await MostrarDialogoFrecuencia("Modificar frecuencia", modelo);
+        if (m is null) return;
+
+        var (_, error) = await Api.ActualizarFrecuenciaPagoAsync(f.Id, m.Descripcion.Trim(), m.DiasPeriodo, m.Activo);
+        Notificar(error, $"Frecuencia '{m.Descripcion}' actualizada.");
+        if (error is null) await CargarFrecuencias();
+    }
+
+    private async Task AlternarEstatusFrecuencia(CatalogoFrecuenciaPagoDto f)
+    {
+        if (f.Activo)
+        {
+            var (_, error) = await Api.DarDeBajaFrecuenciaPagoAsync(f.Id);
+            Notificar(error, $"Frecuencia '{f.Descripcion}' desactivada.");
+            if (error is null) await CargarFrecuencias();
+        }
+        else
+        {
+            var (_, error) = await Api.ActualizarFrecuenciaPagoAsync(f.Id, f.Descripcion, f.DiasPeriodo, true);
+            Notificar(error, $"Frecuencia '{f.Descripcion}' reactivada.");
+            if (error is null) await CargarFrecuencias();
+        }
+    }
+
+    // ===================== Catálogo de comisiones =====================
+
+    private async Task CargarComisiones()
+    {
+        _cargandoComisiones = true;
+        try
+        {
+            var (datos, error) = await Api.ListarComisionesAdminAsync();
+            if (error is not null) _snackbar.Add(error, Severity.Error);
+            _comisiones = datos ?? new();
+        }
+        finally
+        {
+            _cargandoComisiones = false;
+        }
+    }
+
+    private async Task AbrirModalNuevaComision()
+    {
+        var m = await MostrarDialogoComision("Registrar nueva comisión", new());
+        if (m is null) return;
+
+        var (_, error) = await Api.CrearComisionAsync(new CrearCatalogoComisionRequest(
+            m.NombreEsquema.Trim(), m.TipoCalculo, m.ComisionContado, m.ComisionCredito));
+        Notificar(error, $"Comisión '{m.NombreEsquema}' registrada.");
+        if (error is null) await CargarComisiones();
+    }
+
+    private async Task AbrirModalEditarComision(CatalogoComisionDto c)
+    {
+        var modelo = new DialogoCatalogoComision.FormModel
+        {
+            NombreEsquema = c.NombreEsquema,
+            TipoCalculo = c.TipoCalculo,
+            ComisionContado = c.ComisionContado,
+            ComisionCredito = c.ComisionCredito,
+            Activo = c.Activo
+        };
+        var m = await MostrarDialogoComision("Modificar comisión", modelo, true);
+        if (m is null) return;
+
+        var (_, error) = await Api.ActualizarComisionAsync(c.Id, new ActualizarCatalogoComisionRequest(
+            m.NombreEsquema.Trim(), m.TipoCalculo, m.ComisionContado, m.ComisionCredito, m.Activo));
+        Notificar(error, $"Comisión '{m.NombreEsquema}' actualizada.");
+        if (error is null) await CargarComisiones();
+    }
+
+    private async Task AlternarEstatusComision(CatalogoComisionDto c)
+    {
+        var (_, error) = c.Activo
+            ? await Api.DarDeBajaComisionAsync(c.Id)
+            : await Api.ActualizarComisionAsync(c.Id, new ActualizarCatalogoComisionRequest(
+                c.NombreEsquema, c.TipoCalculo, c.ComisionContado, c.ComisionCredito, true));
+        Notificar(error, $"Comisión '{c.NombreEsquema}' {(c.Activo ? "desactivada" : "reactivada")}.");
+        if (error is null) await CargarComisiones();
+    }
+
+    private async Task<DialogoCatalogoComision.FormModel?> MostrarDialogoComision(
+        string titulo, DialogoCatalogoComision.FormModel modelo, bool esEdicion = false)
+    {
+        var opciones = new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true, CloseButton = true };
+        var parametros = new DialogParameters<DialogoCatalogoComision>
+        {
+            { x => x.Titulo, titulo },
+            { x => x.Modelo, modelo },
+            { x => x.EsEdicion, esEdicion }
+        };
+        var dialogo = await _dialogo.ShowAsync<DialogoCatalogoComision>(titulo, parametros, opciones);
+        var resultado = await dialogo.Result;
+        return resultado is { Canceled: false, Data: DialogoCatalogoComision.FormModel datos } ? datos : null;
+    }
+
+    // ===================== Helpers de diálogo =====================
+
+    private async Task<DialogoGenerico.FormModel?> MostrarDialogoGenerico(
+        string titulo, string icono, string labelNombre, DialogoGenerico.FormModel modelo)
+    {
+        var opciones = new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true, CloseButton = true };
+        var parametros = new DialogParameters<DialogoGenerico>
+        {
+            { x => x.Titulo, titulo },
+            { x => x.Icono, icono },
+            { x => x.LabelNombre, labelNombre },
+            { x => x.Modelo, modelo }
+        };
+        var dialogo = await _dialogo.ShowAsync<DialogoGenerico>(titulo, parametros, opciones);
+        var resultado = await dialogo.Result;
+        return resultado is { Canceled: false, Data: DialogoGenerico.FormModel datos } ? datos : null;
+    }
+
+    private async Task<DialogoMes.FormModel?> MostrarDialogoMes(string titulo, DialogoMes.FormModel modelo)
+    {
+        var opciones = new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true, CloseButton = true };
+        var parametros = new DialogParameters<DialogoMes>
+        {
+            { x => x.Titulo, titulo },
+            { x => x.Icono, Icons.Material.Filled.CalendarMonth },
+            { x => x.Modelo, modelo }
+        };
+        var dialogo = await _dialogo.ShowAsync<DialogoMes>(titulo, parametros, opciones);
+        var resultado = await dialogo.Result;
+        return resultado is { Canceled: false, Data: DialogoMes.FormModel datos } ? datos : null;
+    }
+
+    private async Task<DialogoFrecuenciaPago.FormModel?> MostrarDialogoFrecuencia(string titulo, DialogoFrecuenciaPago.FormModel modelo)
+    {
+        var opciones = new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true, CloseButton = true };
+        var parametros = new DialogParameters<DialogoFrecuenciaPago>
+        {
+            { x => x.Titulo, titulo },
+            { x => x.Icono, Icons.Material.Filled.EventRepeat },
+            { x => x.Modelo, modelo }
+        };
+        var dialogo = await _dialogo.ShowAsync<DialogoFrecuenciaPago>(titulo, parametros, opciones);
+        var resultado = await dialogo.Result;
+        return resultado is { Canceled: false, Data: DialogoFrecuenciaPago.FormModel datos } ? datos : null;
+    }
+
+    private void Notificar(string? error, string exito)
+    {
+        if (error is null) _snackbar.Add(exito, Severity.Success);
+        else _snackbar.Add(error, Severity.Error);
+    }
+}

@@ -229,9 +229,16 @@ public class ServicioPropuestas
                               where d.IdPropuesta == idPropuesta
                               join pr in _db.Productos.AsNoTracking() on d.IdProducto equals pr.IdProducto into prj
                               from pr in prj.DefaultIfEmpty()
+                              join mc in _db.CatalogoMarcas.AsNoTracking() on (pr != null ? pr.IdMarca : (long?)null) equals mc.IdMarca into mcj
+                              from mc in mcj.DefaultIfEmpty()
+                              join cat in _db.CatalogoCategorias.AsNoTracking() on (pr != null ? pr.IdCategoria : (long?)null) equals cat.IdCategoria into catj
+                              from cat in catj.DefaultIfEmpty()
                               orderby d.IdPropuestaDetalle
                               select new PropuestaDetalleDto(
-                                  d.IdPropuestaDetalle, d.IdProducto, pr != null ? pr.Descripcion : null, d.Cantidad))
+                                  d.IdPropuestaDetalle, d.IdProducto, pr != null ? pr.Descripcion : null, d.Cantidad,
+                                  pr != null ? pr.CodigoClave : null,
+                                  mc != null ? mc.Descripcion : null,
+                                  cat != null ? cat.Descripcion : null))
                              .ToListAsync(ct);
 
         return new PropuestaDto(

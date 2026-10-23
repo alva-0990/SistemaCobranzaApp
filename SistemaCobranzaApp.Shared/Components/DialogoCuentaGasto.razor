@@ -1,0 +1,67 @@
+@using MudBlazor
+@using SistemaCobranzaApp.Shared.Dtos
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6"><b>@(EsEdicion ? "Editar cuenta" : "Nueva cuenta de gasto")</b></MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudTextField T="string" @bind-Value="Nombre" Label="Nombre" Variant="Variant.Outlined"
+                      Immediate="true" MaxLength="100" Class="mb-3" />
+
+        <MudSelect T="string" @bind-Value="TipoCuenta" Label="Tipo de cuenta" Variant="Variant.Outlined" Class="mb-3">
+            <MudSelectItem T="string" Value="@("EFECTIVO")">Efectivo</MudSelectItem>
+            <MudSelectItem T="string" Value="@("CAJA_CHICA")">Caja chica</MudSelectItem>
+            <MudSelectItem T="string" Value="@("BANCO")">Banco</MudSelectItem>
+            <MudSelectItem T="string" Value="@("OTRO")">Otro</MudSelectItem>
+        </MudSelect>
+
+        <MudTextField T="string" @bind-Value="Moneda" Label="Moneda" Variant="Variant.Outlined"
+                      MaxLength="5" Class="mb-3" />
+
+        @if (!EsEdicion)
+        {
+            <MudNumericField T="decimal" @bind-Value="SaldoInicial" Label="Saldo inicial"
+                             Variant="Variant.Outlined" Min="0" Format="N2" Class="mb-3" />
+        }
+
+        <MudTextField T="string" @bind-Value="Observaciones" Label="Observaciones (opcional)"
+                      Variant="Variant.Outlined" Lines="2" MaxLength="250" Class="mb-3" />
+
+        @if (EsEdicion)
+        {
+            <MudSwitch T="bool" @bind-Value="Activo" Color="Color.Primary" Label="Activa" />
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancelar">Cancelar</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Aceptar">Guardar</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter] public bool EsEdicion { get; set; }
+    [Parameter] public string Nombre { get; set; } = "";
+    [Parameter] public string TipoCuenta { get; set; } = "EFECTIVO";
+    [Parameter] public string Moneda { get; set; } = "MXN";
+    [Parameter] public decimal SaldoInicial { get; set; }
+    [Parameter] public string? Observaciones { get; set; }
+    [Parameter] public bool Activo { get; set; } = true;
+
+    public record Resultado(string Nombre, string TipoCuenta, string Moneda, decimal SaldoInicial, string? Observaciones, bool Activo);
+
+    private void Aceptar()
+    {
+        if (string.IsNullOrWhiteSpace(Nombre)) return;
+        MudDialog.Close(DialogResult.Ok(new Resultado(
+            Nombre.Trim(), TipoCuenta,
+            string.IsNullOrWhiteSpace(Moneda) ? "MXN" : Moneda.Trim(),
+            SaldoInicial,
+            string.IsNullOrWhiteSpace(Observaciones) ? null : Observaciones!.Trim(),
+            Activo)));
+    }
+
+    private void Cancelar() => MudDialog.Cancel();
+}

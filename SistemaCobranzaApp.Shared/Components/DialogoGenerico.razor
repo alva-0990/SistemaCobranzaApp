@@ -1,0 +1,89 @@
+@using System.ComponentModel.DataAnnotations
+@using MudBlazor 
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6" Style="font-weight: 600;">
+            <MudIcon Icon="@Icono" Class="mr-2" Style="vertical-align: middle;" />
+            @Titulo
+        </MudText>
+    </TitleContent>
+    
+    <DialogContent>
+        <MudForm @ref="_form" @bind-IsValid="@_formValido">
+            <MudGrid>
+                @* Campo Dinámico 1: Nombre / Título / Concepto *@
+                <MudItem xs="12">
+                    <MudTextField T="string" 
+                                  Label="@LabelNombre" 
+                                  @bind-Value="Modelo.Nombre" 
+                                  Required="true" 
+                                  RequiredError="@($"{LabelNombre} es obligatorio.")"
+                                  Variant="Variant.Outlined"
+                                  Margin="Margin.Dense" />
+                </MudItem>
+
+                @* Campo: Estatus *@
+                <MudItem xs="12" Class="d-flex align-center">
+                    <MudSwitch T="bool" 
+                               @bind-Value="Modelo.Activo" 
+                               Color="Color.Primary" 
+                               Label="@(Modelo.Activo ? "Estatus: Activo" : "Estatus: Inactivo")" />
+                </MudItem>
+            </MudGrid>
+        </MudForm>
+    </DialogContent>
+    
+    <DialogActions>
+        <MudButton OnClick="Cancelar" Variant="Variant.Text" Color="Color.Default">
+            Cancelar
+        </MudButton>
+        <MudButton OnClick="Guardar" 
+                   Variant="Variant.Filled" 
+                   Color="Color.Primary" 
+                   Disabled="@(!_formValido)">
+            Guardar Cambios
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] 
+    private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter] 
+    public string Titulo { get; set; } = "Gestionar Registro";
+
+    [Parameter] 
+    public string Icono { get; set; } = Icons.Material.Filled.Edit;
+
+    [Parameter] 
+    public string LabelNombre { get; set; } = "Nombre";
+
+    [Parameter] 
+    public string LabelDescripcion { get; set; } = "Descripción";
+
+    [Parameter] 
+    public FormModel Modelo { get; set; } = new();
+
+    private MudForm _form = null!;
+    private bool _formValido;
+
+    private void Cancelar() => MudDialog.Cancel();
+
+    private async Task Guardar()
+    {
+        await _form.Validate();
+        if (_formValido)
+        {
+            MudDialog.Close(DialogResult.Ok(Modelo));
+        }
+    }
+
+    public class FormModel
+    {
+        public string Nombre { get; set; } = string.Empty;
+        public string Descripcion { get; set; } = string.Empty;
+        public bool Activo { get; set; } = true;
+    }
+}

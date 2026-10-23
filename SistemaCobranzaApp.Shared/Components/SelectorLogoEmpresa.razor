@@ -1,0 +1,66 @@
+@using MudBlazor
+@using Microsoft.AspNetCore.Components.Forms
+@using SistemaCobranzaApp.Shared.Services
+
+<div class="selector-logo">
+    <MudText Typo="Typo.subtitle2">@Titulo</MudText>
+    @if (!string.IsNullOrWhiteSpace(Value))
+    {
+        <div style="background: @(Blanco ? "#26332D" : "#FFFFFF"); padding: 12px; border-radius: 8px; margin: 8px 0;">
+            <img src="@Value" alt="@Titulo" style="max-width: 100%; height: 96px; object-fit: contain;" />
+        </div>
+    }
+    <label class="d-block my-2">
+        <span>Seleccionar imagen (PNG, JPEG o WebP; máximo 256 KB)</span>
+        <InputFile OnChange="Seleccionar" accept="image/png,image/jpeg,image/webp" disabled="@Disabled" />
+    </label>
+    @if (_error is not null)
+    {
+        <MudAlert Severity="Severity.Error">@_error</MudAlert>
+    }
+    @if (Value?.StartsWith("data:", StringComparison.OrdinalIgnoreCase) != true)
+    {
+        <MudTextField T="string" Value="Value" ValueChanged="ValueChanged" Label="O ingresar URL de imagen"
+                      Variant="Variant.Outlined" Margin="Margin.Dense" Disabled="Disabled" />
+    }
+    @if (!string.IsNullOrWhiteSpace(Value))
+    {
+        <MudButton OnClick="Quitar" Disabled="Disabled" Size="Size.Small" Color="Color.Error">Quitar imagen</MudButton>
+    }
+</div>
+
+@code {
+    [Parameter] public string Titulo { get; set; } = "Logotipo";
+    [Parameter] public string? Value { get; set; }
+    [Parameter] public EventCallback<string> ValueChanged { get; set; }
+    [Parameter] public bool Blanco { get; set; }
+    [Parameter] public bool Disabled { get; set; }
+    private string? _error;
+
+    private async Task Seleccionar(InputFileChangeEventArgs e)
+    {
+        _error = null;
+        try
+        {
+            var archivo = e.File;
+            if (archivo.Size > ImagenEmpresa.MaxBytes)
+            {
+                _error = "La imagen no puede exceder 256 KB.";
+                return;
+            }
+            await using var stream = archivo.OpenReadStream(ImagenEmpresa.MaxBytes);
+            using var memoria = new MemoryStream();
+            await stream.CopyToAsync(memoria);
+            var valor = $"data:{archivo.ContentType};base64,{Convert.ToBase64String(memoria.ToArray())}";
+            _error = ImagenEmpresa.Validar(valor);
+            if (_error is null) await ValueChanged.InvokeAsync(valor);
+        }
+        catch { _error = "No se pudo leer la imagen. Selecciona un archivo PNG, JPEG o WebP de hasta 256 KB."; }
+    }
+
+    private async Task Quitar()
+    {
+        _error = null;
+        await ValueChanged.InvokeAsync("");
+    }
+}

@@ -1,0 +1,1208 @@
+@page "/inventario"
+
+@using MudBlazor
+@using SistemaCobranzaApp.Shared.Components
+@using SistemaCobranzaApp.Shared.Dtos
+@using SistemaCobranzaApp.Shared.Services
+@inject ApiCliente Api
+@inject IDialogService _dialogo
+@inject ISnackbar _snackbar
+
+<MudTabs Elevation="2" Rounded="true" Color="Color.Primary" ApplyEffectsToContainer="true"
+         PanelClass="pa-0 pt-4" SliderColor="Color.Warning" Class="ma-2 tabs-remarcados">
+
+    <!-- ============================================================= -->
+    <!-- ===================== INVENTARIO CENTRAL ==================== -->
+    <!-- ============================================================= -->
+    <MudTabPanel Text="Inventario Central" Icon="@Icons.Material.Filled.Warehouse">
+        <MudPaper Elevation="0" Class="pa-4">
+
+            <div class="encabezado-seccion mb-4">
+                <MudIcon Icon="@Icons.Material.Filled.Warehouse" Color="Color.Primary" Size="Size.Large" />
+                <div>
+                    <MudText Typo="Typo.h6" Class="titulo-seccion">Inventario Central</MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">
+                        Registre entradas de mercancía y ajuste las existencias del almacén principal.
+                    </MudText>
+                </div>
+            </div>
+
+            <MudGrid Spacing="3">
+                <!-- Panel izquierdo: entrada / ajuste -->
+                <MudItem xs="12" md="4" lg="3">
+                    <MudPaper Elevation="0" Outlined="true" Class="pa-4 panel-accion">
+                        <div class="d-flex align-center gap-2 mb-3">
+                            <MudIcon Icon="@Icons.Material.Filled.Inventory" Color="Color.Primary" />
+                            <MudText Typo="Typo.subtitle1"><b>Entrada / Ajuste de existencias</b></MudText>
+                        </div>
+
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Producto seleccionado:</MudText>
+                        @if (_centralSeleccion is null)
+                        {
+                            <MudText Typo="Typo.body2" Color="Color.Info" Class="mb-2">
+                                Seleccione un producto de la tabla
+                            </MudText>
+                        }
+                        else
+                        {
+                            <MudText Typo="Typo.body1" Class="mb-1">
+                                <b>@_centralSeleccion.CodigoClave</b> — @_centralSeleccion.Descripcion
+                            </MudText>
+                            @MetaProducto(_centralSeleccion.Marca, _centralSeleccion.Categoria, _centralSeleccion.Color, _centralSeleccion.Talla)
+                            <MudText Typo="Typo.body2" Class="mb-2">
+                                Existencia actual:
+                                <MudChip T="string" Size="Size.Small" Color="Color.Success" Variant="Variant.Text">
+                                    @_centralSeleccion.Cantidad
+                                </MudChip>
+                            </MudText>
+                        }
+
+                        <MudSelect T="bool" Label="Tipo de operación" @bind-Value="_centralEsAjuste"
+                                   Variant="Variant.Outlined" Dense="true" Class="mb-3"
+                                   Disabled="@(_centralSeleccion is null)">
+                            <MudSelectItem T="bool" Value="false">Entrada (suma al stock)</MudSelectItem>
+                            <MudSelectItem T="bool" Value="true">Ajuste (fija cantidad exacta)</MudSelectItem>
+                        </MudSelect>
+
+                        <MudNumericField T="int" @bind-Value="_centralCantidad"
+                                         Label="@(_centralEsAjuste ? "Nueva cantidad exacta" : "Cantidad a ingresar")"
+                                         Variant="Variant.Outlined" Dense="true" Min="0" Class="mb-3"
+                                         Disabled="@(_centralSeleccion is null)" />
+
+                        <MudTextField T="string" @bind-Value="_centralObservaciones"
+                                      Label="Observaciones (opcional)" Variant="Variant.Outlined"
+                                      Lines="3" Dense="true" Class="mb-3"
+                                      Disabled="@(_centralSeleccion is null)" />
+
+                        <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true"
+                                   StartIcon="@Icons.Material.Filled.Save" Class="mb-2"
+                                   Disabled="@(_centralSeleccion is null || _guardandoCentral)"
+                                   OnClick="AplicarMovimientoCentral">
+                            @(_guardandoCentral ? "Aplicando..." : "Aplicar movimiento")
+                        </MudButton>
+
+                        <MudButton Variant="Variant.Outlined" Color="Color.Default" FullWidth="true"
+                                   StartIcon="@Icons.Material.Filled.Clear"
+                                   Disabled="@(_centralSeleccion is null)"
+                                   OnClick="LimpiarSeleccionCentral">
+                            Limpiar selección
+                        </MudButton>
+                    </MudPaper>
+                </MudItem>
+
+                <!-- Tabla derecha: existencias centrales -->
+                <MudItem xs="12" md="8" lg="9">
+                    <div class="barra-acciones">
+                        <MudTextField T="string"
+                                      @bind-Value="_busquedaCentral"
+                                      Immediate="true"
+                                      Placeholder="Filtrar por nombre o clave..."
+                                      Variant="Variant.Outlined"
+                                      Adornment="Adornment.Start"
+                                      AdornmentIcon="@Icons.Material.Filled.Search"
+                                      AdornmentColor="Color.Primary"
+                                      Clearable="true"
+                                      Class="buscador-remarcado" />
+                        <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                                   StartIcon="@Icons.Material.Filled.Refresh"
+                                   OnClick="CargarCentral" Class="boton-nuevo">
+                            Refrescar
+                        </MudButton>
+                    </div>
+
+                    @if (_cargandoCentral)
+                    {
+                        <div class="d-flex justify-center pa-8">
+                            <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+                        </div>
+                    }
+                    else
+                    {
+                        <MudTable Items="CentralFiltrado" Hover="true" Dense="true" FixedHeader="true"
+                                  Height="60vh" Breakpoint="Breakpoint.Sm" Elevation="0" RowsPerPage="25"
+                                  T="ExistenciaCentralDto"
+                                  OnRowClick="@((TableRowClickEventArgs<ExistenciaCentralDto> e) => SeleccionarCentral(e.Item))"
+                                  RowClassFunc="@FilaCentralClass">
+                            <HeaderContent>
+                                <MudTh Style="width:8%;">ID</MudTh>
+                                <MudTh Style="width:14%;">Clave</MudTh>
+                                <MudTh>Descripción / Artículo</MudTh>
+                                <MudTh Style="width:10%; text-align:right;">Existencia</MudTh>
+                                <MudTh Style="width:8%; text-align:right;">Mín.</MudTh>
+                                <MudTh Style="width:13%; text-align:center;">Estado Stock</MudTh>
+                            </HeaderContent>
+                            <RowTemplate>
+                                <MudTd DataLabel="ID">@context.IdProducto</MudTd>
+                                <MudTd DataLabel="Clave"><b>@context.CodigoClave</b></MudTd>
+                                <MudTd DataLabel="Descripción">
+                                    <div>@context.Descripcion</div>
+                                    @MetaProducto(context.Marca, context.Categoria, context.Color, context.Talla)
+                                </MudTd>
+                                <MudTd DataLabel="Existencia" Style="text-align:right;">@context.Cantidad</MudTd>
+                                <MudTd DataLabel="Mín." Style="text-align:right;">@context.StockMini</MudTd>
+                                <MudTd DataLabel="Estado Stock" Style="text-align:center;">
+                                    @ChipStock(context.Cantidad, context.StockMini)
+                                </MudTd>
+                            </RowTemplate>
+                            <NoRecordsContent>@EstadoVacio("No hay productos que coincidan.")</NoRecordsContent>
+                            <PagerContent>
+                                <MudTablePager InfoFormat="{first_item}-{last_item} de {all_items}"
+                                               RowsPerPageString="Filas:"
+                                               PageSizeOptions="new[] { 25, 50, 100 }" />
+                            </PagerContent>
+                        </MudTable>
+                    }
+                </MudItem>
+            </MudGrid>
+        </MudPaper>
+    </MudTabPanel>
+
+    <!-- ============================================================= -->
+    <!-- ===================== EXISTENCIAS POR ZONA ================== -->
+    <!-- ============================================================= -->
+    <MudTabPanel Text="Existencias por Zona" Icon="@Icons.Material.Filled.Map">
+        <MudPaper Elevation="0" Class="pa-4">
+
+            <div class="encabezado-seccion mb-4">
+                <MudIcon Icon="@Icons.Material.Filled.Map" Color="Color.Primary" Size="Size.Large" />
+                <div>
+                    <MudText Typo="Typo.h6" Class="titulo-seccion">Existencias por Zona</MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">
+                        Consulte las existencias del almacén de cada zona y ajuste cantidades (conteo físico, mermas, correcciones).
+                    </MudText>
+                </div>
+            </div>
+
+            <MudGrid Spacing="3">
+                <!-- Panel izquierdo: ajuste de zona -->
+                <MudItem xs="12" md="4" lg="3">
+                    <MudPaper Elevation="0" Outlined="true" Class="pa-4 panel-accion">
+                        <div class="d-flex align-center gap-2 mb-3">
+                            <MudIcon Icon="@Icons.Material.Filled.EditNote" Color="Color.Primary" />
+                            <MudText Typo="Typo.subtitle1"><b>Ajuste de existencia en zona</b></MudText>
+                        </div>
+
+                        <MudSelect T="long?" Label="Zona" Value="_zonaSeleccionada"
+                                   ValueChanged="OnZonaSeleccionadaChanged"
+                                   Variant="Variant.Outlined" Dense="true" Class="mb-3"
+                                   Placeholder="Seleccione una zona">
+                            @foreach (var z in _zonas)
+                            {
+                                <MudSelectItem T="long?" Value="@z.IdZona">@z.Descripcion</MudSelectItem>
+                            }
+                        </MudSelect>
+
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Producto seleccionado:</MudText>
+                        @if (_zonaSeleccion is null)
+                        {
+                            <MudText Typo="Typo.body2" Color="Color.Info" Class="mb-2">
+                                Seleccione un producto de la tabla
+                            </MudText>
+                        }
+                        else
+                        {
+                            <MudText Typo="Typo.body1" Class="mb-1">
+                                <b>@_zonaSeleccion.CodigoClave</b> — @_zonaSeleccion.Descripcion
+                            </MudText>
+                            @MetaProducto(_zonaSeleccion.Marca, _zonaSeleccion.Categoria, _zonaSeleccion.Color, _zonaSeleccion.Talla)
+                            <MudText Typo="Typo.body2" Class="mb-2">
+                                Existencia actual:
+                                <MudChip T="string" Size="Size.Small" Color="Color.Success" Variant="Variant.Text">
+                                    @_zonaSeleccion.Cantidad
+                                </MudChip>
+                            </MudText>
+                        }
+
+                        <MudNumericField T="int" @bind-Value="_zonaCantidad"
+                                         Label="Nueva cantidad exacta" Variant="Variant.Outlined"
+                                         Dense="true" Min="0" Class="mb-3"
+                                         Disabled="@(_zonaSeleccion is null)" />
+
+                        <MudTextField T="string" @bind-Value="_zonaObservaciones"
+                                      Label="Motivo / Observaciones (opcional)" Variant="Variant.Outlined"
+                                      Lines="3" Dense="true" Class="mb-3"
+                                      Disabled="@(_zonaSeleccion is null)" />
+
+                        <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true"
+                                   StartIcon="@Icons.Material.Filled.Save" Class="mb-2"
+                                   Disabled="@(_zonaSeleccion is null || _guardandoZona)"
+                                   OnClick="AplicarAjusteZona">
+                            @(_guardandoZona ? "Aplicando..." : "Aplicar ajuste")
+                        </MudButton>
+
+                        <MudButton Variant="Variant.Outlined" Color="Color.Default" FullWidth="true"
+                                   StartIcon="@Icons.Material.Filled.Clear"
+                                   Disabled="@(_zonaSeleccion is null)"
+                                   OnClick="LimpiarSeleccionZona">
+                            Limpiar selección
+                        </MudButton>
+                    </MudPaper>
+                </MudItem>
+
+                <!-- Tabla derecha: existencias por zona -->
+                <MudItem xs="12" md="8" lg="9">
+                    <div class="barra-acciones">
+                        <MudTextField T="string"
+                                      @bind-Value="_busquedaZona"
+                                      Immediate="true"
+                                      Placeholder="Filtrar por nombre o clave..."
+                                      Variant="Variant.Outlined"
+                                      Adornment="Adornment.Start"
+                                      AdornmentIcon="@Icons.Material.Filled.Search"
+                                      AdornmentColor="Color.Primary"
+                                      Clearable="true"
+                                      Class="buscador-remarcado" />
+                        <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                                   StartIcon="@Icons.Material.Filled.Refresh"
+                                   OnClick="CargarExistenciasZona" Class="boton-nuevo"
+                                   Disabled="@(_zonaSeleccionada is null)">
+                            Refrescar
+                        </MudButton>
+                    </div>
+
+                    @if (_zonaSeleccionada is null)
+                    {
+                        @EstadoVacio("Seleccione una zona para ver sus existencias.")
+                    }
+                    else if (_cargandoZona)
+                    {
+                        <div class="d-flex justify-center pa-8">
+                            <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+                        </div>
+                    }
+                    else
+                    {
+                        <MudTable Items="ZonaFiltrado" Hover="true" Dense="true" FixedHeader="true"
+                                  Height="60vh" Breakpoint="Breakpoint.Sm" Elevation="0" RowsPerPage="25"
+                                  T="ExistenciaZonaDto"
+                                  OnRowClick="@((TableRowClickEventArgs<ExistenciaZonaDto> e) => SeleccionarZona(e.Item))"
+                                  RowClassFunc="@FilaZonaClass">
+                            <HeaderContent>
+                                <MudTh Style="width:8%;">ID</MudTh>
+                                <MudTh Style="width:16%;">Clave</MudTh>
+                                <MudTh>Descripción / Artículo</MudTh>
+                                <MudTh Style="width:12%; text-align:right;">Existencia</MudTh>
+                            </HeaderContent>
+                            <RowTemplate>
+                                <MudTd DataLabel="ID">@context.IdProducto</MudTd>
+                                <MudTd DataLabel="Clave"><b>@context.CodigoClave</b></MudTd>
+                                <MudTd DataLabel="Descripción">
+                                    <div>@context.Descripcion</div>
+                                    @MetaProducto(context.Marca, context.Categoria, context.Color, context.Talla)
+                                </MudTd>
+                                <MudTd DataLabel="Existencia" Style="text-align:right;">
+                                    <b>@context.Cantidad</b>
+                                </MudTd>
+                            </RowTemplate>
+                            <NoRecordsContent>@EstadoVacio("Esta zona no tiene existencias registradas.")</NoRecordsContent>
+                            <PagerContent>
+                                <MudTablePager InfoFormat="{first_item}-{last_item} de {all_items}"
+                                               RowsPerPageString="Filas:"
+                                               PageSizeOptions="new[] { 25, 50, 100 }" />
+                            </PagerContent>
+                        </MudTable>
+                    }
+                </MudItem>
+            </MudGrid>
+        </MudPaper>
+    </MudTabPanel>
+
+    <!-- ============================================================= -->
+    <!-- ===================== ENVÍO A ZONAS ======================== -->
+    <!-- ============================================================= -->
+    <MudTabPanel Text="Envío a Zonas" Icon="@Icons.Material.Filled.LocalShipping">
+        <MudPaper Elevation="0" Class="pa-4">
+
+            <div class="encabezado-seccion mb-4">
+                <MudIcon Icon="@Icons.Material.Filled.LocalShipping" Color="Color.Primary" Size="Size.Large" />
+                <div>
+                    <MudText Typo="Typo.h6" Class="titulo-seccion">Envío a Zonas</MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">
+                        Genere propuestas de envío del central a las zonas, confírmelas o recházalas y consulte el historial.
+                    </MudText>
+                </div>
+            </div>
+
+            <MudTabs Elevation="0" Rounded="true" Color="Color.Info" Border="true"
+                     PanelClass="pa-3" ApplyEffectsToContainer="true">
+
+                <!-- Nueva propuesta: panel de datos (izquierda) + lista de artículos (derecha) -->
+                <MudTabPanel Text="Nueva propuesta" Icon="@Icons.Material.Filled.PlaylistAdd">
+                    <MudGrid Spacing="3">
+                        <!-- Panel izquierdo: datos de la propuesta + agregar producto -->
+                        <MudItem xs="12" md="4" lg="3">
+                            <MudPaper Elevation="0" Outlined="true" Class="pa-4 panel-accion">
+                                <div class="d-flex align-center gap-2 mb-3">
+                                    <MudIcon Icon="@Icons.Material.Filled.Assignment" Color="Color.Primary" />
+                                    <MudText Typo="Typo.subtitle1"><b>Datos de la propuesta</b></MudText>
+                                </div>
+
+                                <MudSelect T="long?" Label="Zona destino" @bind-Value="_propZonaDestino"
+                                           Variant="Variant.Outlined" Dense="true" Class="mb-3"
+                                           Placeholder="Seleccione una zona">
+                                    @foreach (var z in _zonas)
+                                    {
+                                        <MudSelectItem T="long?" Value="@z.IdZona">@z.Descripcion</MudSelectItem>
+                                    }
+                                </MudSelect>
+
+                                <MudTextField T="string" @bind-Value="_propObservaciones"
+                                              Label="Observaciones (opcional)" Variant="Variant.Outlined"
+                                              Lines="2" Dense="true" Class="mb-4" />
+
+                                <MudDivider Class="mb-3" />
+
+                                <div class="d-flex align-center gap-2 mb-3">
+                                    <MudIcon Icon="@Icons.Material.Filled.AddShoppingCart" Color="Color.Primary" />
+                                    <MudText Typo="Typo.subtitle1"><b>Agregar producto</b></MudText>
+                                </div>
+
+                                <MudAutocomplete T="ExistenciaCentralDto" Label="Producto"
+                                                 @bind-Value="_propProductoSel"
+                                                 SearchFunc="BuscarProductoCentral"
+                                                 ToStringFunc="@(p => p is null ? "" : $"{p.CodigoClave} — {p.Descripcion}")"
+                                                 Variant="Variant.Outlined" Dense="true" Class="mb-1"
+                                                 ResetValueOnEmptyText="true" CoerceText="true" Clearable="true">
+                                    <ItemTemplate Context="prod">
+                                        <div>
+                                            <b>@prod.CodigoClave</b> — @prod.Descripcion
+                                        </div>
+                                        @MetaProducto(prod.Marca, prod.Categoria, prod.Color, prod.Talla)
+                                    </ItemTemplate>
+                                </MudAutocomplete>
+
+                                <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mb-2 d-block">
+                                    Existencia central:
+                                    <b>@(_propProductoSel is null ? "—" : _propProductoSel.Cantidad.ToString())</b>
+                                </MudText>
+
+                                <MudNumericField T="int" @bind-Value="_propCantidad"
+                                                 Label="Cantidad a enviar" Variant="Variant.Outlined"
+                                                 Dense="true" Min="1" Class="mb-3"
+                                                 Disabled="@(_propProductoSel is null)" />
+
+                                <MudButton Variant="Variant.Filled" Color="Color.Info" FullWidth="true"
+                                           StartIcon="@Icons.Material.Filled.Add"
+                                           Disabled="@(_propProductoSel is null)"
+                                           OnClick="AgregarArticuloPropuesta">
+                                    Agregar a la lista
+                                </MudButton>
+                            </MudPaper>
+                        </MudItem>
+
+                        <!-- Lista de artículos de la propuesta -->
+                        <MudItem xs="12" md="8" lg="9">
+                            <MudTable Items="_articulosPropuesta" Hover="true" Dense="true"
+                                      Breakpoint="Breakpoint.Sm" Elevation="0" T="ArticuloPropuesta"
+                                      Height="48vh" FixedHeader="true">
+                                <HeaderContent>
+                                    <MudTh Style="width:16%;">Clave</MudTh>
+                                    <MudTh>Producto</MudTh>
+                                    <MudTh Style="width:12%; text-align:right;">Cantidad</MudTh>
+                                    <MudTh Style="width:12%; text-align:right;">Exist. Central</MudTh>
+                                    <MudTh Style="width:8%; text-align:center;"></MudTh>
+                                </HeaderContent>
+                                <RowTemplate>
+                                    <MudTd DataLabel="Clave"><b>@context.CodigoClave</b></MudTd>
+                                    <MudTd DataLabel="Producto">
+                                        <div>@context.Descripcion</div>
+                                        @MetaProducto(context.Marca, context.Categoria, context.Color, context.Talla)
+                                    </MudTd>
+                                    <MudTd DataLabel="Cantidad" Style="text-align:right;">@context.Cantidad</MudTd>
+                                    <MudTd DataLabel="Exist. Central" Style="text-align:right;">@context.ExistenciaCentral</MudTd>
+                                    <MudTd Style="text-align:center;">
+                                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small"
+                                                       Color="Color.Error" Title="Quitar"
+                                                       OnClick="@(() => QuitarArticulo(context))" />
+                                    </MudTd>
+                                </RowTemplate>
+                                <NoRecordsContent>@EstadoVacio("Agregue productos a la propuesta desde el panel izquierdo.")</NoRecordsContent>
+                            </MudTable>
+
+                            <div class="d-flex justify-end gap-2 mt-3 flex-wrap">
+                                <MudButton Variant="Variant.Outlined" Color="Color.Default"
+                                           StartIcon="@Icons.Material.Filled.CleaningServices"
+                                           Disabled="@(_articulosPropuesta.Count == 0)"
+                                           OnClick="LimpiarPropuesta">
+                                    Limpiar todo
+                                </MudButton>
+                                <MudButton Variant="Variant.Filled" Color="Color.Success"
+                                           StartIcon="@Icons.Material.Filled.Save"
+                                           Disabled="@(_articulosPropuesta.Count == 0 || _propZonaDestino is null || _guardandoPropuesta)"
+                                           OnClick="GuardarPropuesta">
+                                    @(_guardandoPropuesta ? "Guardando..." : "Guardar propuesta")
+                                </MudButton>
+                            </div>
+                        </MudItem>
+                    </MudGrid>
+                </MudTabPanel>
+
+                        <!-- Propuestas existentes: tabla + panel de detalle lateral -->
+                        <MudTabPanel Text="Propuestas" Icon="@Icons.Material.Filled.Inventory2">
+                            <div class="barra-acciones">
+                                <MudSelect T="string" Value="_filtroEstatus" Label="Filtrar estatus"
+                                           Variant="Variant.Outlined" Dense="true" Clearable="true"
+                                           Class="buscador-remarcado"
+                                           ValueChanged="@(async v => { _filtroEstatus = v; await CargarPropuestas(); })">
+                                    <MudSelectItem T="string" Value="@("PENDIENTE")">Pendiente</MudSelectItem>
+                                    <MudSelectItem T="string" Value="@("CONFIRMADA")">Confirmada</MudSelectItem>
+                                    <MudSelectItem T="string" Value="@("RECHAZADA")">Rechazada</MudSelectItem>
+                                </MudSelect>
+                                <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                                           StartIcon="@Icons.Material.Filled.Refresh"
+                                           OnClick="CargarPropuestas" Class="boton-nuevo">
+                                    Actualizar
+                                </MudButton>
+                            </div>
+
+                            <MudGrid Spacing="3">
+                                <!-- Lista de propuestas -->
+                                <MudItem xs="12" md="7" lg="8">
+                                    @if (_cargandoPropuestas)
+                                    {
+                                        <div class="d-flex justify-center pa-8">
+                                            <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <MudTable Items="_propuestas" Hover="true" Dense="true"
+                                                  Breakpoint="Breakpoint.Sm" Elevation="0" RowsPerPage="15"
+                                                  T="PropuestaDto" Height="56vh" FixedHeader="true"
+                                                  OnRowClick="@((TableRowClickEventArgs<PropuestaDto> e) => SeleccionarPropuesta(e.Item))"
+                                                  RowClassFunc="@FilaPropuestaClass">
+                                            <HeaderContent>
+                                                <MudTh Style="width:7%;">#</MudTh>
+                                                <MudTh>Zona</MudTh>
+                                                <MudTh Style="width:11%; text-align:center;">Líneas</MudTh>
+                                                <MudTh Style="width:11%; text-align:center;">Piezas</MudTh>
+                                                <MudTh>Fecha</MudTh>
+                                                <MudTh Style="width:16%; text-align:center;">Estatus</MudTh>
+                                            </HeaderContent>
+                                            <RowTemplate>
+                                                <MudTd DataLabel="#">@context.IdPropuesta</MudTd>
+                                                <MudTd DataLabel="Zona">
+                                                    <b>@(string.IsNullOrWhiteSpace(context.ZonaDestino) ? $"Zona #{context.IdZonaDestino}" : context.ZonaDestino)</b>
+                                                </MudTd>
+                                                <MudTd DataLabel="Líneas" Style="text-align:center;">@context.Detalles.Count</MudTd>
+                                                <MudTd DataLabel="Piezas" Style="text-align:center;">@context.Detalles.Sum(d => d.Cantidad)</MudTd>
+                                                <MudTd DataLabel="Fecha">@context.FechaCreacion.EnZonaProyecto().DateTime.ToString("dd/MM/yyyy HH:mm")</MudTd>
+                                                <MudTd DataLabel="Estatus" Style="text-align:center;">@ChipEstatus(context.Estatus)</MudTd>
+                                            </RowTemplate>
+                                            <NoRecordsContent>@EstadoVacio("No hay propuestas con los filtros seleccionados.")</NoRecordsContent>
+                                            <PagerContent>
+                                                <MudTablePager InfoFormat="{first_item}-{last_item} de {all_items}" RowsPerPageString="Filas:" />
+                                            </PagerContent>
+                                        </MudTable>
+                                    }
+                                </MudItem>
+
+                                <!-- Panel de detalle de la propuesta seleccionada -->
+                                <MudItem xs="12" md="5" lg="4">
+                                    <MudPaper Elevation="0" Outlined="true" Class="pa-4 panel-accion">
+                                        <MudText Typo="Typo.subtitle1" Class="mb-1"><b>Detalle de la propuesta</b></MudText>
+
+                                        @if (_propuestaDetalle is null)
+                                        {
+                                            <div class="pa-6 text-center">
+                                                <MudIcon Icon="@Icons.Material.Filled.TouchApp" Size="Size.Large" Color="Color.Secondary" />
+                                                <MudText Color="Color.Secondary" Class="mt-2">
+                                                    Seleccione una propuesta de la lista para ver su detalle.
+                                                </MudText>
+                                            </div>
+                                        }
+                                        else
+                                        {
+                                            <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
+                                                Propuesta #@_propuestaDetalle.IdPropuesta →
+                                                <b>@(_propuestaDetalle.ZonaDestino ?? $"Zona #{_propuestaDetalle.IdZonaDestino}")</b>
+                                                (@_propuestaDetalle.Estatus)
+                                            </MudText>
+
+                                            @if (_cargandoDetalle)
+                                            {
+                                                <div class="d-flex justify-center pa-4">
+                                                    <MudProgressCircular Indeterminate="true" Color="Color.Primary" Size="Size.Small" />
+                                                </div>
+                                            }
+                                            else
+                                            {
+                                                <MudTable Items="_propuestaDetalle.Detalles" Dense="true" Hover="true" Elevation="0"
+                                                          Breakpoint="Breakpoint.None" T="PropuestaDetalleDto" Height="38vh" FixedHeader="true">
+                                                    <HeaderContent>
+                                                        <MudTh>Producto</MudTh>
+                                                        <MudTh Style="width:22%; text-align:right;">Cant.</MudTh>
+                                                    </HeaderContent>
+                                                    <RowTemplate>
+                                                        <MudTd DataLabel="Producto">
+                                                            <div>
+                                                                @if (!string.IsNullOrWhiteSpace(context.CodigoClave))
+                                                                {
+                                                                    <b>@context.CodigoClave</b> <text>— </text>
+                                                                }
+                                                                @(context.Producto ?? $"Producto #{context.IdProducto}")
+                                                            </div>
+                                                            @MetaProducto(context.Marca, context.Categoria, null, null)
+                                                        </MudTd>
+                                                        <MudTd DataLabel="Cant." Style="text-align:right;"><b>@context.Cantidad</b></MudTd>
+                                                    </RowTemplate>
+                                                    <NoRecordsContent>
+                                                        <MudText Color="Color.Secondary" Class="pa-3 text-center">Sin artículos.</MudText>
+                                                    </NoRecordsContent>
+                                                </MudTable>
+
+                                                @if (!string.IsNullOrWhiteSpace(_propuestaDetalle.Observaciones))
+                                                {
+                                                    <MudAlert Severity="Severity.Info" Dense="true" Class="mt-2" Variant="Variant.Outlined">
+                                                        @_propuestaDetalle.Observaciones
+                                                    </MudAlert>
+                                                }
+
+                                                @if (EsPendiente(_propuestaDetalle.Estatus))
+                                                {
+                                                    <MudButton Variant="Variant.Filled" Color="Color.Success" FullWidth="true"
+                                                               StartIcon="@Icons.Material.Filled.CheckCircle" Class="mt-3 mb-2"
+                                                               Disabled="@_resolviendoPropuesta"
+                                                               OnClick="ConfirmarPropuestaSeleccionada">
+                                                        Confirmar y enviar
+                                                    </MudButton>
+                                                    <MudButton Variant="Variant.Filled" Color="Color.Error" FullWidth="true"
+                                                               StartIcon="@Icons.Material.Filled.Cancel"
+                                                               Disabled="@_resolviendoPropuesta"
+                                                               OnClick="RechazarPropuestaSeleccionada">
+                                                        Rechazar propuesta
+                                                    </MudButton>
+                                                }
+                                                else
+                                                {
+                                                    <MudAlert Severity="@(EsConfirmada(_propuestaDetalle.Estatus) ? Severity.Success : Severity.Error)"
+                                                              Dense="true" Class="mt-3" Variant="Variant.Outlined">
+                                                        Esta propuesta ya fue @(_propuestaDetalle.Estatus?.ToLowerInvariant()).
+                                                        @if (_propuestaDetalle.FechaResolucion is not null)
+                                                        {
+                                                            <text> (@_propuestaDetalle.FechaResolucion.Value.EnZonaProyecto().DateTime.ToString("dd/MM/yyyy HH:mm"))</text>
+                                                        }
+                                                    </MudAlert>
+                                                }
+                                            }
+                                        }
+                                    </MudPaper>
+                                </MudItem>
+                            </MudGrid>
+                        </MudTabPanel>
+
+                        <!-- Historial de inventario: vista global con filtros -->
+                        <MudTabPanel Text="Historial de inventario" Icon="@Icons.Material.Filled.History">
+                            <div class="barra-filtros-hist">
+                                <MudSelect T="string" @bind-Value="_histTipo" Label="Tipo"
+                                           Variant="Variant.Outlined" Dense="true" Margin="Margin.Dense"
+                                           Clearable="true" Class="filtro-hist">
+                                    @foreach (var t in _tiposMovimiento)
+                                    {
+                                        <MudSelectItem T="string" Value="@t.Key">@t.Value</MudSelectItem>
+                                    }
+                                </MudSelect>
+                                <MudSelect T="long?" @bind-Value="_histZona" Label="Zona"
+                                           Variant="Variant.Outlined" Dense="true" Margin="Margin.Dense"
+                                           Clearable="true" Class="filtro-hist">
+                                    @foreach (var z in _zonas)
+                                    {
+                                        <MudSelectItem T="long?" Value="@z.IdZona">@z.Descripcion</MudSelectItem>
+                                    }
+                                </MudSelect>
+                                <MudDatePicker Label="Desde" @bind-Date="_histDesde" Variant="Variant.Outlined"
+                                               Margin="Margin.Dense" Clearable="true" Class="filtro-hist filtro-hist-fecha" />
+                                <MudDatePicker Label="Hasta" @bind-Date="_histHasta" Variant="Variant.Outlined"
+                                               Margin="Margin.Dense" Clearable="true" Class="filtro-hist filtro-hist-fecha" />
+                                <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small"
+                                           StartIcon="@Icons.Material.Filled.Search"
+                                           OnClick="CargarHistorial" Class="boton-hist">
+                                    Actualizar
+                                </MudButton>
+                                <MudButton Variant="Variant.Outlined" Color="Color.Default" Size="Size.Small"
+                                           StartIcon="@Icons.Material.Filled.FilterAltOff"
+                                           OnClick="LimpiarFiltrosHistorial" Class="boton-hist">
+                                    Limpiar
+                                </MudButton>
+                            </div>
+
+                            @if (_cargandoHistorial)
+                            {
+                                <div class="d-flex justify-center pa-8">
+                                    <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+                                </div>
+                            }
+                            else
+                            {
+                                <MudTable Items="_historial" Hover="true" Dense="true"
+                                          Breakpoint="Breakpoint.Sm" Elevation="0" RowsPerPage="25"
+                                          T="MovimientoHistorialDto" Height="56vh" FixedHeader="true">
+                                    <HeaderContent>
+                                        <MudTh>Fecha</MudTh>
+                                        <MudTh>Tipo</MudTh>
+                                        <MudTh Style="width:12%;">Clave</MudTh>
+                                        <MudTh>Producto</MudTh>
+                                        <MudTh Style="width:8%; text-align:right;">Cant.</MudTh>
+                                        <MudTh Style="width:8%; text-align:right;">Antes</MudTh>
+                                        <MudTh Style="width:8%; text-align:right;">Después</MudTh>
+                                        <MudTh>Zona</MudTh>
+                                        <MudTh>Usuario</MudTh>
+                                    </HeaderContent>
+                                    <RowTemplate>
+                                        <MudTd DataLabel="Fecha">@context.FechaMovimiento.EnZonaProyecto().DateTime.ToString("dd/MM/yyyy HH:mm")</MudTd>
+                                        <MudTd DataLabel="Tipo">@ChipTipoMovimiento(context.TipoMovimiento)</MudTd>
+                                        <MudTd DataLabel="Clave"><b>@context.CodigoClave</b></MudTd>
+                                        <MudTd DataLabel="Producto">
+                                            <div>@context.Descripcion</div>
+                                            @MetaProducto(context.Marca, context.Categoria, null, null)
+                                        </MudTd>
+                                        <MudTd DataLabel="Cant." Style="text-align:right;">@context.Cantidad</MudTd>
+                                        <MudTd DataLabel="Antes" Style="text-align:right;">@context.ExistenciaAnterior</MudTd>
+                                        <MudTd DataLabel="Después" Style="text-align:right;"><b>@context.ExistenciaNueva</b></MudTd>
+                                        <MudTd DataLabel="Zona">@(context.Zona ?? "—")</MudTd>
+                                        <MudTd DataLabel="Usuario">@(context.Usuario ?? "—")</MudTd>
+                                    </RowTemplate>
+                                    <NoRecordsContent>@EstadoVacio("No hay movimientos con los filtros seleccionados.")</NoRecordsContent>
+                                    <PagerContent>
+                                        <MudTablePager InfoFormat="{first_item}-{last_item} de {all_items}"
+                                                       RowsPerPageString="Filas:"
+                                                       PageSizeOptions="new[] { 25, 50, 100 }" />
+                                    </PagerContent>
+                                </MudTable>
+                            }
+                        </MudTabPanel>
+                    </MudTabs>
+        </MudPaper>
+    </MudTabPanel>
+</MudTabs>
+
+@{
+    RenderFragment ChipStock(int cantidad, int minimo) => __builder =>
+    {
+        var bajo = cantidad <= minimo;
+        <MudChip T="string" Size="Size.Small" Variant="Variant.Filled"
+                 Color="@(bajo ? Color.Error : Color.Success)">
+            @(bajo ? "Bajo mínimo" : "Disponible")
+        </MudChip>
+    };
+
+    RenderFragment ChipEstatus(string estatus) => __builder =>
+    {
+        var color = estatus?.ToUpperInvariant() switch
+        {
+            "CONFIRMADA" => Color.Success,
+            "RECHAZADA" => Color.Error,
+            "PENDIENTE" => Color.Warning,
+            _ => Color.Default
+        };
+        <MudChip T="string" Size="Size.Small" Variant="Variant.Filled" Color="@color">
+            @(string.IsNullOrWhiteSpace(estatus) ? "—" : estatus)
+        </MudChip>
+    };
+
+    RenderFragment EstadoVacio(string mensaje) => __builder =>
+    {
+        <div class="pa-8 text-center">
+            <MudIcon Icon="@Icons.Material.Filled.SearchOff" Size="Size.Large" Color="Color.Secondary" />
+            <MudText Color="Color.Secondary" Class="mt-2">@mensaje</MudText>
+        </div>
+    };
+
+    // Chip de color por tipo de movimiento del historial de inventario.
+    RenderFragment ChipTipoMovimiento(string tipo) => __builder =>
+    {
+        var (color, etiqueta) = tipo switch
+        {
+            "ENTRADA_CENTRAL" => (Color.Success, "Entrada central"),
+            "AJUSTE_CENTRAL" => (Color.Warning, "Ajuste central"),
+            "SALIDA_ZONA" => (Color.Info, "Salida a zona"),
+            "ENTRADA_ZONA" => (Color.Primary, "Entrada a zona"),
+            "AJUSTE_ZONA" => (Color.Warning, "Ajuste zona"),
+            "VENTA" => (Color.Error, "Venta"),
+            _ => (Color.Default, tipo)
+        };
+        <MudChip T="string" Size="Size.Small" Variant="Variant.Text" Color="@color">@etiqueta</MudChip>
+    };
+
+    // Línea secundaria con la clasificación del producto (marca · categoría · color · talla).
+    RenderFragment MetaProducto(string? marca, string? categoria, string? color, string? talla) => __builder =>
+    {
+        var partes = new[] { marca, categoria, color, talla }
+            .Where(s => !string.IsNullOrWhiteSpace(s))
+            .ToArray();
+        if (partes.Length == 0) return;
+        <div class="meta-producto">@string.Join(" · ", partes)</div>
+    };
+}
+
+<style>
+    .barra-acciones {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 16px;
+        flex-wrap: wrap;
+    }
+
+    .barra-acciones .buscador-remarcado { flex: 1 1 260px; min-width: 0; }
+    .boton-nuevo { white-space: nowrap; flex: 0 0 auto; }
+    .buscador-remarcado .mud-input-outlined-border { border-width: 2px; }
+
+    /* ===== Filtros del historial de inventario: compactos para que quepan en una línea ===== */
+    .barra-filtros-hist {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 16px;
+        flex-wrap: wrap;
+    }
+
+    /* Selectores (Tipo / Zona) toman el espacio sobrante pero sin crecer de más. */
+    .barra-filtros-hist .filtro-hist { flex: 1 1 130px; min-width: 110px; max-width: 200px; }
+    /* Las fechas son más angostas que los selectores. */
+    .barra-filtros-hist .filtro-hist-fecha { flex: 0 1 150px; min-width: 120px; max-width: 170px; }
+    /* Botones sin que el texto se parta y sin crecer. */
+    .barra-filtros-hist .boton-hist { white-space: nowrap; flex: 0 0 auto; }
+
+    .encabezado-seccion { display: flex; align-items: center; gap: 12px; }
+    .titulo-seccion { font-weight: 800; }
+
+    .panel-accion { position: sticky; top: 16px; }
+
+    /* Línea secundaria (marca · categoría · color · talla) bajo la descripción del producto. */
+    .meta-producto {
+        font-size: 0.72rem;
+        color: var(--mud-palette-text-secondary);
+        margin-top: 2px;
+        line-height: 1.1;
+    }
+
+    .tabs-remarcados .mud-tab { opacity: 0.65; font-weight: 500; transition: opacity 0.15s ease, background-color 0.15s ease; }
+    .tabs-remarcados .mud-tab.mud-tab-active { opacity: 1; font-weight: 800; background-color: rgba(255,255,255,0.18); border-radius: 8px 8px 0 0; }
+    .tabs-remarcados .mud-tab-slider { height: 4px; }
+
+    /* Resalta la fila seleccionada en las tablas de existencias. */
+    .fila-seleccionada { background-color: var(--mud-palette-primary-hover) !important; }
+</style>
+
+@code {
+    // ===================== INVENTARIO CENTRAL =====================
+    private List<ExistenciaCentralDto> _central = new();
+    private bool _cargandoCentral;
+    private string _busquedaCentral = "";
+    private ExistenciaCentralDto? _centralSeleccion;
+    private bool _centralEsAjuste;
+    private int _centralCantidad;
+    private string _centralObservaciones = "";
+    private bool _guardandoCentral;
+
+    private IEnumerable<ExistenciaCentralDto> CentralFiltrado => FiltrarCentral(_central, _busquedaCentral);
+
+    // ===================== EXISTENCIAS POR ZONA =====================
+    private List<ZonaDto> _zonas = new();
+    private long? _zonaSeleccionada;
+    private List<ExistenciaZonaDto> _existenciasZona = new();
+    private bool _cargandoZona;
+    private string _busquedaZona = "";
+    private ExistenciaZonaDto? _zonaSeleccion;
+    private int _zonaCantidad;
+    private string _zonaObservaciones = "";
+    private bool _guardandoZona;
+
+    private IEnumerable<ExistenciaZonaDto> ZonaFiltrado
+    {
+        get
+        {
+            var q = _busquedaZona?.Trim() ?? "";
+            if (string.IsNullOrEmpty(q)) return _existenciasZona;
+            return _existenciasZona.Where(x =>
+                (x.CodigoClave ?? "").Contains(q, StringComparison.OrdinalIgnoreCase)
+                || (x.Descripcion ?? "").Contains(q, StringComparison.OrdinalIgnoreCase)
+                || x.IdProducto.ToString().Contains(q, StringComparison.OrdinalIgnoreCase));
+        }
+    }
+
+    // ===================== ENVÍO A ZONAS (PROPUESTAS) =====================
+    private long? _propZonaDestino;
+    private string _propObservaciones = "";
+    private ExistenciaCentralDto? _propProductoSel;
+    private int _propCantidad = 1;
+    private readonly List<ArticuloPropuesta> _articulosPropuesta = new();
+    private bool _guardandoPropuesta;
+
+    private List<PropuestaDto> _propuestas = new();
+    private bool _cargandoPropuestas;
+    private string? _filtroEstatus;
+    private PropuestaDto? _propuestaDetalle;
+    private bool _cargandoDetalle;
+    private bool _resolviendoPropuesta;
+
+    // Historial de inventario (vista global con filtros).
+    private List<MovimientoHistorialDto> _historial = new();
+    private bool _cargandoHistorial;
+    private string? _histTipo;
+    private long? _histZona;
+    private DateTime? _histDesde;
+    private DateTime? _histHasta;
+
+    // Catálogo de tipos de movimiento para el filtro (clave backend -> etiqueta UI).
+    private static readonly Dictionary<string, string> _tiposMovimiento = new()
+    {
+        ["ENTRADA_CENTRAL"] = "Entradas a central",
+        ["AJUSTE_CENTRAL"] = "Ajustes de central",
+        ["SALIDA_ZONA"] = "Salidas a zona",
+        ["ENTRADA_ZONA"] = "Entradas a zona",
+        ["AJUSTE_ZONA"] = "Ajustes de zona",
+        ["VENTA"] = "Solo ventas"
+    };
+
+    // Línea de la propuesta en construcción (en memoria).
+    private sealed class ArticuloPropuesta
+    {
+        public long IdProducto { get; init; }
+        public string CodigoClave { get; init; } = "";
+        public string Descripcion { get; init; } = "";
+        public int Cantidad { get; set; }
+        public int ExistenciaCentral { get; init; }
+        public string? Marca { get; init; }
+        public string? Categoria { get; init; }
+        public string? Color { get; init; }
+        public string? Talla { get; init; }
+    }
+
+    private long? IdUsuarioActual => Api.Sesion?.IdUsuario;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CargarCentral();
+        await CargarZonas();
+        await CargarPropuestas();
+        await CargarHistorial();
+    }
+
+    // ===================== Carga de datos =====================
+
+    private async Task CargarCentral()
+    {
+        _cargandoCentral = true;
+        var (datos, error) = await Api.ObtenerExistenciasCentralAsync();
+        if (error is not null) _snackbar.Add(error, Severity.Error);
+        _central = datos ?? new();
+        _cargandoCentral = false;
+    }
+
+    private async Task CargarZonas()
+    {
+        var (datos, error) = await Api.ListarZonasOperativasAsync();
+        if (error is not null) _snackbar.Add(error, Severity.Error);
+        _zonas = datos ?? new();
+    }
+
+    private async Task CargarExistenciasZona()
+    {
+        if (_zonaSeleccionada is null) return;
+        _cargandoZona = true;
+        LimpiarSeleccionZona();
+        var (datos, error) = await Api.ObtenerExistenciasZonaAsync(_zonaSeleccionada.Value);
+        if (error is not null) _snackbar.Add(error, Severity.Error);
+        _existenciasZona = datos ?? new();
+        _cargandoZona = false;
+    }
+
+    // Al cambiar la zona en el selector, carga automáticamente sus existencias.
+    private async Task OnZonaSeleccionadaChanged(long? idZona)
+    {
+        _zonaSeleccionada = idZona;
+        if (idZona is null)
+        {
+            _existenciasZona = new();
+            LimpiarSeleccionZona();
+            return;
+        }
+        await CargarExistenciasZona();
+    }
+
+    private async Task CargarPropuestas()
+    {
+        _cargandoPropuestas = true;
+        var (datos, error) = await Api.ListarPropuestasAsync(
+            estatus: string.IsNullOrWhiteSpace(_filtroEstatus) ? null : _filtroEstatus,
+            idZona: null);
+        if (error is not null) _snackbar.Add(error, Severity.Error);
+        _propuestas = datos ?? new();
+        _cargandoPropuestas = false;
+    }
+
+    private async Task CargarHistorial()
+    {
+        _cargandoHistorial = true;
+        var tipos = string.IsNullOrWhiteSpace(_histTipo) ? null : new[] { _histTipo! };
+        DateTimeOffset? desde = _histDesde.HasValue ? FechaProyecto.DesdeFechaLocal(_histDesde.Value.Date) : null;
+        DateTimeOffset? hasta = _histHasta.HasValue ? FechaProyecto.DesdeFechaLocal(_histHasta.Value.Date) : null;
+        var (datos, error) = await Api.ObtenerHistorialGlobalAsync(tipos, _histZona, desde, hasta, max: 500);
+        if (error is not null) _snackbar.Add(error, Severity.Error);
+        _historial = datos ?? new();
+        _cargandoHistorial = false;
+    }
+
+    private async Task LimpiarFiltrosHistorial()
+    {
+        _histTipo = null;
+        _histZona = null;
+        _histDesde = null;
+        _histHasta = null;
+        await CargarHistorial();
+    }
+
+    // ===================== Inventario Central: acciones =====================
+
+    private void SeleccionarCentral(ExistenciaCentralDto? item)
+    {
+        if (item is null) return;
+        _centralSeleccion = item;
+        _centralCantidad = 0;
+        _centralObservaciones = "";
+        _centralEsAjuste = false;
+    }
+
+    private void LimpiarSeleccionCentral()
+    {
+        _centralSeleccion = null;
+        _centralCantidad = 0;
+        _centralObservaciones = "";
+        _centralEsAjuste = false;
+    }
+
+    private async Task AplicarMovimientoCentral()
+    {
+        if (_centralSeleccion is null) return;
+        if (!_centralEsAjuste && _centralCantidad <= 0)
+        {
+            _snackbar.Add("La cantidad a ingresar debe ser mayor a cero.", Severity.Warning);
+            return;
+        }
+
+        _guardandoCentral = true;
+        var req = new MovimientoCentralRequest(
+            _centralSeleccion.IdProducto, _centralCantidad, _centralEsAjuste,
+            string.IsNullOrWhiteSpace(_centralObservaciones) ? null : _centralObservaciones.Trim(),
+            IdUsuarioActual);
+
+        var (_, error) = await Api.RegistrarMovimientoCentralAsync(req);
+        _guardandoCentral = false;
+
+        if (error is not null) { _snackbar.Add(error, Severity.Error); return; }
+        _snackbar.Add($"Movimiento aplicado a '{_centralSeleccion.CodigoClave}'.", Severity.Success);
+        LimpiarSeleccionCentral();
+        await CargarCentral();
+    }
+
+    private string FilaCentralClass(ExistenciaCentralDto item, int _)
+        => _centralSeleccion is not null && _centralSeleccion.IdProducto == item.IdProducto ? "fila-seleccionada" : "";
+
+    // ===================== Existencias por Zona: acciones =====================
+
+    private void SeleccionarZona(ExistenciaZonaDto? item)
+    {
+        if (item is null) return;
+        _zonaSeleccion = item;
+        _zonaCantidad = item.Cantidad;
+        _zonaObservaciones = "";
+    }
+
+    private void LimpiarSeleccionZona()
+    {
+        _zonaSeleccion = null;
+        _zonaCantidad = 0;
+        _zonaObservaciones = "";
+    }
+
+    private async Task AplicarAjusteZona()
+    {
+        if (_zonaSeleccion is null || _zonaSeleccionada is null) return;
+
+        _guardandoZona = true;
+        // El ajuste de zona fija la cantidad exacta (EsAjuste = true).
+        var req = new MovimientoZonaRequest(
+            _zonaSeleccionada.Value, _zonaSeleccion.IdProducto, _zonaCantidad, true,
+            string.IsNullOrWhiteSpace(_zonaObservaciones) ? null : _zonaObservaciones.Trim(),
+            IdUsuarioActual);
+
+        var (_, error) = await Api.RegistrarMovimientoZonaAsync(req);
+        _guardandoZona = false;
+
+        if (error is not null) { _snackbar.Add(error, Severity.Error); return; }
+        _snackbar.Add($"Existencia de '{_zonaSeleccion.CodigoClave}' ajustada.", Severity.Success);
+        await CargarExistenciasZona();
+    }
+
+    private string FilaZonaClass(ExistenciaZonaDto item, int _)
+        => _zonaSeleccion is not null && _zonaSeleccion.IdProducto == item.IdProducto ? "fila-seleccionada" : "";
+
+    // ===================== Envío a Zonas: acciones =====================
+
+    private Task<IEnumerable<ExistenciaCentralDto>> BuscarProductoCentral(string? valor, CancellationToken ct)
+    {
+        IEnumerable<ExistenciaCentralDto> resultado = string.IsNullOrWhiteSpace(valor)
+            ? _central.Take(50)
+            : FiltrarCentral(_central, valor).Take(50);
+        return Task.FromResult(resultado);
+    }
+
+    private void AgregarArticuloPropuesta()
+    {
+        if (_propProductoSel is null) return;
+        if (_propCantidad <= 0)
+        {
+            _snackbar.Add("La cantidad a enviar debe ser mayor a cero.", Severity.Warning);
+            return;
+        }
+
+        var existente = _articulosPropuesta.FirstOrDefault(a => a.IdProducto == _propProductoSel.IdProducto);
+        if (existente is not null)
+        {
+            existente.Cantidad += _propCantidad;
+        }
+        else
+        {
+            _articulosPropuesta.Add(new ArticuloPropuesta
+            {
+                IdProducto = _propProductoSel.IdProducto,
+                CodigoClave = _propProductoSel.CodigoClave,
+                Descripcion = _propProductoSel.Descripcion,
+                Cantidad = _propCantidad,
+                ExistenciaCentral = _propProductoSel.Cantidad,
+                Marca = _propProductoSel.Marca,
+                Categoria = _propProductoSel.Categoria,
+                Color = _propProductoSel.Color,
+                Talla = _propProductoSel.Talla
+            });
+        }
+
+        _propProductoSel = null;
+        _propCantidad = 1;
+    }
+
+    private void QuitarArticulo(ArticuloPropuesta a) => _articulosPropuesta.Remove(a);
+
+    private void LimpiarPropuesta()
+    {
+        _articulosPropuesta.Clear();
+        _propObservaciones = "";
+        _propProductoSel = null;
+        _propCantidad = 1;
+    }
+
+    private async Task GuardarPropuesta()
+    {
+        if (_articulosPropuesta.Count == 0 || _propZonaDestino is null) return;
+
+        _guardandoPropuesta = true;
+        var detalles = _articulosPropuesta
+            .Select(a => new CrearPropuestaDetalleRequest(a.IdProducto, a.Cantidad))
+            .ToList();
+        var req = new CrearPropuestaRequest(_propZonaDestino.Value,
+            string.IsNullOrWhiteSpace(_propObservaciones) ? null : _propObservaciones.Trim(),
+            IdUsuarioActual, detalles);
+
+        var (datos, error) = await Api.CrearPropuestaAsync(req);
+        _guardandoPropuesta = false;
+
+        if (error is not null) { _snackbar.Add(error, Severity.Error); return; }
+        _snackbar.Add($"Propuesta #{datos?.IdPropuesta} creada correctamente.", Severity.Success);
+        LimpiarPropuesta();
+        _propZonaDestino = null;
+        await CargarPropuestas();
+    }
+
+    // Al seleccionar una propuesta carga su detalle completo (con artículos) en el panel lateral.
+    private async Task SeleccionarPropuesta(PropuestaDto? p)
+    {
+        if (p is null) return;
+        _propuestaDetalle = p;        // muestra lo que ya tenemos mientras llega el detalle
+        _cargandoDetalle = true;
+        var (datos, error) = await Api.ObtenerPropuestaAsync(p.IdPropuesta);
+        _cargandoDetalle = false;
+        if (error is not null) { _snackbar.Add(error, Severity.Error); return; }
+        if (datos is not null) _propuestaDetalle = datos;
+    }
+
+    private string FilaPropuestaClass(PropuestaDto item, int _)
+        => _propuestaDetalle is not null && _propuestaDetalle.IdPropuesta == item.IdPropuesta ? "fila-seleccionada" : "";
+
+    private async Task ConfirmarPropuestaSeleccionada()
+    {
+        if (_propuestaDetalle is null) return;
+        var p = _propuestaDetalle;
+        var ok = await ConfirmarDialogo(
+            "Confirmar y enviar",
+            $"¿Confirmar la propuesta #{p.IdPropuesta} hacia '{p.ZonaDestino}'? Esto descontará del central y cargará el inventario a la zona.",
+            "Confirmar y enviar", Color.Success);
+        if (!ok) return;
+
+        _resolviendoPropuesta = true;
+        var (datos, error) = await Api.ConfirmarPropuestaAsync(p.IdPropuesta, new ResolverPropuestaRequest(IdUsuarioActual));
+        _resolviendoPropuesta = false;
+        if (error is not null) { _snackbar.Add(error, Severity.Error); return; }
+        _snackbar.Add($"Propuesta #{p.IdPropuesta} confirmada y enviada.", Severity.Success);
+        _propuestaDetalle = datos;
+        await CargarPropuestas();
+        await CargarCentral();
+    }
+
+    private async Task RechazarPropuestaSeleccionada()
+    {
+        if (_propuestaDetalle is null) return;
+        var p = _propuestaDetalle;
+        var ok = await ConfirmarDialogo(
+            "Rechazar propuesta",
+            $"¿Rechazar la propuesta #{p.IdPropuesta} hacia '{p.ZonaDestino}'? No se moverá ningún inventario.",
+            "Rechazar", Color.Error);
+        if (!ok) return;
+
+        _resolviendoPropuesta = true;
+        var (datos, error) = await Api.RechazarPropuestaAdminAsync(p.IdPropuesta, new ResolverPropuestaRequest(IdUsuarioActual));
+        _resolviendoPropuesta = false;
+        if (error is not null) { _snackbar.Add(error, Severity.Error); return; }
+        _snackbar.Add($"Propuesta #{p.IdPropuesta} rechazada.", Severity.Success);
+        _propuestaDetalle = datos;
+        await CargarPropuestas();
+    }
+
+    // ===================== Helpers =====================
+
+    private static bool EsPendiente(string? estatus)
+        => string.Equals(estatus?.Trim(), "PENDIENTE", StringComparison.OrdinalIgnoreCase);
+
+    private static bool EsConfirmada(string? estatus)
+        => string.Equals(estatus?.Trim(), "CONFIRMADA", StringComparison.OrdinalIgnoreCase);
+
+    private static IEnumerable<ExistenciaCentralDto> FiltrarCentral(List<ExistenciaCentralDto> fuente, string? busqueda)
+    {
+        var q = busqueda?.Trim() ?? "";
+        if (string.IsNullOrEmpty(q)) return fuente;
+        return fuente.Where(x =>
+            (x.CodigoClave ?? "").Contains(q, StringComparison.OrdinalIgnoreCase)
+            || (x.Descripcion ?? "").Contains(q, StringComparison.OrdinalIgnoreCase)
+            || (x.Marca ?? "").Contains(q, StringComparison.OrdinalIgnoreCase)
+            || (x.Categoria ?? "").Contains(q, StringComparison.OrdinalIgnoreCase)
+            || x.IdProducto.ToString().Contains(q, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private async Task<bool> ConfirmarDialogo(string titulo, string mensaje, string textoAceptar, Color color)
+    {
+        var opciones = new DialogOptions { MaxWidth = MaxWidth.ExtraSmall, FullWidth = true };
+        var parametros = new DialogParameters<DialogoConfirmacion>
+        {
+            { x => x.Titulo, titulo },
+            { x => x.Mensaje, mensaje },
+            { x => x.TextoAceptar, textoAceptar },
+            { x => x.ColorAceptar, color },
+            { x => x.Icono, Icons.Material.Filled.CheckCircle },
+            { x => x.ColorIcono, color }
+        };
+        var dialogo = await _dialogo.ShowAsync<DialogoConfirmacion>(titulo, parametros, opciones);
+        var resultado = await dialogo.Result;
+        return resultado is { Canceled: false, Data: true };
+    }
+}

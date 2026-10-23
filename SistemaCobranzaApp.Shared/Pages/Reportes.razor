@@ -1,0 +1,975 @@
+@page "/reportes"
+
+@using MudBlazor
+@using SistemaCobranzaApp.Shared.Dtos
+@using SistemaCobranzaApp.Shared.Services
+@inject IDescargaArchivo Descarga
+@inject ApiCliente Api
+@inject ISnackbar Snackbar
+@inject NavigationManager Nav
+@inject IDialogService Dialogo
+
+<MudTabs Elevation="2" Rounded="true" Color="Color.Primary" ApplyEffectsToContainer="true"
+         PanelClass="pa-0 pt-4" SliderColor="Color.Warning" Class="ma-2 tabs-remarcados">
+
+    <!-- ===================== CARTERA ===================== -->
+    <MudTabPanel Text="Cartera" Icon="@Icons.Material.Filled.AccountBalanceWallet">
+        <MudPaper Elevation="0" Class="pa-4">
+            <div class="seccion-titulo mb-3">
+                <MudIcon Icon="@Icons.Material.Filled.FilterAlt" Size="Size.Small" Class="mr-1" />
+                Filtros de cartera
+            </div>
+            <MudGrid Spacing="2" Class="align-end">
+                <MudItem xs="12" sm="4">
+                    <MudSelect T="long?" Label="Zona" @bind-Value="_cartZona" Dense="true" Clearable="true"
+                               Variant="Variant.Outlined">
+                        <MudSelectItem T="long?" Value="@((long?)null)">Todas</MudSelectItem>
+                        @foreach (var z in _zonas)
+                        {
+                            <MudSelectItem T="long?" Value="@((long?)z.IdZona)">@z.Descripcion</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" sm="4">
+                    <MudSelect T="long?" Label="Ruta" @bind-Value="_cartRuta" Dense="true" Clearable="true"
+                               Variant="Variant.Outlined">
+                        <MudSelectItem T="long?" Value="@((long?)null)">Todas</MudSelectItem>
+                        @foreach (var r in _rutas)
+                        {
+                            <MudSelectItem T="long?" Value="@((long?)r.IdRuta)">@r.Descripcion</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" sm="4">
+                    <MudSelect T="long?" Label="Estatus de venta" @bind-Value="_cartEstatus" Dense="true" Clearable="true"
+                               Variant="Variant.Outlined">
+                        <MudSelectItem T="long?" Value="@((long?)null)">Todos</MudSelectItem>
+                        @foreach (var e in _estatusVenta)
+                        {
+                            <MudSelectItem T="long?" Value="@((long?)e.Id)">@e.Descripcion</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+            </MudGrid>
+
+            <div class="d-flex justify-end mt-3">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Assessment"
+                           OnClick="GenerarCarteraAsync" Disabled="_cargando">
+                    Generar reporte
+                </MudButton>
+            </div>
+        </MudPaper>
+
+        @if (_cargando && _tabActivo == 0)
+        {
+            @CargandoFragment
+        }
+        else if (_cartera is not null)
+        {
+            <MudPaper Elevation="0" Outlined="true" Class="pa-3 ma-2">
+                <div class="d-flex flex-wrap justify-space-between align-center mb-2">
+                    <div class="seccion-titulo">
+                        <MudIcon Icon="@Icons.Material.Filled.AccountBalanceWallet" Size="Size.Small" Class="mr-1" />
+                        Cartera (@_cartera.Total)
+                    </div>
+                    <MudChip T="string" Color="Color.Error" Variant="Variant.Filled">
+                        Saldo total: @_cartera.SaldoTotal.ToString("C2")
+                    </MudChip>
+                </div>
+                <div class="d-flex justify-end mb-3">
+                    <MudButton Variant="Variant.Outlined" Color="Color.Success" StartIcon="@Icons.Material.Filled.FileDownload"
+                               OnClick="ExportarCartera" Disabled="@(_cargando || _exportando || _cartera.Filas.Count == 0)">
+                        Exportar a Excel
+                    </MudButton>
+                </div>
+                <MudTable Items="_cartera.Filas" Hover="true" Dense="true" Breakpoint="Breakpoint.Sm"
+                          Elevation="0" RowsPerPage="15" T="ReporteCarteraFila">
+                    <HeaderContent>
+                        <MudTh>Venta</MudTh>
+                        <MudTh>Código</MudTh>
+                        <MudTh>Cliente</MudTh>
+                        <MudTh>Producto</MudTh>
+                        <MudTh>Ruta</MudTh>
+                        <MudTh>Zona</MudTh>
+                        <MudTh Style="text-align:right;">Total</MudTh>
+                        <MudTh Style="text-align:right;">Abonado</MudTh>
+                        <MudTh Style="text-align:right;">Saldo</MudTh>
+                        <MudTh>Estado</MudTh>
+                        <MudTh>Último pago</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd DataLabel="Venta">@context.IdVenta</MudTd>
+                        <MudTd DataLabel="Código"><b>@Mostrar(context.CodigoVenta)</b></MudTd>
+                        <MudTd DataLabel="Cliente">@context.Cliente</MudTd>
+                        <MudTd DataLabel="Producto">@Mostrar(context.Productos)</MudTd>
+                        <MudTd DataLabel="Ruta">@Mostrar(context.Ruta)</MudTd>
+                        <MudTd DataLabel="Zona">@Mostrar(context.Zona)</MudTd>
+                        <MudTd DataLabel="Total" Style="text-align:right;">@context.TotalFinal.ToString("C2")</MudTd>
+                        <MudTd DataLabel="Abonado" Style="text-align:right;">@context.TotalAbonos.ToString("C2")</MudTd>
+                        <MudTd DataLabel="Saldo" Style="text-align:right;"><b class="saldo-pendiente">@context.Saldo.ToString("C2")</b></MudTd>
+                        <MudTd DataLabel="Estado">@Mostrar(context.Estado)</MudTd>
+                        <MudTd DataLabel="Último pago">@FechaCorta(context.FechaUltimoPago)</MudTd>
+                    </RowTemplate>
+                    <NoRecordsContent>@SinDatosFragment</NoRecordsContent>
+                    <PagerContent>
+                        <MudTablePager InfoFormat="{first_item}-{last_item} de {all_items}" RowsPerPageString="Filas:" />
+                    </PagerContent>
+                </MudTable>
+            </MudPaper>
+        }
+    </MudTabPanel>
+
+    <!-- ===================== PAGOS ===================== -->
+    <MudTabPanel Text="Pagos" Icon="@Icons.Material.Filled.Payments">
+        <MudPaper Elevation="0" Class="pa-4">
+            <div class="seccion-titulo mb-3">
+                <MudIcon Icon="@Icons.Material.Filled.FilterAlt" Size="Size.Small" Class="mr-1" />
+                Filtros de pagos
+            </div>
+            <MudGrid Spacing="2" Class="align-end">
+                <MudItem xs="12" sm="6" md="2">
+                    <MudDatePicker Label="Desde" @bind-Date="_pagDesde" Variant="Variant.Outlined" Clearable="true" />
+                </MudItem>
+                <MudItem xs="12" sm="6" md="2">
+                    <MudDatePicker Label="Hasta" @bind-Date="_pagHasta" Variant="Variant.Outlined" Clearable="true" />
+                </MudItem>
+                <MudItem xs="12" sm="6" md="2">
+                    <MudSelect T="long?" Label="Cobrador" @bind-Value="_pagCobrador" Dense="true" Clearable="true"
+                               Variant="Variant.Outlined">
+                        <MudSelectItem T="long?" Value="@((long?)null)">Todos</MudSelectItem>
+                        @foreach (var c in _cobradores)
+                        {
+                            <MudSelectItem T="long?" Value="@((long?)c.IdCobrador)">@c.Nombre</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" sm="6" md="2">
+                    <MudSelect T="long?" Label="Zona" @bind-Value="_pagZona" Dense="true" Clearable="true"
+                               Variant="Variant.Outlined">
+                        <MudSelectItem T="long?" Value="@((long?)null)">Todas</MudSelectItem>
+                        @foreach (var z in _zonas)
+                        {
+                            <MudSelectItem T="long?" Value="@((long?)z.IdZona)">@z.Descripcion</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" sm="6" md="2">
+                    <MudSelect T="long?" Label="Ruta" @bind-Value="_pagRuta" Dense="true" Clearable="true"
+                               Variant="Variant.Outlined">
+                        <MudSelectItem T="long?" Value="@((long?)null)">Todas</MudSelectItem>
+                        @foreach (var r in _rutas)
+                        {
+                            <MudSelectItem T="long?" Value="@((long?)r.IdRuta)">@r.Descripcion</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" sm="6" md="2">
+                    <MudSelect T="long?" Label="Movimiento" @bind-Value="_pagMovimiento" Dense="true" Clearable="true"
+                               Variant="Variant.Outlined">
+                        <MudSelectItem T="long?" Value="@((long?)null)">Todos</MudSelectItem>
+                        @foreach (var m in _movimientos)
+                        {
+                            <MudSelectItem T="long?" Value="@((long?)m.Id)">@m.Descripcion</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+            </MudGrid>
+
+            <div class="d-flex justify-end mt-3">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Assessment"
+                           OnClick="GenerarPagosAsync" Disabled="_cargando">
+                    Generar reporte
+                </MudButton>
+            </div>
+        </MudPaper>
+
+        @if (_cargando && _tabActivo == 1)
+        {
+            @CargandoFragment
+        }
+        else if (_pagos is not null)
+        {
+            <MudPaper Elevation="0" Outlined="true" Class="pa-3 ma-2">
+                <div class="d-flex flex-wrap justify-space-between align-center mb-2">
+                    <div class="seccion-titulo">
+                        <MudIcon Icon="@Icons.Material.Filled.Payments" Size="Size.Small" Class="mr-1" />
+                        Pagos (@_pagos.Total)
+                    </div>
+                    <MudChip T="string" Color="Color.Success" Variant="Variant.Filled">
+                        Monto total: @_pagos.MontoTotal.ToString("C2")
+                    </MudChip>
+                </div>
+                <div class="d-flex justify-end mb-3">
+                    <MudButton Variant="Variant.Outlined" Color="Color.Success" StartIcon="@Icons.Material.Filled.FileDownload"
+                               OnClick="ExportarPagos" Disabled="@(_cargando || _exportando || _pagos.Filas.Count == 0)">
+                        Exportar a Excel
+                    </MudButton>
+                </div>
+                <MudTable Items="_pagos.Filas" Hover="true" Dense="true" Breakpoint="Breakpoint.Sm"
+                          Elevation="0" RowsPerPage="15" T="ReportePagoFila">
+                    <HeaderContent>
+                        <MudTh>Pago</MudTh>
+                        <MudTh>Folio</MudTh>
+                        <MudTh>Venta</MudTh>
+                        <MudTh>Cliente</MudTh>
+                        <MudTh>Producto</MudTh>
+                        <MudTh>Cobrador</MudTh>
+                        <MudTh>Movimiento</MudTh>
+                        <MudTh Style="text-align:right;">Total de venta</MudTh>
+                        <MudTh Style="text-align:right;">Abono</MudTh>
+                        <MudTh Style="text-align:right;">Saldo act.</MudTh>
+                        <MudTh>Fecha</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd DataLabel="Pago">@context.IdPago</MudTd>
+                        <MudTd DataLabel="Folio"><b>@Mostrar(context.FolioPago)</b></MudTd>
+                        <MudTd DataLabel="Venta">@context.IdVenta</MudTd>
+                        <MudTd DataLabel="Cliente">@context.Cliente</MudTd>
+                        <MudTd DataLabel="Producto">@Mostrar(context.Productos)</MudTd>
+                        <MudTd DataLabel="Cobrador">@Mostrar(context.Cobrador)</MudTd>
+                        <MudTd DataLabel="Movimiento">
+                            <MudChip T="string" Size="Size.Small" Variant="Variant.Text" Color="Color.Primary">
+                                @Mostrar(context.Movimiento)
+                            </MudChip>
+                        </MudTd>
+                        <MudTd DataLabel="Total de venta" Style="text-align:right;">@context.TotalVenta.ToString("C2")</MudTd>
+                        <MudTd DataLabel="Abono" Style="text-align:right;"><b>@context.MontoAbona.ToString("C2")</b></MudTd>
+                        <MudTd DataLabel="Saldo act." Style="text-align:right;">@context.SaldoActual.ToString("C2")</MudTd>
+                        <MudTd DataLabel="Fecha">@FechaHora(context.FechaPago)</MudTd>
+                    </RowTemplate>
+                    <NoRecordsContent>@SinDatosFragment</NoRecordsContent>
+                    <PagerContent>
+                        <MudTablePager InfoFormat="{first_item}-{last_item} de {all_items}" RowsPerPageString="Filas:" />
+                    </PagerContent>
+                </MudTable>
+            </MudPaper>
+        }
+    </MudTabPanel>
+
+    <!-- ===================== VENTAS ===================== -->
+    <MudTabPanel Text="Ventas" Icon="@Icons.Material.Filled.PointOfSale">
+        <MudPaper Elevation="0" Class="pa-4">
+            <div class="seccion-titulo mb-3">
+                <MudIcon Icon="@Icons.Material.Filled.FilterAlt" Size="Size.Small" Class="mr-1" />
+                Filtros de ventas
+            </div>
+            <MudGrid Spacing="2" Class="align-end">
+                <MudItem xs="12" sm="4">
+                    <MudDatePicker Label="Desde" @bind-Date="_venDesde" Variant="Variant.Outlined" Clearable="true" />
+                </MudItem>
+                <MudItem xs="12" sm="4">
+                    <MudDatePicker Label="Hasta" @bind-Date="_venHasta" Variant="Variant.Outlined" Clearable="true" />
+                </MudItem>
+                <MudItem xs="12" sm="4">
+                    <MudSelect T="long?" Label="Vendedor" @bind-Value="_venVendedor" Dense="true" Clearable="true"
+                               Variant="Variant.Outlined">
+                        <MudSelectItem T="long?" Value="@((long?)null)">Todos</MudSelectItem>
+                        @foreach (var v in _vendedores)
+                        {
+                            <MudSelectItem T="long?" Value="@((long?)v.IdVendedor)">@v.Nombre</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudSelect T="long?" Label="Zona" @bind-Value="_venZona" Dense="true" Clearable="true"
+                               Variant="Variant.Outlined">
+                        <MudSelectItem T="long?" Value="@((long?)null)">Todas</MudSelectItem>
+                        @foreach (var z in _zonas)
+                        {
+                            <MudSelectItem T="long?" Value="@((long?)z.IdZona)">@z.Descripcion</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudSelect T="long?" Label="Ruta" @bind-Value="_venRuta" Dense="true" Clearable="true"
+                               Variant="Variant.Outlined">
+                        <MudSelectItem T="long?" Value="@((long?)null)">Todas</MudSelectItem>
+                        @foreach (var r in _rutas)
+                        {
+                            <MudSelectItem T="long?" Value="@((long?)r.IdRuta)">@r.Descripcion</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+            </MudGrid>
+
+            <div class="d-flex justify-end mt-3">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Assessment"
+                           OnClick="GenerarVentasAsync" Disabled="_cargando">
+                    Generar reporte
+                </MudButton>
+            </div>
+        </MudPaper>
+
+        @if (_cargando && _tabActivo == 2)
+        {
+            @CargandoFragment
+        }
+        else if (_ventas is not null)
+        {
+            <MudPaper Elevation="0" Outlined="true" Class="pa-3 ma-2">
+                <div class="d-flex flex-wrap justify-space-between align-center mb-2">
+                    <div class="seccion-titulo">
+                        <MudIcon Icon="@Icons.Material.Filled.PointOfSale" Size="Size.Small" Class="mr-1" />
+                        Ventas (@_ventas.Total)
+                    </div>
+                    <MudChip T="string" Color="Color.Info" Variant="Variant.Filled">
+                        Monto total: @_ventas.MontoTotal.ToString("C2")
+                    </MudChip>
+                </div>
+                <div class="d-flex justify-end mb-3">
+                    <MudButton Variant="Variant.Outlined" Color="Color.Success" StartIcon="@Icons.Material.Filled.FileDownload"
+                               OnClick="ExportarVentas" Disabled="@(_cargando || _exportando || _ventas.Filas.Count == 0)">
+                        Exportar a Excel
+                    </MudButton>
+                </div>
+                <MudTable Items="_ventas.Filas" Hover="true" Dense="true" Breakpoint="Breakpoint.Sm"
+                          Elevation="0" RowsPerPage="15" T="ReporteVentaFila">
+                    <HeaderContent>
+                        <MudTh>Venta</MudTh>
+                        <MudTh>Código</MudTh>
+                        <MudTh>Cliente</MudTh>
+                        <MudTh>Producto</MudTh>
+                        <MudTh>Vendedor</MudTh>
+                        <MudTh Style="text-align:right;">Total</MudTh>
+                        <MudTh Style="text-align:right;">Enganche</MudTh>
+                        <MudTh Style="text-align:right;">Saldo</MudTh>
+                        <MudTh>Estado</MudTh>
+                        <MudTh>Fecha</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd DataLabel="Venta">@context.IdVenta</MudTd>
+                        <MudTd DataLabel="Código"><b>@Mostrar(context.CodigoVenta)</b></MudTd>
+                        <MudTd DataLabel="Cliente">@context.Cliente</MudTd>
+                        <MudTd DataLabel="Producto">@Mostrar(context.Productos)</MudTd>
+                        <MudTd DataLabel="Vendedor">@Mostrar(context.Vendedor)</MudTd>
+                        <MudTd DataLabel="Total" Style="text-align:right;"><b>@context.TotalFinal.ToString("C2")</b></MudTd>
+                        <MudTd DataLabel="Enganche" Style="text-align:right;">@context.Enganche.ToString("C2")</MudTd>
+                        <MudTd DataLabel="Saldo" Style="text-align:right;">@context.Saldo.ToString("C2")</MudTd>
+                        <MudTd DataLabel="Estado">@Mostrar(context.Estado)</MudTd>
+                        <MudTd DataLabel="Fecha">@FechaCorta(context.FechaCompra)</MudTd>
+                    </RowTemplate>
+                    <NoRecordsContent>@SinDatosFragment</NoRecordsContent>
+                    <PagerContent>
+                        <MudTablePager InfoFormat="{first_item}-{last_item} de {all_items}" RowsPerPageString="Filas:" />
+                    </PagerContent>
+                </MudTable>
+            </MudPaper>
+        }
+    </MudTabPanel>
+
+    <!-- ===================== RECUPERACIÓN ===================== -->
+    <MudTabPanel Text="Recuperación" Icon="@Icons.Material.Filled.TrendingUp">
+        <MudPaper Elevation="0" Class="pa-4">
+            <div class="seccion-titulo mb-3">
+                <MudIcon Icon="@Icons.Material.Filled.FilterAlt" Size="Size.Small" Class="mr-1" />
+                Filtros de recuperación
+            </div>
+            <MudGrid Spacing="2" Class="align-end">
+                <MudItem xs="12" sm="6">
+                    <MudDatePicker Label="Desde" @bind-Date="_recDesde" Variant="Variant.Outlined" Clearable="true" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudDatePicker Label="Hasta" @bind-Date="_recHasta" Variant="Variant.Outlined" Clearable="true" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudSelect T="long?" Label="Zona" @bind-Value="_recZona" Dense="true" Clearable="true"
+                               Variant="Variant.Outlined">
+                        <MudSelectItem T="long?" Value="@((long?)null)">Todas</MudSelectItem>
+                        @foreach (var z in _zonas)
+                        {
+                            <MudSelectItem T="long?" Value="@((long?)z.IdZona)">@z.Descripcion</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudSelect T="long?" Label="Ruta" @bind-Value="_recRuta" Dense="true" Clearable="true"
+                               Variant="Variant.Outlined">
+                        <MudSelectItem T="long?" Value="@((long?)null)">Todas</MudSelectItem>
+                        @foreach (var r in _rutas)
+                        {
+                            <MudSelectItem T="long?" Value="@((long?)r.IdRuta)">@r.Descripcion</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+            </MudGrid>
+
+            <div class="d-flex justify-end mt-3">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Assessment"
+                           OnClick="GenerarRecuperacionAsync" Disabled="_cargando">
+                    Generar reporte
+                </MudButton>
+            </div>
+        </MudPaper>
+
+        @if (_cargando && _tabActivo == 3)
+        {
+            @CargandoFragment
+        }
+        else if (_recuperacion is not null)
+        {
+            <MudPaper Elevation="0" Outlined="true" Class="pa-3 ma-2">
+                <div class="d-flex flex-wrap justify-space-between align-center mb-2">
+                    <div class="seccion-titulo">
+                        <MudIcon Icon="@Icons.Material.Filled.TrendingUp" Size="Size.Small" Class="mr-1" />
+                        Recuperación por cobrador (@_recuperacion.Filas.Count)
+                    </div>
+                    <MudChip T="string" Color="Color.Success" Variant="Variant.Filled">
+                        Monto total: @_recuperacion.MontoTotal.ToString("C2")
+                    </MudChip>
+                </div>
+                <div class="d-flex justify-end mb-3">
+                    <MudButton Variant="Variant.Outlined" Color="Color.Success" StartIcon="@Icons.Material.Filled.FileDownload"
+                               OnClick="ExportarRecuperacion" Disabled="@(_cargando || _exportando || _recuperacion.Filas.Count == 0)">
+                        Exportar a Excel
+                    </MudButton>
+                </div>
+                <MudTable Items="_recuperacion.Filas" Hover="true" Dense="true" Breakpoint="Breakpoint.Sm"
+                          Elevation="0" RowsPerPage="15" T="ReporteRecuperacionFila">
+                    <HeaderContent>
+                        <MudTh>Cobrador</MudTh>
+                        <MudTh Style="text-align:right;">N.° de pagos</MudTh>
+                        <MudTh Style="text-align:right;">Monto cobrado</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd DataLabel="Cobrador"><b>@context.Cobrador</b></MudTd>
+                        <MudTd DataLabel="N.° de pagos" Style="text-align:right;">@context.NumeroPagos</MudTd>
+                        <MudTd DataLabel="Monto cobrado" Style="text-align:right;"><b>@context.MontoCobrado.ToString("C2")</b></MudTd>
+                    </RowTemplate>
+                    <NoRecordsContent>@SinDatosFragment</NoRecordsContent>
+                    <PagerContent>
+                        <MudTablePager InfoFormat="{first_item}-{last_item} de {all_items}" RowsPerPageString="Filas:" />
+                    </PagerContent>
+                </MudTable>
+            </MudPaper>
+        }
+    </MudTabPanel>
+
+    <!-- ===================== CLIENTES ===================== -->
+    <MudTabPanel Text="Clientes" Icon="@Icons.Material.Filled.People">
+        <MudPaper Elevation="0" Class="pa-4">
+            <div class="seccion-titulo mb-3">
+                <MudIcon Icon="@Icons.Material.Filled.FilterAlt" Size="Size.Small" Class="mr-1" />
+                Filtros de clientes
+            </div>
+            <MudGrid Spacing="2" Class="align-end">
+                <MudItem xs="12" sm="4">
+                    <MudSelect T="long?" Label="Zona" @bind-Value="_cliZona" Dense="true" Clearable="true"
+                               Variant="Variant.Outlined">
+                        <MudSelectItem T="long?" Value="@((long?)null)">Todas</MudSelectItem>
+                        @foreach (var z in _zonas)
+                        {
+                            <MudSelectItem T="long?" Value="@((long?)z.IdZona)">@z.Descripcion</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" sm="4">
+                    <MudSelect T="long?" Label="Ruta" @bind-Value="_cliRuta" Dense="true" Clearable="true"
+                               Variant="Variant.Outlined">
+                        <MudSelectItem T="long?" Value="@((long?)null)">Todas</MudSelectItem>
+                        @foreach (var r in _rutas)
+                        {
+                            <MudSelectItem T="long?" Value="@((long?)r.IdRuta)">@r.Descripcion</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" sm="4">
+                    <MudSelect T="long?" Label="Clasificación" @bind-Value="_cliClasificacion" Dense="true" Clearable="true"
+                               Variant="Variant.Outlined">
+                        <MudSelectItem T="long?" Value="@((long?)null)">Todas</MudSelectItem>
+                        @foreach (var c in _clasificaciones)
+                        {
+                            <MudSelectItem T="long?" Value="@((long?)c.IdClasificaionCliente)">@c.Descripcion</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" sm="12" Class="d-flex align-center">
+                    <MudSwitch T="bool" @bind-Value="_cliIncluirInactivos" Color="Color.Primary" Label="Incluir inactivos" />
+                </MudItem>
+            </MudGrid>
+
+            <div class="d-flex justify-end mt-3">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Assessment"
+                           OnClick="GenerarClientesAsync" Disabled="_cargando">
+                    Generar reporte
+                </MudButton>
+            </div>
+        </MudPaper>
+
+        @if (_cargando && _tabActivo == 4)
+        {
+            @CargandoFragment
+        }
+        else if (_clientes is not null)
+        {
+            <MudPaper Elevation="0" Outlined="true" Class="pa-3 ma-2">
+                <div class="d-flex flex-wrap justify-space-between align-center mb-2">
+                    <div class="seccion-titulo">
+                        <MudIcon Icon="@Icons.Material.Filled.People" Size="Size.Small" Class="mr-1" />
+                        Clientes (@_clientes.Total)
+                    </div>
+                </div>
+                <div class="d-flex justify-end mb-3">
+                    <MudButton Variant="Variant.Outlined" Color="Color.Success" StartIcon="@Icons.Material.Filled.FileDownload"
+                               OnClick="ExportarClientes" Disabled="@(_cargando || _exportando || _clientes.Filas.Count == 0)">
+                        Exportar a Excel
+                    </MudButton>
+                </div>
+                <MudTable Items="_clientes.Filas" Hover="true" Dense="true" Breakpoint="Breakpoint.Sm"
+                          Elevation="0" RowsPerPage="15" T="ReporteClienteFila">
+                    <HeaderContent>
+                        <MudTh>ID</MudTh>
+                        <MudTh>Cliente</MudTh>
+                        <MudTh>Ruta</MudTh>
+                        <MudTh>Zona</MudTh>
+                        <MudTh>Clasificación</MudTh>
+                        <MudTh Style="text-align:center;">Estatus</MudTh>
+                        <MudTh>Alta</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd DataLabel="ID">@context.IdCliente</MudTd>
+                        <MudTd DataLabel="Cliente"><b>@context.Cliente</b></MudTd>
+                        <MudTd DataLabel="Ruta">@Mostrar(context.Ruta)</MudTd>
+                        <MudTd DataLabel="Zona">@Mostrar(context.Zona)</MudTd>
+                        <MudTd DataLabel="Clasificación">@Mostrar(context.Clasificacion)</MudTd>
+                        <MudTd DataLabel="Estatus" Style="text-align:center;">
+                            <MudChip T="string" Size="Size.Small" Variant="Variant.Filled"
+                                     Color="@(context.Activo ? Color.Success : Color.Default)">
+                                @(context.Activo ? "Activo" : "Inactivo")
+                            </MudChip>
+                        </MudTd>
+                        <MudTd DataLabel="Alta">@FechaCorta(context.FechaAlta)</MudTd>
+                    </RowTemplate>
+                    <NoRecordsContent>@SinDatosFragment</NoRecordsContent>
+                    <PagerContent>
+                        <MudTablePager InfoFormat="{first_item}-{last_item} de {all_items}" RowsPerPageString="Filas:" />
+                    </PagerContent>
+                </MudTable>
+            </MudPaper>
+        }
+    </MudTabPanel>
+
+    <!-- ===================== SEGUIMIENTO ===================== -->
+    <MudTabPanel Text="Seguimiento" Icon="@Icons.Material.Filled.EventNote">
+        <MudPaper Elevation="0" Class="pa-4">
+            <div class="seccion-titulo mb-3">
+                <MudIcon Icon="@Icons.Material.Filled.FilterAlt" Size="Size.Small" Class="mr-1" />
+                Filtros de seguimiento
+            </div>
+            <MudGrid Spacing="2" Class="align-end">
+                <MudItem xs="12" sm="4">
+                    <MudSelect T="long?" Label="Zona" @bind-Value="_segZona" Dense="true" Clearable="true"
+                               Variant="Variant.Outlined">
+                        <MudSelectItem T="long?" Value="@((long?)null)">Todas</MudSelectItem>
+                        @foreach (var z in _zonas)
+                        {
+                            <MudSelectItem T="long?" Value="@((long?)z.IdZona)">@z.Descripcion</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" sm="4">
+                    <MudDatePicker Label="Alta desde" @bind-Date="_segAltaDesde" Variant="Variant.Outlined" Clearable="true" />
+                </MudItem>
+                <MudItem xs="12" sm="4">
+                    <MudDatePicker Label="Alta hasta" @bind-Date="_segAltaHasta" Variant="Variant.Outlined" Clearable="true" />
+                </MudItem>
+            </MudGrid>
+
+            <div class="d-flex justify-end mt-3">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Assessment"
+                           OnClick="GenerarSeguimientoAsync" Disabled="_cargando">
+                    Generar reporte
+                </MudButton>
+            </div>
+        </MudPaper>
+
+        @if (_cargando && _tabActivo == 5)
+        {
+            @CargandoFragment
+        }
+        else if (_seguimiento is not null)
+        {
+            <MudPaper Elevation="0" Outlined="true" Class="pa-3 ma-2">
+                <div class="d-flex flex-wrap justify-space-between align-center mb-2">
+                    <div class="seccion-titulo">
+                        <MudIcon Icon="@Icons.Material.Filled.EventNote" Size="Size.Small" Class="mr-1" />
+                        Seguimiento (@_seguimiento.Total)
+                    </div>
+                    <MudChip T="string" Color="Color.Error" Variant="Variant.Filled">
+                        Pendiente total: @_seguimiento.TotalPendienteGlobal.ToString("C2")
+                    </MudChip>
+                </div>
+                <div class="d-flex justify-end mb-3">
+                    <MudButton Variant="Variant.Outlined" Color="Color.Success" StartIcon="@Icons.Material.Filled.FileDownload"
+                               OnClick="ExportarSeguimiento" Disabled="@(_cargando || _exportando || _seguimiento.Filas.Count == 0)">
+                        Exportar a Excel
+                    </MudButton>
+                </div>
+                <MudTextField T="string" @bind-Value="_segBusqueda" Immediate="true"
+                              Placeholder="Buscar por ID o nombre del cliente…" Variant="Variant.Outlined"
+                              Margin="Margin.Dense" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
+                              Clearable="true" Class="mb-3" />
+                <MudTable Items="_seguimiento.Filas" Hover="true" Dense="true" Breakpoint="Breakpoint.Sm"
+                          Elevation="0" RowsPerPage="20" T="ReporteSeguimientoFila" Class="tabla-seguimiento"
+                          Filter="new Func<ReporteSeguimientoFila, bool>(FiltrarSeguimiento)">
+                    <HeaderContent>
+                        <MudTh><MudTableSortLabel SortBy="new Func<ReporteSeguimientoFila, object>(x => x.IdCliente)">ID</MudTableSortLabel></MudTh>
+                        <MudTh><MudTableSortLabel SortBy="new Func<ReporteSeguimientoFila, object>(x => x.Cliente)">Cliente</MudTableSortLabel></MudTh>
+                        <MudTh><MudTableSortLabel SortBy="new Func<ReporteSeguimientoFila, object>(x => x.FolioVenta ?? string.Empty)">Folio</MudTableSortLabel></MudTh>
+                        <MudTh>Producto</MudTh>
+                        <MudTh Style="text-align:right;"><MudTableSortLabel SortBy="new Func<ReporteSeguimientoFila, object>(x => x.TotalVenta)">Total venta</MudTableSortLabel></MudTh>
+                        <MudTh Style="text-align:right;"><MudTableSortLabel SortBy="new Func<ReporteSeguimientoFila, object>(x => x.TotalCobrado)">Cobrado</MudTableSortLabel></MudTh>
+                        <MudTh Style="text-align:right;"><MudTableSortLabel SortBy="new Func<ReporteSeguimientoFila, object>(x => x.TotalPendiente)">Pendiente</MudTableSortLabel></MudTh>
+                        <MudTh><MudTableSortLabel SortBy="new Func<ReporteSeguimientoFila, object>(x => x.FechaVenta)">F. venta</MudTableSortLabel></MudTh>
+                        <MudTh><MudTableSortLabel SortBy="new Func<ReporteSeguimientoFila, object>(x => (object?)x.FechaUltimoPago ?? DateTimeOffset.MinValue)">Último pago</MudTableSortLabel></MudTh>
+                        <MudTh Style="text-align:right;"><MudTableSortLabel InitialDirection="SortDirection.Descending" SortBy="new Func<ReporteSeguimientoFila, object>(x => x.DiasTranscurridos)">Días</MudTableSortLabel></MudTh>
+                        <MudTh><MudTableSortLabel SortBy="new Func<ReporteSeguimientoFila, object>(x => x.Clasificacion ?? string.Empty)">Clasificación</MudTableSortLabel></MudTh>
+                        <MudTh Style="text-align:center;">Acción</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd DataLabel="ID">@context.IdCliente</MudTd>
+                        <MudTd DataLabel="Cliente"><b>@context.Cliente</b></MudTd>
+                        <MudTd DataLabel="Folio">@Mostrar(context.FolioVenta)</MudTd>
+                        <MudTd DataLabel="Producto">@Mostrar(context.Productos)</MudTd>
+                        <MudTd DataLabel="Total venta" Style="text-align:right;">@context.TotalVenta.ToString("C2")</MudTd>
+                        <MudTd DataLabel="Cobrado" Style="text-align:right;">@context.TotalCobrado.ToString("C2")</MudTd>
+                        <MudTd DataLabel="Pendiente" Style="text-align:right;"><b class="saldo-pendiente">@context.TotalPendiente.ToString("C2")</b></MudTd>
+                        <MudTd DataLabel="F. venta">@FechaCorta(context.FechaVenta)</MudTd>
+                        <MudTd DataLabel="Último pago">@FechaCorta(context.FechaUltimoPago)</MudTd>
+                        <MudTd DataLabel="Días" Style="text-align:right;">
+                            <MudChip T="string" Size="Size.Small" Variant="Variant.Filled" Color="@ColorDias(context.DiasTranscurridos)">
+                                @context.DiasTranscurridos
+                            </MudChip>
+                        </MudTd>
+                        <MudTd DataLabel="Clasificación">@Mostrar(context.Clasificacion)</MudTd>
+                        <MudTd DataLabel="Acción" Style="text-align:center;">
+                            <MudButton Size="Size.Small" Variant="Variant.Text" Color="Color.Primary"
+                                       StartIcon="@Icons.Material.Filled.Edit"
+                                       OnClick="@(() => AbrirDialogoClasificacionAsync(context))">
+                                Estatus
+                            </MudButton>
+                        </MudTd>
+                    </RowTemplate>
+                    <NoRecordsContent>@SinDatosFragment</NoRecordsContent>
+                    <PagerContent>
+                        <MudTablePager InfoFormat="{first_item}-{last_item} de {all_items}" RowsPerPageString="Filas:" />
+                    </PagerContent>
+                </MudTable>
+            </MudPaper>
+        }
+    </MudTabPanel>
+</MudTabs>
+
+<style>
+    /* Texto pequeño para que la tabla de seguimiento (muchas columnas) quepa mejor. */
+    .tabla-seguimiento .mud-table-cell,
+    .tabla-seguimiento .mud-table-cell .mud-button-label,
+    .tabla-seguimiento th.mud-table-cell {
+        font-size: 0.72rem;
+        padding: 2px 6px;
+    }
+</style>
+
+@code {
+    // Catálogos para los combos de filtros.
+    private List<ZonaDto> _zonas = new();
+    private List<RutaAdminDto> _rutas = new();
+    private List<EstatusVentaDto> _estatusVenta = new();
+    private List<CobradorDto> _cobradores = new();
+    private List<VendedorDto> _vendedores = new();
+    private List<ClasificaionClienteDto> _clasificaciones = new();
+    private List<MovimientoDto> _movimientos = new();
+
+    private bool _cargando, _exportando;
+    private int _tabActivo; // Para mostrar el spinner solo en la pestaña que genera.
+
+    // ---- Cartera ----
+    private long? _cartZona;
+    private long? _cartRuta;
+    private long? _cartEstatus;
+    private ReporteCarteraResponse? _cartera;
+
+    // ---- Pagos ----
+    private DateTime? _pagDesde = FechaProyecto.Hoy.AddDays(-30);
+    private DateTime? _pagHasta = FechaProyecto.Hoy;
+    private long? _pagCobrador;
+    private long? _pagZona;
+    private long? _pagRuta;
+    private long? _pagMovimiento;
+    private ReportePagosResponse? _pagos;
+
+    // ---- Ventas ----
+    private DateTime? _venDesde = FechaProyecto.Hoy.AddDays(-30);
+    private DateTime? _venHasta = FechaProyecto.Hoy;
+    private long? _venVendedor;
+    private long? _venZona;
+    private long? _venRuta;
+    private ReporteVentasResponse? _ventas;
+
+    // ---- Recuperación ----
+    private DateTime? _recDesde = FechaProyecto.Hoy.AddDays(-30);
+    private DateTime? _recHasta = FechaProyecto.Hoy;
+    private long? _recZona;
+    private long? _recRuta;
+    private ReporteRecuperacionResponse? _recuperacion;
+
+    // ---- Clientes ----
+    private long? _cliRuta;
+    private long? _cliClasificacion;
+    private bool _cliIncluirInactivos;
+    private long? _cliZona;
+    private ReporteClientesResponse? _clientes;
+
+    // ---- Seguimiento ----
+    private long? _segZona;
+    private DateTime? _segAltaDesde;
+    private DateTime? _segAltaHasta;
+    private ReporteSeguimientoResponse? _seguimiento;
+    private string? _segBusqueda;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Api.CargarSesionDesdeAlmacenamientoAsync();
+        if (!Api.Autenticado)
+        {
+            Nav.NavigateTo("/login");
+            return;
+        }
+
+        await CargarCatalogosAsync();
+    }
+
+    // Carga en paralelo todos los catálogos de los combos. Los errores se ignoran de forma suave
+    // (el combo simplemente queda vacío); los reportes se pueden generar igualmente sin filtros.
+    private async Task CargarCatalogosAsync()
+    {
+        var tZonas = Api.ListarZonasOperativasAsync();
+        var tRutas = Api.ListarRutasOperativasAsync();
+        var tEstatus = Api.ListarEstatusVentaOperativosAsync();
+        var tCobradores = Api.ListarCobradoresOperativosAsync();
+        var tVendedores = Api.ListarVendedoresOperativosAsync();
+        var tClasificaciones = Api.ListarClasificacionesClienteOperativasAsync();
+        var tMovimientos = Api.ListarMovimientosOperativosAsync();
+
+        await Task.WhenAll(tZonas, tRutas, tEstatus, tCobradores, tVendedores, tClasificaciones, tMovimientos);
+
+        _zonas = (await tZonas).datos ?? new();
+        _rutas = (await tRutas).datos ?? new();
+        _estatusVenta = (await tEstatus).datos ?? new();
+        _cobradores = (await tCobradores).datos ?? new();
+        _vendedores = (await tVendedores).datos ?? new();
+        _clasificaciones = (await tClasificaciones).datos ?? new();
+        _movimientos = (await tMovimientos).datos ?? new();
+    }
+
+    // ===================== Generadores de cada reporte =====================
+
+    private async Task GenerarCarteraAsync()
+    {
+        _tabActivo = 0;
+        _cargando = true;
+        try
+        {
+            var (datos, error) = await Api.ReporteCarteraAsync(_cartZona, _cartRuta, _cartEstatus);
+            if (error is not null) { Snackbar.Add(error, Severity.Error); return; }
+            _cartera = datos;
+        }
+        finally { _cargando = false; }
+    }
+
+    private async Task GenerarPagosAsync()
+    {
+        _tabActivo = 1;
+        _cargando = true;
+        try
+        {
+            var (datos, error) = await Api.ReportePagosAsync(ADesde(_pagDesde), AHasta(_pagHasta), _pagCobrador, _pagZona, _pagRuta, _pagMovimiento);
+            if (error is not null) { Snackbar.Add(error, Severity.Error); return; }
+            _pagos = datos;
+        }
+        finally { _cargando = false; }
+    }
+
+    private async Task GenerarVentasAsync()
+    {
+        _tabActivo = 2;
+        _cargando = true;
+        try
+        {
+            var (datos, error) = await Api.ReporteVentasAsync(ADesde(_venDesde), AHasta(_venHasta), _venVendedor, _venZona, _venRuta);
+            if (error is not null) { Snackbar.Add(error, Severity.Error); return; }
+            _ventas = datos;
+        }
+        finally { _cargando = false; }
+    }
+
+    private async Task GenerarRecuperacionAsync()
+    {
+        _tabActivo = 3;
+        _cargando = true;
+        try
+        {
+            var (datos, error) = await Api.ReporteRecuperacionAsync(ADesde(_recDesde), AHasta(_recHasta), _recZona, _recRuta);
+            if (error is not null) { Snackbar.Add(error, Severity.Error); return; }
+            _recuperacion = datos;
+        }
+        finally { _cargando = false; }
+    }
+
+    private async Task GenerarClientesAsync()
+    {
+        _tabActivo = 4;
+        _cargando = true;
+        try
+        {
+            var (datos, error) = await Api.ReporteClientesAsync(_cliRuta, _cliClasificacion, _cliIncluirInactivos, _cliZona);
+            if (error is not null) { Snackbar.Add(error, Severity.Error); return; }
+            _clientes = datos;
+        }
+        finally { _cargando = false; }
+    }
+
+    private async Task GenerarSeguimientoAsync()
+    {
+        _tabActivo = 5;
+        _cargando = true;
+        try
+        {
+            var (datos, error) = await Api.ReporteSeguimientoAsync(_segZona, ADesde(_segAltaDesde), AHasta(_segAltaHasta));
+            if (error is not null) { Snackbar.Add(error, Severity.Error); return; }
+            _seguimiento = datos;
+        }
+        finally { _cargando = false; }
+    }
+
+    // Filtro en memoria de la tabla de seguimiento por ID o nombre del cliente (sin regenerar el reporte).
+    private bool FiltrarSeguimiento(ReporteSeguimientoFila f)
+    {
+        var texto = _segBusqueda?.Trim();
+        if (string.IsNullOrWhiteSpace(texto)) return true;
+        return f.IdCliente.ToString().Contains(texto, StringComparison.OrdinalIgnoreCase)
+            || f.Cliente.Contains(texto, StringComparison.OrdinalIgnoreCase);
+    }
+
+    // Abre un diálogo con selector de clasificación + observaciones; al guardar, persiste y refleja
+    // el cambio en memoria para todas las ventas del mismo cliente.
+    private async Task AbrirDialogoClasificacionAsync(ReporteSeguimientoFila fila)
+    {
+        var parametros = new DialogParameters<Components.DialogoClasificacionCliente>
+        {
+            { x => x.Cliente, fila.Cliente },
+            { x => x.IdClasificacionActual, fila.IdClasificacion ?? 0 },
+            { x => x.ObservacionesActuales, fila.Observaciones },
+            { x => x.Clasificaciones, _clasificaciones }
+        };
+        var dialogo = await Dialogo.ShowAsync<Components.DialogoClasificacionCliente>("Actualizar estatus", parametros,
+            new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.ExtraSmall, FullWidth = true });
+        if (await dialogo.Result is not { Canceled: false, Data: ResultadoClasificacionCliente r }) return;
+        if (r.IdClasificacion <= 0) { Snackbar.Add("Selecciona una clasificación válida.", Severity.Warning); return; }
+
+        var (datos, error) = await Api.ActualizarClasificacionClienteAsync(fila.IdCliente, r.IdClasificacion, r.Observaciones);
+        if (error is not null || datos is null) { Snackbar.Add(error ?? "No se pudo actualizar la clasificación.", Severity.Error); return; }
+
+        // Actualizamos en memoria todas las filas del mismo cliente (puede tener varias ventas).
+        if (_seguimiento is not null)
+        {
+            var nuevas = _seguimiento.Filas
+                .Select(f => f.IdCliente == fila.IdCliente
+                    ? f with { IdClasificacion = datos.IdClasificacion, Clasificacion = datos.ClasificacionNombre, Observaciones = datos.Observaciones }
+                    : f)
+                .ToList();
+            _seguimiento = _seguimiento with { Filas = nuevas };
+        }
+        Snackbar.Add($"Estatus de '{fila.Cliente}' actualizado a {datos.ClasificacionNombre}.", Severity.Success);
+    }
+
+    // Color del chip de días: verde reciente, amarillo en alerta, rojo crítico.
+    private static Color ColorDias(int dias) => dias switch
+    {
+        <= 7 => Color.Success,
+        <= 15 => Color.Warning,
+        _ => Color.Error
+    };
+
+    private async Task ExportarAsync(string nombre, string[] columnas, IEnumerable<object?[]> filas)
+    {
+        if (_exportando) return;
+        _exportando = true;
+        try
+        {
+            var archivo = ExportadorExcel.Crear(columnas, filas);
+            await Descarga.GuardarAsync($"{nombre}-{FechaProyecto.Ahora:yyyyMMdd-HHmmssfff}.xlsx", archivo);
+        }
+        catch (Exception ex) { Snackbar.Add($"No se pudo exportar el reporte: {ex.Message}", Severity.Error); }
+        finally { _exportando = false; }
+    }
+
+    private Task ExportarCartera() => _cartera is null ? Task.CompletedTask : ExportarAsync("Cartera",
+        ["Venta", "Código", "Cliente", "Producto", "Ruta", "Zona", "Total", "Abonado", "Saldo", "Estado", "Último pago"],
+        _cartera.Filas.Select(f => new object?[] { f.IdVenta, f.CodigoVenta, f.Cliente, f.Productos, f.Ruta, f.Zona,
+            f.TotalFinal, f.TotalAbonos, f.Saldo, f.Estado, FechaCorta(f.FechaUltimoPago) }));
+
+    private Task ExportarPagos() => _pagos is null ? Task.CompletedTask : ExportarAsync("Pagos",
+        ["Pago", "Folio", "Venta", "Cliente", "Producto", "Cobrador", "Movimiento", "Total de venta", "Abono", "Saldo actual", "Fecha"],
+        _pagos.Filas.Select(f => new object?[] { f.IdPago, f.FolioPago, f.IdVenta, f.Cliente, f.Productos, f.Cobrador,
+            f.Movimiento, f.TotalVenta, f.MontoAbona, f.SaldoActual, FechaHora(f.FechaPago) }));
+
+    private Task ExportarVentas() => _ventas is null ? Task.CompletedTask : ExportarAsync("Ventas",
+        ["Venta", "Código", "Cliente", "Producto", "Vendedor", "Total", "Enganche", "Saldo", "Estado", "Fecha"],
+        _ventas.Filas.Select(f => new object?[] { f.IdVenta, f.CodigoVenta, f.Cliente, f.Productos, f.Vendedor,
+            f.TotalFinal, f.Enganche, f.Saldo, f.Estado, FechaCorta(f.FechaCompra) }));
+
+    private Task ExportarRecuperacion() => _recuperacion is null ? Task.CompletedTask : ExportarAsync("Recuperacion",
+        ["Cobrador", "Número de pagos", "Monto cobrado"],
+        _recuperacion.Filas.Select(f => new object?[] { f.Cobrador, f.NumeroPagos, f.MontoCobrado }));
+
+    private Task ExportarClientes() => _clientes is null ? Task.CompletedTask : ExportarAsync("Clientes",
+        ["ID", "Cliente", "Ruta", "Zona", "Clasificación", "Estatus", "Alta"],
+        _clientes.Filas.Select(f => new object?[] { f.IdCliente, f.Cliente, f.Ruta, f.Zona, f.Clasificacion,
+            f.Activo ? "Activo" : "Inactivo", FechaCorta(f.FechaAlta) }));
+
+    private Task ExportarSeguimiento() => _seguimiento is null ? Task.CompletedTask : ExportarAsync("Seguimiento",
+        ["ID cliente", "Cliente", "Folio venta", "Producto", "Total venta", "Total cobrado", "Total pendiente",
+         "Fecha venta", "Último pago", "Días transcurridos", "Clasificación", "Zona", "Fecha alta"],
+        _seguimiento.Filas.Select(f => new object?[] { f.IdCliente, f.Cliente, f.FolioVenta, f.Productos,
+            f.TotalVenta, f.TotalCobrado, f.TotalPendiente, FechaCorta(f.FechaVenta), FechaCorta(f.FechaUltimoPago),
+            f.DiasTranscurridos, f.Clasificacion, f.Zona, FechaCorta(f.FechaAlta) }));
+
+    // ===================== Helpers =====================
+
+    // Convierte la fecha del date picker a un DateTimeOffset (inicio del día local).
+    private static DateTimeOffset? ADesde(DateTime? d) => d is { } v ? FechaProyecto.DesdeFechaLocal(v.Date) : null;
+
+    // Fin del día: el servidor normaliza el rango, así que basta con la fecha seleccionada.
+    private static DateTimeOffset? AHasta(DateTime? d) => d is { } v ? FechaProyecto.DesdeFechaLocal(v.Date) : null;
+
+    private static string Mostrar(string? v) => string.IsNullOrWhiteSpace(v) ? "—" : v!;
+
+    private static string FechaCorta(DateTimeOffset? d)
+        => d is { } v ? v.EnZonaProyecto().DateTime.ToString("dd/MM/yyyy") : "—";
+
+    private static string FechaHora(DateTimeOffset d)
+        => d.EnZonaProyecto().DateTime.ToString("dd/MM/yyyy HH:mm");
+
+    private readonly RenderFragment CargandoFragment = builder =>
+    {
+        builder.OpenElement(0, "div");
+        builder.AddAttribute(1, "class", "d-flex justify-center pa-6");
+        builder.OpenComponent<MudProgressCircular>(2);
+        builder.AddAttribute(3, "Indeterminate", true);
+        builder.AddAttribute(4, "Color", Color.Primary);
+        builder.CloseComponent();
+        builder.CloseElement();
+    };
+
+    private readonly RenderFragment SinDatosFragment = builder =>
+    {
+        builder.OpenElement(0, "div");
+        builder.AddAttribute(1, "class", "pa-3 text-center");
+        builder.OpenComponent<MudText>(2);
+        builder.AddAttribute(3, "Color", Color.Secondary);
+        builder.AddAttribute(4, "Typo", Typo.body2);
+        builder.AddAttribute(5, "ChildContent", (RenderFragment)(b => b.AddContent(0, "No hay datos para los filtros seleccionados.")));
+        builder.CloseComponent();
+        builder.CloseElement();
+    };
+}

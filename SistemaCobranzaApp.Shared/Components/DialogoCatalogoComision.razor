@@ -1,0 +1,87 @@
+@using MudBlazor
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6" Style="font-weight: 600;">
+            <MudIcon Icon="@Icons.Material.Filled.Percent" Class="mr-2" Style="vertical-align: middle;" />
+            @Titulo
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudForm @ref="_form">
+            <MudGrid>
+                <MudItem xs="12">
+                    <MudTextField T="string" Label="Nombre del esquema" @bind-Value="Modelo.NombreEsquema"
+                                  Required="true" RequiredError="El nombre del esquema es obligatorio."
+                                  Validation="@(new Func<string, string?>(ValidarNombre))"
+                                  Variant="Variant.Outlined" Margin="Margin.Dense" />
+                </MudItem>
+                <MudItem xs="12">
+                    <MudSelect T="string" Label="Tipo de cálculo" @bind-Value="Modelo.TipoCalculo"
+                               Required="true" Variant="Variant.Outlined" Margin="Margin.Dense">
+                        <MudSelectItem Value='@("PORCENTAJE")'>Porcentaje</MudSelectItem>
+                        <MudSelectItem Value='@("FIJO")'>Monto fijo</MudSelectItem>
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudNumericField T="decimal" Label="Comisión contado" @bind-Value="Modelo.ComisionContado"
+                                     Min="0m" Required="true" Format="N2"
+                                     Validation="@(new Func<decimal, string?>(ValidarComision))"
+                                     Adornment="Adornment.End" AdornmentText="@(Modelo.TipoCalculo == "PORCENTAJE" ? "%" : "$")"
+                                     Variant="Variant.Outlined" Margin="Margin.Dense" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudNumericField T="decimal" Label="Comisión crédito" @bind-Value="Modelo.ComisionCredito"
+                                     Min="0m" Required="true" Format="N2"
+                                     Validation="@(new Func<decimal, string?>(ValidarComision))"
+                                     Adornment="Adornment.End" AdornmentText="@(Modelo.TipoCalculo == "PORCENTAJE" ? "%" : "$")"
+                                     Variant="Variant.Outlined" Margin="Margin.Dense" />
+                </MudItem>
+                @if (EsEdicion)
+                {
+                    <MudItem xs="12">
+                        <MudSwitch T="bool" @bind-Value="Modelo.Activo" Color="Color.Primary"
+                                   Label="@(Modelo.Activo ? "Estatus: Activo" : "Estatus: Inactivo")" />
+                    </MudItem>
+                }
+            </MudGrid>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancelar" Variant="Variant.Text" Color="Color.Default">Cancelar</MudButton>
+        <MudButton OnClick="Guardar" Variant="Variant.Filled" Color="Color.Primary">Guardar</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter] public string Titulo { get; set; } = "Gestionar comisión de ventas";
+    [Parameter] public FormModel Modelo { get; set; } = new();
+    [Parameter] public bool EsEdicion { get; set; }
+
+    private MudForm _form = null!;
+
+    private static string? ValidarNombre(string valor)
+        => string.IsNullOrWhiteSpace(valor) ? "El nombre del esquema es obligatorio." : null;
+
+    private static string? ValidarComision(decimal valor)
+        => valor < 0 ? "La comisión no puede ser negativa." : null;
+
+    private void Cancelar() => MudDialog.Cancel();
+
+    private async Task Guardar()
+    {
+        await _form.ValidateAsync();
+        if (_form.IsValid)
+            MudDialog.Close(DialogResult.Ok(Modelo));
+    }
+
+    public class FormModel
+    {
+        public string NombreEsquema { get; set; } = string.Empty;
+        public string TipoCalculo { get; set; } = "PORCENTAJE";
+        public decimal ComisionContado { get; set; }
+        public decimal ComisionCredito { get; set; }
+        public bool Activo { get; set; } = true;
+    }
+}

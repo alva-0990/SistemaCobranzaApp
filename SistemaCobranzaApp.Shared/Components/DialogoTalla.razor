@@ -1,0 +1,86 @@
+@using MudBlazor
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6" Style="font-weight: 600;">
+            <MudIcon Icon="@Icono" Class="mr-2" Style="vertical-align: middle;" />
+            @Titulo
+        </MudText>
+    </TitleContent>
+
+    <DialogContent>
+        <MudForm @ref="_form" @bind-IsValid="@_formValido">
+            <MudGrid>
+                @* Descripción (ej: '26', 'M', 'CH') *@
+                <MudItem xs="12" sm="6">
+                    <MudTextField T="string"
+                                  Label="Descripción"
+                                  @bind-Value="Modelo.Descripcion"
+                                  Required="true"
+                                  RequiredError="La descripción es obligatoria."
+                                  HelperText="Ej: '26', 'M', 'CH'"
+                                  Variant="Variant.Outlined"
+                                  Margin="Margin.Dense" />
+                </MudItem>
+
+                @* Tipo (para agrupar) *@
+                <MudItem xs="12" sm="6">
+                    <MudSelect T="string"
+                               Label="Tipo"
+                               @bind-Value="Modelo.Tipo"
+                               Required="true"
+                               RequiredError="El tipo es obligatorio."
+                               Variant="Variant.Outlined"
+                               Margin="Margin.Dense"
+                              >
+                        <MudSelectItem T="string" Value="@("ROPA")">Ropa</MudSelectItem>
+                        <MudSelectItem T="string" Value="@("CALZADO")">Calzado</MudSelectItem>
+                        <MudSelectItem T="string" Value="@("GENERAL")">General</MudSelectItem>
+                    </MudSelect>
+                </MudItem>
+
+                @* Estatus *@
+                <MudItem xs="12" Class="d-flex align-center">
+                    <MudSwitch T="bool"
+                               @bind-Value="Modelo.Activo"
+                               Color="Color.Primary"
+                               Label="@(Modelo.Activo ? "Estatus: Activo" : "Estatus: Inactivo")" />
+                </MudItem>
+            </MudGrid>
+        </MudForm>
+    </DialogContent>
+
+    <DialogActions>
+        <MudButton OnClick="Cancelar" Variant="Variant.Text" Color="Color.Default">Cancelar</MudButton>
+        <MudButton OnClick="Guardar" Variant="Variant.Filled" Color="Color.Primary" Disabled="@(!_formValido)">
+            Guardar
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter] public string Titulo { get; set; } = "Gestionar talla";
+    [Parameter] public string Icono { get; set; } = Icons.Material.Filled.Straighten;
+    [Parameter] public FormModel Modelo { get; set; } = new();
+
+    private MudForm _form = null!;
+    private bool _formValido;
+
+    private void Cancelar() => MudDialog.Cancel();
+
+    private async Task Guardar()
+    {
+        await _form.Validate();
+        if (_formValido)
+            MudDialog.Close(DialogResult.Ok(Modelo));
+    }
+
+    public class FormModel
+    {
+        public string Descripcion { get; set; } = string.Empty;
+        public string Tipo { get; set; } = "GENERAL";
+        public bool Activo { get; set; } = true;
+    }
+}

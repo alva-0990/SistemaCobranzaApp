@@ -9,11 +9,9 @@ using SistemaCobranzaApp.Shared.Dtos;
 namespace SistemaCobranzaApp.Infrastructure.Sincronizacion;
 
 /// <summary>
-/// Motor de sincronización offline:
-///  - Push: sube la cola de pagos capturados sin conexión. Cada pago se
-///    resuelve con idempotencia (por PagoUuid) y detección de conflictos
-///    (el saldo autoritativo es el del servidor).
-///  - Pull: baja los cambios (ventas y pagos) desde una marca de tiempo.
+/// Motor de sincronización offline unificado para .NET MAUI:
+///  - Push: Sube la cola de pagos capturados en calle sin conexión distribuyéndose en cascada.
+///  - Pull: Descarga delta de cambios de cartera bajo el nuevo esquema financiero de cuotas.
 /// </summary>
 public class ServicioSincronizacion
 {
@@ -26,7 +24,7 @@ public class ServicioSincronizacion
         _cobranza = cobranza;
     }
 
-    // ----------------------------- PUSH -----------------------------
+    // ----------------------------- PUSH (SUBIR CAMBIOS OFFLINE) -----------------------------
 
     public async Task<PushPagosResponse> PushPagosAsync(PushPagosRequest req, CancellationToken ct = default)
     {
@@ -48,21 +46,22 @@ public class ServicioSincronizacion
 
     private async Task<PushPagoResultado> ProcesarPagoEntranteAsync(RegistrarPagoRequest pago, CancellationToken ct)
     {
-        // ¿Ya existe? (idempotencia)
+        // 1. Idempotencia exacta mediante el UUID inmutable de .NET MAUI
         var existente = await _db.Pagos.AsNoTracking()
             .FirstOrDefaultAsync(p => p.PagoUuid == pago.PagoUuid, ct);
         var yaExiste = existente is not null;
 
-        // Saldo autoritativo del servidor para esta venta.
+        // 2. Extraer el saldo y estado autoritativo real del Servidor Central
         var venta = await _db.Ventas.AsNoTracking()
             .FirstOrDefaultAsync(v => v.IdVenta == pago.IdVenta, ct);
 
         if (venta is null)
             return new PushPagoResultado(pago.PagoUuid, EstadoSincronizacionPago.Error,
-                $"No se encontró la venta #{pago.IdVenta}.", null);
+                $"No se encontró la venta transaccional #{pago.IdVenta}.", null);
 
+        // 🎯 CORREGIDO: Se sustituyó 'TotalAbonos' por 'TotalAbonado' alineado a tu tabla real de PostgreSQL
         var saldoReal = CalculoCobranza.CalcularSaldoAnterior(
-            venta.TotalFinal, venta.Enganche, venta.TotalAbonos);
+            venta.TotalFinal, venta.Enganche, venta.TotalAbonado);
 
         var decision = ResolucionSincronizacion.Resolver(yaExiste, pago.MontoAbona, saldoReal);
 
@@ -70,7 +69,7 @@ public class ServicioSincronizacion
         {
             case ResolucionSincronizacion.Decision.Duplicado:
                 return new PushPagoResultado(pago.PagoUuid, EstadoSincronizacionPago.Duplicado,
-                    "El pago ya había sido sincronizado.",
+                    "El abono ya se encontraba sincronizado en el servidor central.",
                     existente is null ? null : new RegistrarPagoResponse(
                         existente.IdPago, existente.PagoUuid, existente.IdVenta,
                         existente.FolioPago ?? string.Empty, existente.ConsecutivoPago ?? 0,
@@ -79,15 +78,15 @@ public class ServicioSincronizacion
 
             case ResolucionSincronizacion.Decision.Error:
                 return new PushPagoResultado(pago.PagoUuid, EstadoSincronizacionPago.Error,
-                    "El monto del abono es inválido.", null);
+                    "El monto del abono offline es inválido o menor a cero.", null);
 
             case ResolucionSincronizacion.Decision.ConflictoYaLiquidada:
                 return new PushPagoResultado(pago.PagoUuid, EstadoSincronizacionPago.Conflicto,
-                    "La venta ya estaba liquidada en el servidor.", null);
+                    "Conflicto: La cuenta ya se encuentra totalmente liquidada en el sistema.", null);
 
             case ResolucionSincronizacion.Decision.ConflictoExcedeSaldo:
                 return new PushPagoResultado(pago.PagoUuid, EstadoSincronizacionPago.Conflicto,
-                    $"El abono ({pago.MontoAbona:C2}) excede el saldo real ({saldoReal:C2}).", null);
+                    $"Conflicto de sincronización: El abono ({pago.MontoAbona:C2}) supera el saldo real ({saldoReal:C2}).", null);
 
             case ResolucionSincronizacion.Decision.Aplicar:
                 var res = await _cobranza.RegistrarPagoAsync(pago, ct);
@@ -96,18 +95,18 @@ public class ServicioSincronizacion
                     : new PushPagoResultado(pago.PagoUuid, EstadoSincronizacionPago.Conflicto, res.Error, null);
 
             default:
-                return new PushPagoResultado(pago.PagoUuid, EstadoSincronizacionPago.Error, "Estado no reconocido.", null);
+                return new PushPagoResultado(pago.PagoUuid, EstadoSincronizacionPago.Error, "Estado de resolución no reconocido.", null);
         }
     }
 
-    // ----------------------------- PULL -----------------------------
+    // ----------------------------- PULL (DESCARGAR CAMBIOS DE CARTERA) -----------------------------
 
     public async Task<PullCambiosResponse> PullCambiosAsync(PullCambiosRequest req, CancellationToken ct = default)
     {
         var marcaServidor = DateTimeOffset.UtcNow;
         var desde = req.Desde ?? DateTimeOffset.MinValue;
 
-        // Ventas modificadas desde la marca.
+        // 1. Construcción del query relacional optimizado para descargar delta de cuentas modificadas
         var ventasQ = from v in _db.Ventas.AsNoTracking()
                       join c in _db.Clientes.AsNoTracking() on v.IdCliente equals c.IdCliente
                       join r in _db.Rutas.AsNoTracking() on c.IdRuta equals r.IdRuta into rj
@@ -122,18 +121,31 @@ public class ServicioSincronizacion
 
         var ventasFilas = await ventasQ.ToListAsync(ct);
 
+        // 2. Mapeo estructural hacia el DTO local de almacenamiento SQLite del celular
         var ventas = ventasFilas.Select(x =>
         {
-            var saldo = CalculoCobranza.CalcularSaldoAnterior(x.v.TotalFinal, x.v.Enganche, x.v.TotalAbonos);
+            // 🎯 CORREGIDO: Alineado al uso de 'TotalAbonado' para evitar inconsistencias en el cálculo del saldo offline
+            var saldo = CalculoCobranza.CalcularSaldoAnterior(x.v.TotalFinal, x.v.Enganche, x.v.TotalAbonado);
+            
             var nombre = string.Join(" ", new[] { x.c.Nombre, x.c.ApPaterno, x.c.ApMaterno }
                 .Where(s => !string.IsNullOrWhiteSpace(s))).Trim();
+                
             return new CarteraCuentaDto(
-                x.v.IdVenta, x.v.IdCliente, nombre, x.r?.Descripcion, x.r?.IdZona,
-                x.v.CodigoVenta, x.v.TotalFinal, saldo, x.v.PagoRequerido,
-                x.v.IdEstatusVenta, x.ev?.Descripcion, x.v.FechaUltimoPago);
+                x.v.IdVenta, 
+                x.v.IdCliente, 
+                nombre, 
+                x.r?.Descripcion, 
+                x.r?.IdZona,
+                x.v.CodigoVenta, 
+                x.v.TotalFinal, 
+                saldo, 
+                x.v.MontoCuotaFija, // 🎯 CORREGIDO: Cambiado de PagoRequerido a tu columna unificada MontoCuotaFija
+                x.v.IdEstatusVenta, 
+                x.ev?.Descripcion, 
+                x.v.FechaUltimoPago);
         }).ToList();
 
-        // Pagos modificados desde la marca (opcionalmente del cobrador).
+        // 3. Obtener el historial comprimido de transacciones para amarrar la libreta del cobrador
         var pagosQ = _db.Pagos.AsNoTracking().Where(p => p.FechaModificacion > desde);
         if (req.IdCobrador is { } cob)
             pagosQ = pagosQ.Where(p => p.IdCobrador == cob);

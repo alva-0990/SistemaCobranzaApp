@@ -1,0 +1,825 @@
+@page "/productos"
+
+@using MudBlazor
+@using SistemaCobranzaApp.Shared.Components
+@using SistemaCobranzaApp.Shared.Dtos
+@using SistemaCobranzaApp.Shared.Services
+@inject ApiCliente Api
+@inject IDialogService _dialogo
+@inject ISnackbar _snackbar
+@inject IFormFactor _formFactor
+
+<MudTabs Elevation="2" Rounded="true" Color="Color.Primary" ApplyEffectsToContainer="true"
+         PanelClass="pa-0 pt-4" SliderColor="Color.Warning" Class="ma-2 tabs-remarcados">
+
+    <!-- ===================== PRODUCTOS ===================== -->
+    <MudTabPanel Text="Productos" Icon="@Icons.Material.Filled.Inventory2">
+        <MudPaper Elevation="0" Class="pa-4">
+            <div class="barra-acciones">
+                <MudTextField T="string"
+                              Value="_busquedaProducto"
+                              ValueChanged="@(async v => { _busquedaProducto = v; await RecargarProductosAsync(); })"
+                              Immediate="false"
+                              DebounceInterval="400"
+                              Placeholder="Buscar por código o descripción..."
+                              Variant="Variant.Outlined"
+                              Adornment="Adornment.Start"
+                              AdornmentIcon="@Icons.Material.Filled.Search"
+                              AdornmentColor="Color.Primary"
+                              Clearable="true"
+                              Class="buscador-remarcado" />
+
+                <MudSwitch T="bool"
+                           Value="_incluirInactivosProducto"
+                           ValueChanged="@(async v => { _incluirInactivosProducto = v; await RecargarProductosAsync(); })"
+                           Color="Color.Primary"
+                           Label="Incluir inactivos"
+                           Class="switch-inactivos" />
+
+                <MudButton Variant="Variant.Filled"
+                           Color="Color.Primary"
+                           StartIcon="@Icons.Material.Filled.Add"
+                           OnClick="AbrirModalNuevoProducto"
+                           Class="boton-nuevo">
+                    <span class="d-inline d-sm-none">Nuevo</span>
+                    <span class="d-none d-sm-inline">Nuevo producto</span>
+                </MudButton>
+            </div>
+
+            <MudTable @ref="_tablaProductos"
+                      ServerData="CargarProductos"
+                      Hover="true"
+                      Dense="true"
+                      Breakpoint="Breakpoint.Sm"
+                      Elevation="0"
+                      RowsPerPage="20">
+                <HeaderContent>
+                    <MudTh Style="width:7%;">ID</MudTh>
+                    <MudTh Style="width:13%;">Código</MudTh>
+                    <MudTh>Descripción</MudTh>
+                    <MudTh>Categoría</MudTh>
+                    <MudTh>Marca</MudTh>
+                    <MudTh Style="text-align:right;">Costo</MudTh>
+                    <MudTh Style="text-align:right;">P. Sugerido</MudTh>
+                    <MudTh Style="width:10%;">Estatus</MudTh>
+                    <MudTh Style="width:12%; text-align:right;">Acciones</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="ID">@context.Id</MudTd>
+                    <MudTd DataLabel="Código"><b>@context.CodigoClave</b></MudTd>
+                    <MudTd DataLabel="Descripción">@context.Descripcion</MudTd>
+                    <MudTd DataLabel="Categoría">
+                        <MudChip T="string" Size="Size.Small" Variant="Variant.Text" Color="Color.Primary">
+                            @context.CategoriaDescripcion
+                        </MudChip>
+                    </MudTd>
+                    <MudTd DataLabel="Marca">@context.MarcaDescripcion</MudTd>
+                    <MudTd DataLabel="Costo" Style="text-align:right;">@context.Costo.ToString("C2")</MudTd>
+                    <MudTd DataLabel="P. Sugerido" Style="text-align:right;">@context.PrecioSugerido.ToString("C2")</MudTd>
+                    <MudTd DataLabel="Estatus">@ChipEstatus(context.Activo)</MudTd>
+                    <MudTd DataLabel="Acciones" Style="text-align:right;">
+                        @AccionesFila(() => AbrirModalEditarProducto(context),
+                            () => AlternarEstatusProducto(context), context.Activo)
+                    </MudTd>
+                </RowTemplate>
+                <NoRecordsContent>@EstadoVacio("No hay productos que coincidan.")</NoRecordsContent>
+                <LoadingContent>
+                    <div class="d-flex justify-center pa-8">
+                        <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+                    </div>
+                </LoadingContent>
+                <PagerContent>
+                    <MudTablePager InfoFormat="{first_item}-{last_item} de {all_items}"
+                                   RowsPerPageString="Filas:"
+                                   PageSizeOptions="new[] { 10, 20, 50, 100 }" />
+                </PagerContent>
+            </MudTable>
+        </MudPaper>
+    </MudTabPanel>
+
+    <!-- ===================== CATEGORÍAS ===================== -->
+    <MudTabPanel Text="Categorías" Icon="@Icons.Material.Filled.Category">
+        <MudPaper Elevation="0" Class="pa-4">
+            <div class="barra-acciones">
+                <MudTextField T="string"
+                              Value="_busquedaCategoria"
+                              ValueChanged="@(v => { _busquedaCategoria = v; })"
+                              Immediate="true"
+                              Placeholder="Buscar categoría..."
+                              Variant="Variant.Outlined"
+                              Adornment="Adornment.Start"
+                              AdornmentIcon="@Icons.Material.Filled.Search"
+                              AdornmentColor="Color.Primary"
+                              Clearable="true"
+                              Class="buscador-remarcado" />
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add"
+                           OnClick="AbrirModalNuevaCategoria" Class="boton-nuevo">Nueva categoría</MudButton>
+            </div>
+
+            @if (_cargandoCategorias)
+            {
+                <div class="d-flex justify-center pa-8"><MudProgressCircular Indeterminate="true" Color="Color.Primary" /></div>
+            }
+            else
+            {
+                <MudTable Items="CategoriasFiltradas" Hover="true" Dense="true" Breakpoint="Breakpoint.Sm" Elevation="0" RowsPerPage="10">
+                    <HeaderContent>
+                        <MudTh Style="width:10%;">ID</MudTh>
+                        <MudTh>Descripción</MudTh>
+                        <MudTh Style="width:15%;">Estatus</MudTh>
+                        <MudTh Style="width:15%; text-align:right;">Acciones</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd DataLabel="ID">@context.Id</MudTd>
+                        <MudTd DataLabel="Descripción"><b>@context.Descripcion</b></MudTd>
+                        <MudTd DataLabel="Estatus">@ChipEstatus(context.Activo)</MudTd>
+                        <MudTd DataLabel="Acciones" Style="text-align:right;">
+                            @AccionesFila(() => AbrirModalEditarCategoria(context),
+                                () => AlternarEstatusCategoria(context), context.Activo)
+                        </MudTd>
+                    </RowTemplate>
+                    <NoRecordsContent>@EstadoVacio("No hay categorías que coincidan.")</NoRecordsContent>
+                    <PagerContent>
+                        <MudTablePager InfoFormat="{first_item}-{last_item} de {all_items}" RowsPerPageString="Filas:" />
+                    </PagerContent>
+                </MudTable>
+            }
+        </MudPaper>
+    </MudTabPanel>
+
+    <!-- ===================== MARCAS ===================== -->
+    <MudTabPanel Text="Marcas" Icon="@Icons.Material.Filled.Sell">
+        <MudPaper Elevation="0" Class="pa-4">
+            <div class="barra-acciones">
+                <MudTextField T="string"
+                              Value="_busquedaMarca"
+                              ValueChanged="@(v => { _busquedaMarca = v; })"
+                              Immediate="true"
+                              Placeholder="Buscar marca..."
+                              Variant="Variant.Outlined"
+                              Adornment="Adornment.Start"
+                              AdornmentIcon="@Icons.Material.Filled.Search"
+                              AdornmentColor="Color.Primary"
+                              Clearable="true"
+                              Class="buscador-remarcado" />
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add"
+                           OnClick="AbrirModalNuevaMarca" Class="boton-nuevo">Nueva marca</MudButton>
+            </div>
+
+            @if (_cargandoMarcas)
+            {
+                <div class="d-flex justify-center pa-8"><MudProgressCircular Indeterminate="true" Color="Color.Primary" /></div>
+            }
+            else
+            {
+                <MudTable Items="MarcasFiltradas" Hover="true" Dense="true" Breakpoint="Breakpoint.Sm" Elevation="0" RowsPerPage="10">
+                    <HeaderContent>
+                        <MudTh Style="width:10%;">ID</MudTh>
+                        <MudTh>Descripción</MudTh>
+                        <MudTh Style="width:15%;">Estatus</MudTh>
+                        <MudTh Style="width:15%; text-align:right;">Acciones</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd DataLabel="ID">@context.Id</MudTd>
+                        <MudTd DataLabel="Descripción"><b>@context.Descripcion</b></MudTd>
+                        <MudTd DataLabel="Estatus">@ChipEstatus(context.Activo)</MudTd>
+                        <MudTd DataLabel="Acciones" Style="text-align:right;">
+                            @AccionesFila(() => AbrirModalEditarMarca(context),
+                                () => AlternarEstatusMarca(context), context.Activo)
+                        </MudTd>
+                    </RowTemplate>
+                    <NoRecordsContent>@EstadoVacio("No hay marcas que coincidan.")</NoRecordsContent>
+                    <PagerContent>
+                        <MudTablePager InfoFormat="{first_item}-{last_item} de {all_items}" RowsPerPageString="Filas:" />
+                    </PagerContent>
+                </MudTable>
+            }
+        </MudPaper>
+    </MudTabPanel>
+
+    <!-- ===================== COLORES ===================== -->
+    <MudTabPanel Text="Colores" Icon="@Icons.Material.Filled.Palette">
+        <MudPaper Elevation="0" Class="pa-4">
+            <div class="barra-acciones">
+                <MudTextField T="string"
+                              Value="_busquedaColor"
+                              ValueChanged="@(v => { _busquedaColor = v; })"
+                              Immediate="true"
+                              Placeholder="Buscar color..."
+                              Variant="Variant.Outlined"
+                              Adornment="Adornment.Start"
+                              AdornmentIcon="@Icons.Material.Filled.Search"
+                              AdornmentColor="Color.Primary"
+                              Clearable="true"
+                              Class="buscador-remarcado" />
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add"
+                           OnClick="AbrirModalNuevoColor" Class="boton-nuevo">Nuevo color</MudButton>
+            </div>
+
+            @if (_cargandoColores)
+            {
+                <div class="d-flex justify-center pa-8"><MudProgressCircular Indeterminate="true" Color="Color.Primary" /></div>
+            }
+            else
+            {
+                <MudTable Items="ColoresFiltrados" Hover="true" Dense="true" Breakpoint="Breakpoint.Sm" Elevation="0" RowsPerPage="10">
+                    <HeaderContent>
+                        <MudTh Style="width:10%;">ID</MudTh>
+                        <MudTh>Descripción</MudTh>
+                        <MudTh Style="width:15%;">Estatus</MudTh>
+                        <MudTh Style="width:15%; text-align:right;">Acciones</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd DataLabel="ID">@context.Id</MudTd>
+                        <MudTd DataLabel="Descripción"><b>@context.Descripcion</b></MudTd>
+                        <MudTd DataLabel="Estatus">@ChipEstatus(context.Activo)</MudTd>
+                        <MudTd DataLabel="Acciones" Style="text-align:right;">
+                            @AccionesFila(() => AbrirModalEditarColor(context),
+                                () => AlternarEstatusColor(context), context.Activo)
+                        </MudTd>
+                    </RowTemplate>
+                    <NoRecordsContent>@EstadoVacio("No hay colores que coincidan.")</NoRecordsContent>
+                    <PagerContent>
+                        <MudTablePager InfoFormat="{first_item}-{last_item} de {all_items}" RowsPerPageString="Filas:" />
+                    </PagerContent>
+                </MudTable>
+            }
+        </MudPaper>
+    </MudTabPanel>
+
+    <!-- ===================== TALLAS ===================== -->
+    <MudTabPanel Text="Tallas" Icon="@Icons.Material.Filled.Straighten">
+        <MudPaper Elevation="0" Class="pa-4">
+            <div class="barra-acciones">
+                <MudTextField T="string"
+                              Value="_busquedaTalla"
+                              ValueChanged="@(v => { _busquedaTalla = v; })"
+                              Immediate="true"
+                              Placeholder="Buscar talla por descripción o tipo..."
+                              Variant="Variant.Outlined"
+                              Adornment="Adornment.Start"
+                              AdornmentIcon="@Icons.Material.Filled.Search"
+                              AdornmentColor="Color.Primary"
+                              Clearable="true"
+                              Class="buscador-remarcado" />
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add"
+                           OnClick="AbrirModalNuevaTalla" Class="boton-nuevo">Nueva talla</MudButton>
+            </div>
+
+            @if (_cargandoTallas)
+            {
+                <div class="d-flex justify-center pa-8"><MudProgressCircular Indeterminate="true" Color="Color.Primary" /></div>
+            }
+            else
+            {
+                <MudTable Items="TallasFiltradas" Hover="true" Dense="true" Breakpoint="Breakpoint.Sm" Elevation="0" RowsPerPage="10">
+                    <HeaderContent>
+                        <MudTh Style="width:10%;">ID</MudTh>
+                        <MudTh>Descripción</MudTh>
+                        <MudTh>Tipo</MudTh>
+                        <MudTh Style="width:15%;">Estatus</MudTh>
+                        <MudTh Style="width:15%; text-align:right;">Acciones</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd DataLabel="ID">@context.Id</MudTd>
+                        <MudTd DataLabel="Descripción"><b>@context.Descripcion</b></MudTd>
+                        <MudTd DataLabel="Tipo">
+                            <MudChip T="string" Size="Size.Small" Variant="Variant.Text" Color="Color.Secondary">@context.Tipo</MudChip>
+                        </MudTd>
+                        <MudTd DataLabel="Estatus">@ChipEstatus(context.Activo)</MudTd>
+                        <MudTd DataLabel="Acciones" Style="text-align:right;">
+                            @AccionesFila(() => AbrirModalEditarTalla(context),
+                                () => AlternarEstatusTalla(context), context.Activo)
+                        </MudTd>
+                    </RowTemplate>
+                    <NoRecordsContent>@EstadoVacio("No hay tallas que coincidan.")</NoRecordsContent>
+                    <PagerContent>
+                        <MudTablePager InfoFormat="{first_item}-{last_item} de {all_items}" RowsPerPageString="Filas:" />
+                    </PagerContent>
+                </MudTable>
+            }
+        </MudPaper>
+    </MudTabPanel>
+</MudTabs>
+
+@{
+    RenderFragment ChipEstatus(bool activo) => __builder =>
+    {
+        <MudChip T="string" Size="Size.Small" Variant="Variant.Filled"
+                 Color="@(activo ? Color.Success : Color.Default)">
+            @(activo ? "Activo" : "Inactivo")
+        </MudChip>
+    };
+
+    RenderFragment AccionesFila(Func<Task> onEditar, Func<Task> onAlternar, bool activo) => __builder =>
+    {
+        <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" Color="Color.Info"
+                       Title="Editar" OnClick="@(async () => await onEditar())" />
+        @if (activo)
+        {
+            <MudIconButton Icon="@Icons.Material.Filled.Block" Size="Size.Small" Color="Color.Error"
+                           Title="Desactivar" OnClick="@(async () => await onAlternar())" />
+        }
+        else
+        {
+            <MudIconButton Icon="@Icons.Material.Filled.CheckCircle" Size="Size.Small" Color="Color.Success"
+                           Title="Reactivar" OnClick="@(async () => await onAlternar())" />
+        }
+    };
+
+    RenderFragment EstadoVacio(string mensaje) => __builder =>
+    {
+        <div class="pa-8 text-center">
+            <MudIcon Icon="@Icons.Material.Filled.SearchOff" Size="Size.Large" Color="Color.Secondary" />
+            <MudText Color="Color.Secondary" Class="mt-2">@mensaje</MudText>
+        </div>
+    };
+}
+
+<style>
+    .barra-acciones {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 16px;
+        flex-wrap: wrap;
+    }
+
+    .barra-acciones .buscador-remarcado { flex: 1 1 260px; min-width: 0; }
+    .barra-acciones .switch-inactivos { flex: 0 0 auto; }
+    .boton-nuevo { white-space: nowrap; flex: 0 0 auto; }
+    .buscador-remarcado .mud-input-outlined-border { border-width: 2px; }
+
+    .tabs-remarcados .mud-tab { opacity: 0.65; font-weight: 500; transition: opacity 0.15s ease, background-color 0.15s ease; }
+    .tabs-remarcados .mud-tab.mud-tab-active { opacity: 1; font-weight: 800; background-color: rgba(255,255,255,0.18); border-radius: 8px 8px 0 0; }
+    .tabs-remarcados .mud-tab-slider { height: 4px; }
+
+    /* ==========================================================================
+       Diálogo de producto a pantalla completa en móvil.
+       Con viewport-fit=cover el contenido se mete bajo la barra de estado del
+       sistema (wifi, hora, batería). Respetamos el área segura superior/inferior
+       y laterales, igual que se hace con la MudAppBar en app.css.
+       ========================================================================== */
+    .dialogo-producto-fullscreen {
+        box-sizing: border-box;
+        padding-bottom: env(safe-area-inset-bottom);
+        padding-left: env(safe-area-inset-left);
+        padding-right: env(safe-area-inset-right);
+    }
+
+    /* El botón de cierre (X) de MudBlazor se posiciona absoluto respecto al
+       diálogo; lo bajamos/separamos para que no quede pegado a la barra de
+       estado del sistema (hora, batería, wifi). */
+    .dialogo-producto-fullscreen .mud-dialog-close-button {
+        top: calc(env(safe-area-inset-top) + 8px);
+        right: calc(env(safe-area-inset-right) + 8px);
+    }
+
+    /* Asegura que el título también respete el área segura superior. */
+    .dialogo-producto-fullscreen .mud-dialog-title {
+        padding-top: env(safe-area-inset-top);
+    }
+</style>
+
+@code {
+    // ---- Productos (paginación en el servidor) ----
+    private MudTable<ProductoDto> _tablaProductos = null!;
+    private string _busquedaProducto = "";
+    private bool _incluirInactivosProducto;
+
+    // Combos (solo activos) para el diálogo de producto.
+    private List<CategoriaDto> _categoriasCombo = new();
+    private List<MarcaDto> _marcasCombo = new();
+    private List<ColorDto> _coloresCombo = new();
+    private List<TallaDto> _tallasCombo = new();
+    private List<CatalogoComisionDto> _comisionesCombo = new();
+
+    // ---- Catálogos de apoyo (en memoria, filtrado en cliente) ----
+    private List<CategoriaDto> _categorias = new();
+    private List<MarcaDto> _marcas = new();
+    private List<ColorDto> _colores = new();
+    private List<TallaDto> _tallas = new();
+
+    private bool _cargandoCategorias;
+    private bool _cargandoMarcas;
+    private bool _cargandoColores;
+    private bool _cargandoTallas;
+
+    private string _busquedaCategoria = "";
+    private string _busquedaMarca = "";
+    private string _busquedaColor = "";
+    private string _busquedaTalla = "";
+
+    // Detección de entorno móvil (misma lógica que MainLayout): MAUI -> Phone/Tablet; web -> Web; escritorio -> Desktop.
+    private bool EsEntornoMovil
+    {
+        get
+        {
+            var ff = _formFactor.GetFormFactor();
+            return !ff.Equals("Web", StringComparison.OrdinalIgnoreCase)
+                   && !ff.Equals("Desktop", StringComparison.OrdinalIgnoreCase);
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CargarCategorias();
+        await CargarMarcas();
+        await CargarColores();
+        await CargarTallas();
+        RefrescarCombos();
+    }
+
+    // ===================== Filtros (cliente) =====================
+
+    private IEnumerable<CategoriaDto> CategoriasFiltradas => FiltrarSimple(_categorias, _busquedaCategoria, c => c.Descripcion, c => c.Id);
+    private IEnumerable<MarcaDto> MarcasFiltradas => FiltrarSimple(_marcas, _busquedaMarca, m => m.Descripcion, m => m.Id);
+    private IEnumerable<ColorDto> ColoresFiltrados => FiltrarSimple(_colores, _busquedaColor, c => c.Descripcion, c => c.Id);
+
+    private IEnumerable<TallaDto> TallasFiltradas
+    {
+        get
+        {
+            var q = _busquedaTalla?.Trim() ?? "";
+            if (string.IsNullOrEmpty(q)) return _tallas;
+            return _tallas.Where(t =>
+                (t.Descripcion ?? "").Contains(q, StringComparison.OrdinalIgnoreCase)
+                || (t.Tipo ?? "").Contains(q, StringComparison.OrdinalIgnoreCase)
+                || t.Id.ToString().Contains(q, StringComparison.OrdinalIgnoreCase));
+        }
+    }
+
+    private static IEnumerable<T> FiltrarSimple<T>(List<T> fuente, string? busqueda, Func<T, string?> desc, Func<T, long> id)
+    {
+        var q = busqueda?.Trim() ?? "";
+        if (string.IsNullOrEmpty(q)) return fuente;
+        return fuente.Where(x =>
+            (desc(x) ?? "").Contains(q, StringComparison.OrdinalIgnoreCase)
+            || id(x).ToString().Contains(q, StringComparison.OrdinalIgnoreCase));
+    }
+
+    // Mantiene los combos del diálogo de producto sincronizados con los catálogos activos.
+    private void RefrescarCombos()
+    {
+        _categoriasCombo = _categorias.Where(c => c.Activo).ToList();
+        _marcasCombo = _marcas.Where(m => m.Activo).ToList();
+        _coloresCombo = _colores.Where(c => c.Activo).ToList();
+        _tallasCombo = _tallas.Where(t => t.Activo).ToList();
+    }
+
+    // ===================== Carga de catálogos =====================
+
+    private async Task CargarCategorias()
+    {
+        _cargandoCategorias = true;
+        var (datos, error) = await Api.ListarCategoriasAdminAsync();
+        if (error is not null) _snackbar.Add(error, Severity.Error);
+        _categorias = datos ?? new();
+        _cargandoCategorias = false;
+    }
+
+    private async Task CargarMarcas()
+    {
+        _cargandoMarcas = true;
+        var (datos, error) = await Api.ListarMarcasAdminAsync();
+        if (error is not null) _snackbar.Add(error, Severity.Error);
+        _marcas = datos ?? new();
+        _cargandoMarcas = false;
+    }
+
+    private async Task CargarColores()
+    {
+        _cargandoColores = true;
+        var (datos, error) = await Api.ListarColoresAdminAsync();
+        if (error is not null) _snackbar.Add(error, Severity.Error);
+        _colores = datos ?? new();
+        _cargandoColores = false;
+    }
+
+    private async Task CargarTallas()
+    {
+        _cargandoTallas = true;
+        var (datos, error) = await Api.ListarTallasAdminAsync();
+        if (error is not null) _snackbar.Add(error, Severity.Error);
+        _tallas = datos ?? new();
+        _cargandoTallas = false;
+    }
+
+    // ===================== Productos =====================
+
+    private async Task<TableData<ProductoDto>> CargarProductos(TableState state, CancellationToken ct)
+    {
+        var pagina = state.Page + 1; // MudTable base 0; API base 1.
+        var (datos, error) = await Api.ListarProductosAsync(
+            texto: string.IsNullOrWhiteSpace(_busquedaProducto) ? null : _busquedaProducto,
+            incluirInactivos: _incluirInactivosProducto,
+            pagina: pagina,
+            tamanoPagina: state.PageSize,
+            ct: ct);
+
+        if (error is not null)
+        {
+            _snackbar.Add(error, Severity.Error);
+            return new TableData<ProductoDto> { Items = Array.Empty<ProductoDto>(), TotalItems = 0 };
+        }
+
+        return new TableData<ProductoDto>
+        {
+            Items = datos?.Items ?? (IReadOnlyList<ProductoDto>)Array.Empty<ProductoDto>(),
+            TotalItems = datos?.Total ?? 0
+        };
+    }
+
+    private Task RecargarProductosAsync() => _tablaProductos.ReloadServerData();
+
+    private async Task AbrirModalNuevoProducto()
+    {
+        var modelo = new DialogoProducto.FormModel { Activo = true };
+        var m = await MostrarDialogoProducto("Dar de alta producto", Icons.Material.Filled.AddBox, esNuevo: true, modelo);
+        if (m is null) return;
+
+        var req = new CrearProductoRequest(
+            m.CodigoClave.Trim(), m.Descripcion.Trim(), m.Costo, m.PrecioSugerido, m.PrecioMinimo,
+            m.StockMini, m.IdCategoria!.Value, m.IdMarca!.Value, m.IdColor, m.IdTalla, m.IdCatalogoComision!.Value);
+
+        var (_, error) = await Api.CrearProductoAsync(req);
+        Notificar(error, $"Producto '{m.CodigoClave}' registrado.");
+        if (error is null) await RecargarProductosAsync();
+    }
+
+    private async Task AbrirModalEditarProducto(ProductoDto p)
+    {
+        var modelo = new DialogoProducto.FormModel
+        {
+            CodigoClave = p.CodigoClave,
+            Descripcion = p.Descripcion,
+            Costo = p.Costo,
+            PrecioSugerido = p.PrecioSugerido,
+            PrecioMinimo = p.PrecioMinimo,
+            StockMini = p.StockMini,
+            IdCategoria = p.IdCategoria,
+            IdMarca = p.IdMarca,
+            IdColor = p.IdColor,
+            IdTalla = p.IdTalla,
+            IdCatalogoComision = p.IdCatalogoComision > 0 ? p.IdCatalogoComision : null,
+            NombreComisionActual = p.ComisionEsquemaNombre,
+            Activo = p.Activo
+        };
+        var m = await MostrarDialogoProducto("Modificar producto", Icons.Material.Filled.Edit, esNuevo: false, modelo);
+        if (m is null) return;
+
+        var req = new ActualizarProductoRequest(
+            m.CodigoClave.Trim(), m.Descripcion.Trim(), m.Costo, m.PrecioSugerido, m.PrecioMinimo,
+            m.StockMini, m.IdCategoria!.Value, m.IdMarca!.Value, m.IdColor, m.IdTalla, m.IdCatalogoComision!.Value, m.Activo);
+
+        var (_, error) = await Api.ActualizarProductoAsync(p.Id, req);
+        Notificar(error, $"Producto '{m.CodigoClave}' actualizado.");
+        if (error is null) await RecargarProductosAsync();
+    }
+
+    private async Task AlternarEstatusProducto(ProductoDto p)
+    {
+        if (p.Activo)
+        {
+            var (ok, error) = await Api.DarDeBajaProductoAsync(p.Id);
+            Notificar(ok ? null : error, $"Producto '{p.CodigoClave}' dado de baja.");
+            if (ok) await RecargarProductosAsync();
+        }
+        else
+        {
+            var req = new ActualizarProductoRequest(
+                p.CodigoClave, p.Descripcion, p.Costo, p.PrecioSugerido, p.PrecioMinimo,
+                p.StockMini, p.IdCategoria, p.IdMarca, p.IdColor, p.IdTalla, p.IdCatalogoComision, true);
+            var (_, error) = await Api.ActualizarProductoAsync(p.Id, req);
+            Notificar(error, $"Producto '{p.CodigoClave}' reactivado.");
+            if (error is null) await RecargarProductosAsync();
+        }
+    }
+
+    // ===================== Categorías =====================
+
+    private async Task AbrirModalNuevaCategoria()
+    {
+        var m = await MostrarDialogoGenerico("Dar de alta categoría", Icons.Material.Filled.Category, "Descripción de la categoría",
+            new DialogoGenerico.FormModel { Activo = true });
+        if (m is null) return;
+        var (_, error) = await Api.CrearCategoriaAsync(m.Nombre.Trim());
+        Notificar(error, $"Categoría '{m.Nombre}' registrada.");
+        if (error is null) { await CargarCategorias(); RefrescarCombos(); }
+    }
+
+    private async Task AbrirModalEditarCategoria(CategoriaDto c)
+    {
+        var m = await MostrarDialogoGenerico("Modificar categoría", Icons.Material.Filled.Category, "Descripción de la categoría",
+            new DialogoGenerico.FormModel { Nombre = c.Descripcion, Activo = c.Activo });
+        if (m is null) return;
+        var (_, error) = await Api.ActualizarCategoriaAsync(c.Id, m.Nombre.Trim(), m.Activo);
+        Notificar(error, $"Categoría '{m.Nombre}' actualizada.");
+        if (error is null) { await CargarCategorias(); RefrescarCombos(); }
+    }
+
+    private async Task AlternarEstatusCategoria(CategoriaDto c)
+    {
+        if (c.Activo)
+        {
+            var (_, error) = await Api.DarDeBajaCategoriaAsync(c.Id);
+            Notificar(error, $"Categoría '{c.Descripcion}' desactivada.");
+            if (error is null) { await CargarCategorias(); RefrescarCombos(); }
+        }
+        else
+        {
+            var (_, error) = await Api.ActualizarCategoriaAsync(c.Id, c.Descripcion, true);
+            Notificar(error, $"Categoría '{c.Descripcion}' reactivada.");
+            if (error is null) { await CargarCategorias(); RefrescarCombos(); }
+        }
+    }
+
+    // ===================== Marcas =====================
+
+    private async Task AbrirModalNuevaMarca()
+    {
+        var m = await MostrarDialogoGenerico("Dar de alta marca", Icons.Material.Filled.Sell, "Descripción de la marca",
+            new DialogoGenerico.FormModel { Activo = true });
+        if (m is null) return;
+        var (_, error) = await Api.CrearMarcaAsync(m.Nombre.Trim());
+        Notificar(error, $"Marca '{m.Nombre}' registrada.");
+        if (error is null) { await CargarMarcas(); RefrescarCombos(); }
+    }
+
+    private async Task AbrirModalEditarMarca(MarcaDto marca)
+    {
+        var m = await MostrarDialogoGenerico("Modificar marca", Icons.Material.Filled.Sell, "Descripción de la marca",
+            new DialogoGenerico.FormModel { Nombre = marca.Descripcion, Activo = marca.Activo });
+        if (m is null) return;
+        var (_, error) = await Api.ActualizarMarcaAsync(marca.Id, m.Nombre.Trim(), m.Activo);
+        Notificar(error, $"Marca '{m.Nombre}' actualizada.");
+        if (error is null) { await CargarMarcas(); RefrescarCombos(); }
+    }
+
+    private async Task AlternarEstatusMarca(MarcaDto marca)
+    {
+        if (marca.Activo)
+        {
+            var (_, error) = await Api.DarDeBajaMarcaAsync(marca.Id);
+            Notificar(error, $"Marca '{marca.Descripcion}' desactivada.");
+            if (error is null) { await CargarMarcas(); RefrescarCombos(); }
+        }
+        else
+        {
+            var (_, error) = await Api.ActualizarMarcaAsync(marca.Id, marca.Descripcion, true);
+            Notificar(error, $"Marca '{marca.Descripcion}' reactivada.");
+            if (error is null) { await CargarMarcas(); RefrescarCombos(); }
+        }
+    }
+
+    // ===================== Colores =====================
+
+    private async Task AbrirModalNuevoColor()
+    {
+        var m = await MostrarDialogoGenerico("Dar de alta color", Icons.Material.Filled.Palette, "Descripción del color",
+            new DialogoGenerico.FormModel { Activo = true });
+        if (m is null) return;
+        var (_, error) = await Api.CrearColorAsync(m.Nombre.Trim());
+        Notificar(error, $"Color '{m.Nombre}' registrado.");
+        if (error is null) { await CargarColores(); RefrescarCombos(); }
+    }
+
+    private async Task AbrirModalEditarColor(ColorDto c)
+    {
+        var m = await MostrarDialogoGenerico("Modificar color", Icons.Material.Filled.Palette, "Descripción del color",
+            new DialogoGenerico.FormModel { Nombre = c.Descripcion, Activo = c.Activo });
+        if (m is null) return;
+        var (_, error) = await Api.ActualizarColorAsync(c.Id, m.Nombre.Trim(), m.Activo);
+        Notificar(error, $"Color '{m.Nombre}' actualizado.");
+        if (error is null) { await CargarColores(); RefrescarCombos(); }
+    }
+
+    private async Task AlternarEstatusColor(ColorDto c)
+    {
+        if (c.Activo)
+        {
+            var (_, error) = await Api.DarDeBajaColorAsync(c.Id);
+            Notificar(error, $"Color '{c.Descripcion}' desactivado.");
+            if (error is null) { await CargarColores(); RefrescarCombos(); }
+        }
+        else
+        {
+            var (_, error) = await Api.ActualizarColorAsync(c.Id, c.Descripcion, true);
+            Notificar(error, $"Color '{c.Descripcion}' reactivado.");
+            if (error is null) { await CargarColores(); RefrescarCombos(); }
+        }
+    }
+
+    // ===================== Tallas =====================
+
+    private async Task AbrirModalNuevaTalla()
+    {
+        var m = await MostrarDialogoTalla("Dar de alta talla", new DialogoTalla.FormModel { Activo = true });
+        if (m is null) return;
+        var (_, error) = await Api.CrearTallaAsync(m.Descripcion.Trim(), m.Tipo);
+        Notificar(error, $"Talla '{m.Descripcion}' registrada.");
+        if (error is null) { await CargarTallas(); RefrescarCombos(); }
+    }
+
+    private async Task AbrirModalEditarTalla(TallaDto t)
+    {
+        var m = await MostrarDialogoTalla("Modificar talla",
+            new DialogoTalla.FormModel { Descripcion = t.Descripcion, Tipo = t.Tipo, Activo = t.Activo });
+        if (m is null) return;
+        var (_, error) = await Api.ActualizarTallaAsync(t.Id, m.Descripcion.Trim(), m.Tipo, m.Activo);
+        Notificar(error, $"Talla '{m.Descripcion}' actualizada.");
+        if (error is null) { await CargarTallas(); RefrescarCombos(); }
+    }
+
+    private async Task AlternarEstatusTalla(TallaDto t)
+    {
+        if (t.Activo)
+        {
+            var (_, error) = await Api.DarDeBajaTallaAsync(t.Id);
+            Notificar(error, $"Talla '{t.Descripcion}' desactivada.");
+            if (error is null) { await CargarTallas(); RefrescarCombos(); }
+        }
+        else
+        {
+            var (_, error) = await Api.ActualizarTallaAsync(t.Id, t.Descripcion, t.Tipo, true);
+            Notificar(error, $"Talla '{t.Descripcion}' reactivada.");
+            if (error is null) { await CargarTallas(); RefrescarCombos(); }
+        }
+    }
+
+    // ===================== Helpers de diálogo =====================
+
+    private async Task<DialogoProducto.FormModel?> MostrarDialogoProducto(
+        string titulo, string icono, bool esNuevo, DialogoProducto.FormModel modelo)
+    {
+        var (comisiones, error) = await Api.ListarComisionesOperativasAsync();
+        if (error is not null)
+        {
+            _snackbar.Add(error, Severity.Error);
+            return null;
+        }
+        _comisionesCombo = comisiones?.Where(c => c.Activo).ToList() ?? new();
+        if (_comisionesCombo.Count == 0 && (esNuevo || modelo.IdCatalogoComision is null))
+        {
+            _snackbar.Add("Registra un esquema de comisión activo en Operaciones de ventas antes de guardar el producto.", Severity.Warning);
+            return null;
+        }
+
+        // En móvil el alta/edición de producto ocupa toda la pantalla; en web es un modal normal.
+        var opciones = EsEntornoMovil
+            ? new DialogOptions { FullScreen = true, CloseButton = true }
+            : new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true, CloseButton = true };
+        var parametros = new DialogParameters<DialogoProducto>
+        {
+            { x => x.Titulo, titulo },
+            { x => x.Icono, icono },
+            { x => x.EsNuevo, esNuevo },
+            { x => x.Modelo, modelo },
+            { x => x.ClaseDialogo, EsEntornoMovil ? "dialogo-producto-fullscreen" : null },
+            { x => x.Categorias, _categoriasCombo },
+            { x => x.Marcas, _marcasCombo },
+            { x => x.Colores, _coloresCombo },
+            { x => x.Tallas, _tallasCombo },
+            { x => x.Comisiones, _comisionesCombo }
+        };
+        var dialogo = await _dialogo.ShowAsync<DialogoProducto>(titulo, parametros, opciones);
+        var resultado = await dialogo.Result;
+        return resultado is { Canceled: false, Data: DialogoProducto.FormModel datos } ? datos : null;
+    }
+
+    private async Task<DialogoGenerico.FormModel?> MostrarDialogoGenerico(
+        string titulo, string icono, string labelNombre, DialogoGenerico.FormModel modelo)
+    {
+        var opciones = new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true, CloseButton = true };
+        var parametros = new DialogParameters<DialogoGenerico>
+        {
+            { x => x.Titulo, titulo },
+            { x => x.Icono, icono },
+            { x => x.LabelNombre, labelNombre },
+            { x => x.Modelo, modelo }
+        };
+        var dialogo = await _dialogo.ShowAsync<DialogoGenerico>(titulo, parametros, opciones);
+        var resultado = await dialogo.Result;
+        return resultado is { Canceled: false, Data: DialogoGenerico.FormModel datos } ? datos : null;
+    }
+
+    private async Task<DialogoTalla.FormModel?> MostrarDialogoTalla(string titulo, DialogoTalla.FormModel modelo)
+    {
+        var opciones = new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true, CloseButton = true };
+        var parametros = new DialogParameters<DialogoTalla>
+        {
+            { x => x.Titulo, titulo },
+            { x => x.Icono, Icons.Material.Filled.Straighten },
+            { x => x.Modelo, modelo }
+        };
+        var dialogo = await _dialogo.ShowAsync<DialogoTalla>(titulo, parametros, opciones);
+        var resultado = await dialogo.Result;
+        return resultado is { Canceled: false, Data: DialogoTalla.FormModel datos } ? datos : null;
+    }
+
+    private void Notificar(string? error, string exito)
+    {
+        if (error is null) _snackbar.Add(exito, Severity.Success);
+        else _snackbar.Add(error, Severity.Error);
+    }
+}

@@ -1,0 +1,275 @@
+@using MudBlazor
+@using SistemaCobranzaApp.Shared.Dtos
+@using SistemaCobranzaApp.Shared.Services
+@inject IFormFactor _formFactor
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6" Style="font-weight: 600;">
+            <MudIcon Icon="@Icons.Material.Filled.Payments" Class="mr-2" Style="vertical-align: middle;" />
+            Registrar pago
+        </MudText>
+    </TitleContent>
+
+    <DialogContent>
+        <!-- Contexto de la cuenta -->
+        <MudPaper Elevation="0" Outlined="true" Class="pa-3 mb-3">
+            <div class="dlg-contexto">
+                <div class="dlg-item">
+                    <span class="dlg-etiqueta">Cliente</span>
+                    <span class="dlg-valor">@Cliente</span>
+                </div>
+                <div class="dlg-item">
+                    <span class="dlg-etiqueta">Venta</span>
+                    <span class="dlg-valor">@(CodigoVenta is null ? $"#{IdVenta}" : CodigoVenta)</span>
+                </div>
+                <div class="dlg-item">
+                    <span class="dlg-etiqueta">Saldo pendiente</span>
+                    <MudText Typo="Typo.subtitle1" Color="Color.Error" Style="font-weight:700;">@SaldoPendiente.ToString("C2")</MudText>
+                </div>
+                <div class="dlg-item">
+                    <span class="dlg-etiqueta">Cuota exigida</span>
+                    <span class="dlg-valor">@CuotaFija.ToString("C2")</span>
+                </div>
+            </div>
+        </MudPaper>
+
+        <!-- Promoción de racha de pagos -->
+        @if (PromoRachaActiva && MetaRacha > 0)
+        {
+            <MudAlert Severity="@(VaACompletarRacha ? Severity.Success : Severity.Info)" Dense="true" Class="mb-3" Variant="Variant.Outlined">
+                @if (VaACompletarRacha)
+                {
+                    <text>¡Este pago puntual completa la racha de @MetaRacha pagos! El sistema otorgará automáticamente la <b>bonificación por promoción</b>.</text>
+                }
+                else
+                {
+                    <text>Racha de pagos consecutivos: <b>@RachaActual de @MetaRacha</b>. Un pago puntual suma a la promoción.</text>
+                }
+            </MudAlert>
+        }
+
+        <MudForm @ref="_form" @bind-IsValid="@_formValido">
+
+            <!-- Tipo de pago -->
+            <MudRadioGroup T="ModoPagoDialogo" @bind-Value="_modo">
+                <MudRadio T="ModoPagoDialogo" Value="ModoPagoDialogo.Abono" Color="Color.Primary" Dense="true">Abono normal</MudRadio>
+                @if (PlanesLiquidacion.Count > 0)
+                {
+                    <MudRadio T="ModoPagoDialogo" Value="ModoPagoDialogo.LiquidacionPlan" Color="Color.Success" Dense="true">Liquidación anticipada (plan de pronto pago)</MudRadio>
+                }
+                <MudRadio T="ModoPagoDialogo" Value="ModoPagoDialogo.LiquidacionAcuerdo" Color="Color.Warning" Dense="true">Liquidación por acuerdo</MudRadio>
+            </MudRadioGroup>
+
+            <!-- Liquidación por plan: planes disponibles -->
+            @if (_modo == ModoPagoDialogo.LiquidacionPlan && PlanesLiquidacion.Count > 0)
+            {
+                <MudPaper Elevation="0" Outlined="true" Class="pa-3 my-2">
+                    <MudText Typo="Typo.body2" Class="mb-2" Color="Color.Secondary">
+                        Elige el plan de liquidación. Si el monto cubre el plan vigente, el sistema aplicará
+                        el <b>descuento automático</b> y liquidará la cuenta.
+                    </MudText>
+                    <MudSelect T="VentaPlanDto" Value="_planElegido" ValueChanged="OnPlanElegido"
+                               Label="Plan de liquidación" Variant="Variant.Outlined" Margin="Margin.Dense"
+                               ToStringFunc="@(p => p is null ? "" : $"{p.NumeroMeses} meses — {p.MontoLiquidacion:C2}")">
+                        @foreach (var p in PlanesLiquidacion)
+                        {
+                            <MudSelectItem T="VentaPlanDto" Value="p">@p.NumeroMeses meses — @p.MontoLiquidacion.ToString("C2")</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudPaper>
+            }
+
+            <!-- Liquidación por acuerdo: captura libre del monto convenido -->
+            @if (_modo == ModoPagoDialogo.LiquidacionAcuerdo)
+            {
+                <MudPaper Elevation="0" Outlined="true" Class="pa-3 my-2">
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">
+                        El cliente paga el <b>monto acordado</b> y el saldo restante se <b>condona</b>
+                        (ajuste), dejando la cuenta liquidada en $0.00.
+                    </MudText>
+                </MudPaper>
+            }
+
+            <MudGrid Class="mt-1">
+                <!-- Monto -->
+                <MudItem xs="12" sm="6">
+                    <MudNumericField T="decimal"
+                                     Label="Monto del abono"
+                                     @bind-Value="_monto"
+                                     Min="0.01m"
+                                     Max="@SaldoPendiente"
+                                     Format="0.00"
+                                     Required="true"
+                                     RequiredError="El monto es obligatorio."
+                                     Variant="Variant.Outlined"
+                                     Margin="Margin.Dense"
+                                     Adornment="Adornment.Start"
+                                     AdornmentIcon="@Icons.Material.Filled.AttachMoney" />
+                </MudItem>
+
+                <!-- Cobrador -->
+                <MudItem xs="12" sm="6">
+                    <MudSelect T="long?" @bind-Value="_idCobrador"
+                               Label="Cobrador (opcional)" Clearable="true"
+                               Variant="Variant.Outlined" Margin="Margin.Dense">
+                        @foreach (var cob in Cobradores)
+                        {
+                            <MudSelectItem T="long?" Value="@((long?)cob.IdCobrador)">@cob.Nombre</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+
+                <!-- Observaciones -->
+                <MudItem xs="12">
+                    <MudTextField T="string"
+                                  Label="Observaciones (opcional)"
+                                  @bind-Value="_observaciones"
+                                  Lines="2"
+                                  Variant="Variant.Outlined"
+                                  Margin="Margin.Dense" />
+                </MudItem>
+            </MudGrid>
+
+            <!-- Avisos según el modo -->
+            @if (_modo == ModoPagoDialogo.LiquidacionPlan && _planElegido is not null && _monto >= _planElegido.MontoLiquidacion)
+            {
+                var descuento = SaldoPendiente - _monto;
+                <MudAlert Severity="Severity.Success" Dense="true" Class="mt-2" Variant="Variant.Outlined">
+                    Al pagar @_monto.ToString("C2") sobre un saldo de @SaldoPendiente.ToString("C2"),
+                    el sistema aplicará un descuento automático de <b>@descuento.ToString("C2")</b> y la cuenta quedará liquidada.
+                </MudAlert>
+            }
+            else if (_modo == ModoPagoDialogo.LiquidacionAcuerdo && _monto > 0 && _monto < SaldoPendiente)
+            {
+                var condonado = SaldoPendiente - _monto;
+                <MudAlert Severity="Severity.Warning" Dense="true" Class="mt-2" Variant="Variant.Outlined">
+                    El cliente paga @_monto.ToString("C2") y se condonará un saldo de <b>@condonado.ToString("C2")</b>.
+                    La cuenta quedará liquidada en $0.00.
+                </MudAlert>
+            }
+            else if (_monto > 0 && _monto >= SaldoPendiente)
+            {
+                <MudAlert Severity="Severity.Info" Dense="true" Class="mt-2" Variant="Variant.Outlined">
+                    Este pago liquidará por completo el saldo pendiente de la venta.
+                </MudAlert>
+            }
+        </MudForm>
+    </DialogContent>
+
+    <DialogActions>
+        <MudButton OnClick="Cancelar" Variant="Variant.Text" Color="Color.Default">Cancelar</MudButton>
+        <MudButton OnClick="Guardar" Variant="Variant.Filled" Color="Color.Primary" Disabled="@(!_formValido)">
+            Registrar pago
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+<style>
+    .dlg-contexto {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 20px;
+    }
+    .dlg-item { display: flex; flex-direction: column; }
+    .dlg-etiqueta { font-size: 0.75rem; color: var(--mud-palette-text-secondary); }
+    .dlg-valor { font-weight: 600; }
+</style>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    // ---- Contexto de la venta/cliente ----
+    [Parameter] public long IdVenta { get; set; }
+    [Parameter] public long IdCliente { get; set; }
+    [Parameter] public string Cliente { get; set; } = string.Empty;
+    [Parameter] public string? CodigoVenta { get; set; }
+    [Parameter] public decimal SaldoPendiente { get; set; }
+    [Parameter] public decimal CuotaFija { get; set; }
+
+    // Monto con el que se precarga el input. Si es null se propone la cuota exigida (comportamiento normal).
+    // Al EDITAR un pago se pasa el monto original (el que muestra la tabla del historial).
+    [Parameter] public decimal? MontoInicial { get; set; }
+
+    // ---- Promoción de racha ----
+    [Parameter] public bool PromoRachaActiva { get; set; }
+    [Parameter] public int MetaRacha { get; set; }
+    [Parameter] public int RachaActual { get; set; }
+
+    // ---- Pronto pago ----
+    [Parameter] public List<VentaPlanDto> PlanesLiquidacion { get; set; } = new();
+
+    // ---- Catálogos ----
+    [Parameter] public List<CobradorDto> Cobradores { get; set; } = new();
+    // Cobrador sugerido (resuelto por la zona del cliente). Se preselecciona al abrir.
+    [Parameter] public long? IdCobradorSugerido { get; set; }
+
+    // ---- Usuario que registra ----
+    [Parameter] public long IdUsuarioRegistro { get; set; }
+
+    private MudForm _form = null!;
+    private bool _formValido;
+
+    private ModoPagoDialogo _modo = ModoPagoDialogo.Abono;
+    private decimal _monto;
+    private long? _idCobrador;
+    private string? _observaciones;
+    private VentaPlanDto? _planElegido;
+
+    protected override void OnInitialized()
+    {
+        // Si se recibe un monto inicial (edición), lo usamos tal cual (acotado al saldo disponible).
+        // Si no, por defecto proponemos la cuota exigida (acotada al saldo).
+        _monto = MontoInicial is { } montoInicial
+            ? Math.Min(montoInicial, SaldoPendiente)
+            : (CuotaFija > 0 && CuotaFija <= SaldoPendiente ? CuotaFija : SaldoPendiente);
+
+        // Preseleccionamos el cobrador sugerido por la zona del cliente.
+        _idCobrador = IdCobradorSugerido;
+    }
+
+    // Al elegir un plan de pronto pago precargamos su monto de liquidación.
+    private void OnPlanElegido(VentaPlanDto plan)
+    {
+        _planElegido = plan;
+        if (plan is not null)
+            _monto = Math.Min(plan.MontoLiquidacion, SaldoPendiente);
+    }
+
+    // Un pago puntual que no es pronto pago hace avanzar la racha; al llegar a la meta se otorga la bonificación.
+    private bool VaACompletarRacha =>
+        PromoRachaActiva && MetaRacha > 0 && _modo == ModoPagoDialogo.Abono && (RachaActual + 1) == MetaRacha;
+
+    private void Cancelar() => MudDialog.Cancel();
+
+    private async Task Guardar()
+    {
+        await _form.Validate();
+        if (!_formValido)
+            return;
+
+        if (_monto <= 0)
+            return;
+
+        // El diálogo solo captura la intención; la vista decide qué llamadas a la API ejecutar
+        // según el modo (abono simple, liquidación por plan vía trigger, o condonación por acuerdo).
+        var resultado = new ResultadoDialogoPago(
+            Modo: _modo,
+            Monto: _monto,
+            IdCobrador: _idCobrador,
+            Observaciones: _observaciones?.Trim(),
+            SaldoPendiente: SaldoPendiente);
+
+        MudDialog.Close(DialogResult.Ok(resultado));
+    }
+    
+    private bool EsEntornoMovil
+    {
+        get
+        {
+            var ff = _formFactor.GetFormFactor();
+            return !ff.Equals("Web", StringComparison.OrdinalIgnoreCase)
+                   && !ff.Equals("Desktop", StringComparison.OrdinalIgnoreCase);
+        }
+    }
+}

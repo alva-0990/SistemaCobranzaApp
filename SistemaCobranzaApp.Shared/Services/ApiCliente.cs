@@ -1,10 +1,12 @@
+using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Text.Json;
 using SistemaCobranzaApp.Shared.Dtos;
 
 namespace SistemaCobranzaApp.Shared.Services;
 
-public class ApiCliente
+public partial class ApiCliente
 {
     private readonly HttpClient _http;
     private readonly IServicioAlmacenamiento _almacenamiento;
@@ -16,85 +18,6 @@ public class ApiCliente
         _http = http;
         _almacenamiento = almacenamiento;
     }
-
-    /// <summary>Sesión actual (token + datos del usuario) tras un login exitoso.</summary>
-    public LoginResponse? Sesion { get; private set; }
-
-    public bool Autenticado => Sesion is not null;
-
-    // 2. NUEVO MÉTODO: Carga la sesión automáticamente al iniciar la app
-    public async Task CargarSesionDesdeAlmacenamientoAsync()
-    {
-        try
-        {
-            var sesionGuardada = await _almacenamiento.ObtenerCadenaAsync(TokenKey);
-            if (!string.IsNullOrEmpty(sesionGuardada))
-            {
-                Sesion = System.Text.Json.JsonSerializer.Deserialize<LoginResponse>(sesionGuardada);
-            }
-        }
-        catch 
-        { 
-            // Previene cierres inesperados si no hay sesión guardada aún
-        }
-    }
-
-    // 3. NUEVO MÉTODO INTERNO: Crea peticiones seguras e inyecta el Token de forma aislada
-    private HttpRequestMessage CrearPeticionAutenticada(HttpMethod metodo, string url)
-    {
-        var request = new HttpRequestMessage(metodo, url);
-        if (Sesion is not null)
-        {
-            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", Sesion.Token);
-        }
-        return request;
-    }
-
-    /// <summary>
-    /// Inicia sesión. Devuelve (true, respuesta) si es correcto, o (false, mensaje) si falla.
-    /// </summary>
-    public async Task<(bool ok, string? error)> LoginAsync(string usuario, string password, CancellationToken ct = default)
-    {
-        try
-        {
-            var resp = await _http.PostAsJsonAsync("/api/auth/login",
-                new LoginRequest(usuario, password), ct);
-
-            if (resp.StatusCode == System.Net.HttpStatusCode.Unauthorized)
-                return (false, "Usuario o contraseña incorrectos.");
-
-            if (!resp.IsSuccessStatusCode)
-                return (false, $"Error del servidor ({(int)resp.StatusCode}).");
-
-            var login = await resp.Content.ReadFromJsonAsync<LoginResponse>(cancellationToken: ct);
-            if (login is null)
-                return (false, "Respuesta inválida del servidor.");
-
-            Sesion = login;
-            
-            // MODIFICADO: Persistimos la sesión en el almacenamiento local seguro
-            var jsonSesion = System.Text.Json.JsonSerializer.Serialize(login);
-            await _almacenamiento.GuardarCadenaAsync(TokenKey, jsonSesion);
-
-            return (true, null);
-        }
-        catch (HttpRequestException ex)
-        {
-            return (false, "No se pudo conectar con el servidor.\n" + ex.Message);
-        }
-        catch (TaskCanceledException)
-        {
-            return (false, "La conexión tardó demasiado. Intenta de nuevo.");
-        }
-    }
-
-    // MODIFICADO: Ahora es asíncrono para limpiar de forma segura el almacenamiento
-    public async Task CerrarSesionAsync()
-    {
-        Sesion = null;
-        await _almacenamiento.EliminarCadenaAsync(TokenKey);
-    }
-
 
     /// <summary>
     /// Consulta la cartera del cobrador. Devuelve (respuesta, error).
@@ -202,166 +125,7 @@ public class ApiCliente
 
     private record ErrorRespuesta(string? Error);
 
-    // ===================== Productos =====================
-
-    public async Task<(ProductosPaginaResponse? datos, string? error)> ListarProductosAsync(
-        string? texto = null, bool incluirInactivos = false, int pagina = 1, int tamanoPagina = 50,
-        CancellationToken ct = default)
-    {
-        try
-        {
-            var url = $"/api/productos?pagina={pagina}&tamanoPagina={tamanoPagina}" +
-                      $"&incluirInactivos={incluirInactivos.ToString().ToLowerInvariant()}";
-            if (!string.IsNullOrWhiteSpace(texto)) url += $"&texto={Uri.EscapeDataString(texto)}";
-
-            var resp = await _http.GetAsync(url, ct);
-            if (resp.StatusCode == System.Net.HttpStatusCode.Unauthorized)
-                return (null, "Tu sesión expiró. Inicia sesión de nuevo.");
-            if (!resp.IsSuccessStatusCode)
-                return (null, $"Error del servidor ({(int)resp.StatusCode}).");
-
-            var datos = await resp.Content.ReadFromJsonAsync<ProductosPaginaResponse>(cancellationToken: ct);
-            return (datos, null);
-        }
-        catch (HttpRequestException ex) { return (null, "No se pudo conectar.\n" + ex.Message); }
-        catch (TaskCanceledException) { return (null, "La conexión tardó demasiado."); }
-    }
-
-    public async Task<(ProductoDto? producto, string? error)> CrearProductoAsync(
-        CrearProductoRequest req, CancellationToken ct = default)
-    {
-        try
-        {
-            var resp = await _http.PostAsJsonAsync("/api/productos", req, ct);
-            return await LeerProductoOError(resp, ct);
-        }
-        catch (HttpRequestException ex) { return (null, "No se pudo conectar.\n" + ex.Message); }
-        catch (TaskCanceledException) { return (null, "La conexión tardó demasiado."); }
-    }
-
-    public async Task<(ProductoDto? producto, string? error)> ActualizarProductoAsync(
-        long id, ActualizarProductoRequest req, CancellationToken ct = default)
-    {
-        try
-        {
-            var resp = await _http.PutAsJsonAsync($"/api/productos/{id}", req, ct);
-            return await LeerProductoOError(resp, ct);
-        }
-        catch (HttpRequestException ex) { return (null, "No se pudo conectar.\n" + ex.Message); }
-        catch (TaskCanceledException) { return (null, "La conexión tardó demasiado."); }
-    }
-
-    public async Task<(bool ok, string? error)> DarDeBajaProductoAsync(long id, CancellationToken ct = default)
-    {
-        try
-        {
-            var resp = await _http.DeleteAsync($"/api/productos/{id}", ct);
-            if (resp.IsSuccessStatusCode) return (true, null);
-            if (resp.StatusCode == System.Net.HttpStatusCode.Unauthorized)
-                return (false, "Tu sesión expiró. Inicia sesión de nuevo.");
-            return (false, $"Error del servidor ({(int)resp.StatusCode}).");
-        }
-        catch (HttpRequestException ex) { return (false, "No se pudo conectar.\n" + ex.Message); }
-        catch (TaskCanceledException) { return (false, "La conexión tardó demasiado."); }
-    }
-
-    private async Task<(ProductoDto?, string?)> LeerProductoOError(HttpResponseMessage resp, CancellationToken ct)
-    {
-        if (resp.StatusCode == System.Net.HttpStatusCode.Unauthorized)
-            return (null, "Tu sesión expiró. Inicia sesión de nuevo.");
-        if (!resp.IsSuccessStatusCode)
-        {
-            try
-            {
-                var err = await resp.Content.ReadFromJsonAsync<ErrorRespuesta>(cancellationToken: ct);
-                return (null, err?.Error ?? $"Error del servidor ({(int)resp.StatusCode}).");
-            }
-            catch { return (null, $"Error del servidor ({(int)resp.StatusCode})."); }
-        }
-        var producto = await resp.Content.ReadFromJsonAsync<ProductoDto>(cancellationToken: ct);
-        return (producto, null);
-    }
-
     // ===================== Clientes (administración) =====================
-
-    public async Task<(ClientesPaginaResponse? datos, string? error)> ListarClientesAsync(
-        string? texto = null, long? idRuta = null, bool incluirInactivos = false,
-        int pagina = 1, int tamanoPagina = 50, CancellationToken ct = default)
-    {
-        try
-        {
-            var url = $"/api/clientes?pagina={pagina}&tamanoPagina={tamanoPagina}" +
-                      $"&incluirInactivos={incluirInactivos.ToString().ToLowerInvariant()}";
-            if (!string.IsNullOrWhiteSpace(texto)) url += $"&texto={Uri.EscapeDataString(texto)}";
-            if (idRuta is { } r) url += $"&idRuta={r}";
-
-            var resp = await _http.GetAsync(url, ct);
-            if (resp.StatusCode == System.Net.HttpStatusCode.Unauthorized)
-                return (null, "Tu sesión expiró. Inicia sesión de nuevo.");
-            if (!resp.IsSuccessStatusCode)
-                return (null, $"Error del servidor ({(int)resp.StatusCode}).");
-
-            var datos = await resp.Content.ReadFromJsonAsync<ClientesPaginaResponse>(cancellationToken: ct);
-            return (datos, null);
-        }
-        catch (HttpRequestException ex) { return (null, "No se pudo conectar.\n" + ex.Message); }
-        catch (TaskCanceledException) { return (null, "La conexión tardó demasiado."); }
-    }
-
-    public async Task<(ClienteDto? cliente, string? error)> CrearClienteAsync(
-        CrearClienteRequest req, CancellationToken ct = default)
-    {
-        try
-        {
-            var resp = await _http.PostAsJsonAsync("/api/clientes", req, ct);
-            return await LeerClienteOError(resp, ct);
-        }
-        catch (HttpRequestException ex) { return (null, "No se pudo conectar.\n" + ex.Message); }
-        catch (TaskCanceledException) { return (null, "La conexión tardó demasiado."); }
-    }
-
-    public async Task<(ClienteDto? cliente, string? error)> ActualizarClienteAsync(
-        long id, ActualizarClienteRequest req, CancellationToken ct = default)
-    {
-        try
-        {
-            var resp = await _http.PutAsJsonAsync($"/api/clientes/{id}", req, ct);
-            return await LeerClienteOError(resp, ct);
-        }
-        catch (HttpRequestException ex) { return (null, "No se pudo conectar.\n" + ex.Message); }
-        catch (TaskCanceledException) { return (null, "La conexión tardó demasiado."); }
-    }
-
-    public async Task<(bool ok, string? error)> DarDeBajaClienteAsync(long id, CancellationToken ct = default)
-    {
-        try
-        {
-            var resp = await _http.DeleteAsync($"/api/clientes/{id}", ct);
-            if (resp.IsSuccessStatusCode) return (true, null);
-            if (resp.StatusCode == System.Net.HttpStatusCode.Unauthorized)
-                return (false, "Tu sesión expiró. Inicia sesión de nuevo.");
-            return (false, $"Error del servidor ({(int)resp.StatusCode}).");
-        }
-        catch (HttpRequestException ex) { return (false, "No se pudo conectar.\n" + ex.Message); }
-        catch (TaskCanceledException) { return (false, "La conexión tardó demasiado."); }
-    }
-
-    private async Task<(ClienteDto?, string?)> LeerClienteOError(HttpResponseMessage resp, CancellationToken ct)
-    {
-        if (resp.StatusCode == System.Net.HttpStatusCode.Unauthorized)
-            return (null, "Tu sesión expiró. Inicia sesión de nuevo.");
-        if (!resp.IsSuccessStatusCode)
-        {
-            try
-            {
-                var err = await resp.Content.ReadFromJsonAsync<ErrorRespuesta>(cancellationToken: ct);
-                return (null, err?.Error ?? $"Error del servidor ({(int)resp.StatusCode}).");
-            }
-            catch { return (null, $"Error del servidor ({(int)resp.StatusCode})."); }
-        }
-        var cliente = await resp.Content.ReadFromJsonAsync<ClienteDto>(cancellationToken: ct);
-        return (cliente, null);
-    }
 
     // ===================== Catálogos de apoyo (para formularios) =====================
 
@@ -511,31 +275,7 @@ public class ApiCliente
         catch (TaskCanceledException) { return (null, "La conexión tardó demasiado."); }
     }
 
-    public async Task<(PropuestaDto? propuesta, string? error)> ObtenerPropuestaAsync(long id, CancellationToken ct = default)
-    {
-        try
-        {
-            var resp = await _http.GetAsync($"/api/propuestas/{id}", ct);
-            if (resp.StatusCode == System.Net.HttpStatusCode.NotFound) return (null, "No se encontró la propuesta.");
-            if (!resp.IsSuccessStatusCode) return (null, $"Error del servidor ({(int)resp.StatusCode}).");
-            var p = await resp.Content.ReadFromJsonAsync<PropuestaDto>(cancellationToken: ct);
-            return (p, null);
-        }
-        catch (HttpRequestException ex) { return (null, "No se pudo conectar.\n" + ex.Message); }
-        catch (TaskCanceledException) { return (null, "La conexión tardó demasiado."); }
-    }
 
-    public async Task<(PropuestaDto? propuesta, string? error)> CrearPropuestaAsync(
-        CrearPropuestaRequest req, CancellationToken ct = default)
-    {
-        try
-        {
-            var resp = await _http.PostAsJsonAsync("/api/propuestas", req, ct);
-            return await LeerPropuestaOError(resp, ct);
-        }
-        catch (HttpRequestException ex) { return (null, "No se pudo conectar.\n" + ex.Message); }
-        catch (TaskCanceledException) { return (null, "La conexión tardó demasiado."); }
-    }
 
     public async Task<(PropuestaDto? propuesta, string? error)> ConfirmarPropuestaAsync(long id, CancellationToken ct = default)
     {
@@ -598,7 +338,7 @@ public class ApiCliente
         }
         catch { return Array.Empty<CatalogoItemDto>(); }
     }
-
+/*
     public async Task<(VentaCompletaDto? venta, string? error)> CrearVentaAsync(
         CrearVentaRequest req, CancellationToken ct = default)
     {
@@ -622,7 +362,7 @@ public class ApiCliente
         catch (HttpRequestException ex) { return (null, "No se pudo conectar.\n" + ex.Message); }
         catch (TaskCanceledException) { return (null, "La conexión tardó demasiado."); }
     }
-
+*/
     // ===================== Catálogos administrables (zonas/rutas/cobradores/vendedores) =====================
     // Genérico: GET lista, POST crear, PUT actualizar, DELETE baja. TResp es el DTO devuelto.
 
@@ -633,7 +373,7 @@ public class ApiCliente
         {
             // 1. Mantenemos tu lógica exacta de construcción de parámetros de tu API original
             var inc = recurso == "zonas" ? "incluirInactivas" : "incluirInactivos";
-            var url = $"api/admin/{recurso}?{inc}={incluirInactivos.ToString().ToLowerInvariant()}";
+            var url = $"/api/admin/{recurso}?{inc}={incluirInactivos.ToString().ToLowerInvariant()}";
 
             // 2. 🔥 CORRECCIÓN CRUCIAL: Creamos la petición inyectando el Bearer Token para Blazor Web
             using var request = CrearPeticionAutenticada(HttpMethod.Get, url);
@@ -664,40 +404,6 @@ public class ApiCliente
         }
     }
 
-
-    public async Task<string?> AdminCrearAsync(string recurso, object body, CancellationToken ct = default)
-    {
-        try
-        {
-            var resp = await _http.PostAsJsonAsync($"/api/admin/{recurso}", body, ct);
-            return await ErrorSiFalla(resp, ct);
-        }
-        catch (HttpRequestException ex) { return "No se pudo conectar.\n" + ex.Message; }
-        catch (TaskCanceledException) { return "La conexión tardó demasiado."; }
-    }
-
-    public async Task<string?> AdminActualizarAsync(string recurso, long id, object body, CancellationToken ct = default)
-    {
-        try
-        {
-            var resp = await _http.PutAsJsonAsync($"/api/admin/{recurso}/{id}", body, ct);
-            return await ErrorSiFalla(resp, ct);
-        }
-        catch (HttpRequestException ex) { return "No se pudo conectar.\n" + ex.Message; }
-        catch (TaskCanceledException) { return "La conexión tardó demasiado."; }
-    }
-
-    public async Task<string?> AdminBajaAsync(string recurso, long id, CancellationToken ct = default)
-    {
-        try
-        {
-            var resp = await _http.DeleteAsync($"/api/admin/{recurso}/{id}", ct);
-            return await ErrorSiFalla(resp, ct);
-        }
-        catch (HttpRequestException ex) { return "No se pudo conectar.\n" + ex.Message; }
-        catch (TaskCanceledException) { return "La conexión tardó demasiado."; }
-    }
-
     private async Task<string?> ErrorSiFalla(HttpResponseMessage resp, CancellationToken ct)
     {
         if (resp.IsSuccessStatusCode) return null;
@@ -711,50 +417,10 @@ public class ApiCliente
         catch { return $"Error del servidor ({(int)resp.StatusCode})."; }
     }
 
-    // ===================== Usuarios =====================
-
-    public async Task<(IReadOnlyList<UsuarioDto>? datos, string? error)> ListarUsuariosAsync(
-        bool incluirInactivos = false, CancellationToken ct = default)
-    {
-        try
-        {
-            var resp = await _http.GetAsync($"/api/admin/usuarios?incluirInactivos={incluirInactivos.ToString().ToLowerInvariant()}", ct);
-            if (resp.StatusCode == System.Net.HttpStatusCode.Unauthorized)
-                return (null, "Tu sesión expiró. Inicia sesión de nuevo.");
-            if (!resp.IsSuccessStatusCode)
-                return (null, $"Error del servidor ({(int)resp.StatusCode}).");
-            var datos = await resp.Content.ReadFromJsonAsync<List<UsuarioDto>>(cancellationToken: ct);
-            return (datos, null);
-        }
-        catch (HttpRequestException ex) { return (null, "No se pudo conectar.\n" + ex.Message); }
-        catch (TaskCanceledException) { return (null, "La conexión tardó demasiado."); }
-    }
-
-    public async Task<string?> CrearUsuarioAsync(CrearUsuarioRequest req, CancellationToken ct = default)
-    {
-        try { return await ErrorSiFalla(await _http.PostAsJsonAsync("/api/admin/usuarios", req, ct), ct); }
-        catch (HttpRequestException ex) { return "No se pudo conectar.\n" + ex.Message; }
-        catch (TaskCanceledException) { return "La conexión tardó demasiado."; }
-    }
-
-    public async Task<string?> ActualizarUsuarioAsync(long id, ActualizarUsuarioRequest req, CancellationToken ct = default)
-    {
-        try { return await ErrorSiFalla(await _http.PutAsJsonAsync($"/api/admin/usuarios/{id}", req, ct), ct); }
-        catch (HttpRequestException ex) { return "No se pudo conectar.\n" + ex.Message; }
-        catch (TaskCanceledException) { return "La conexión tardó demasiado."; }
-    }
-
-    public async Task<string?> DarDeBajaUsuarioAsync(long id, CancellationToken ct = default)
-    {
-        try { return await ErrorSiFalla(await _http.DeleteAsync($"/api/admin/usuarios/{id}", ct), ct); }
-        catch (HttpRequestException ex) { return "No se pudo conectar.\n" + ex.Message; }
-        catch (TaskCanceledException) { return "La conexión tardó demasiado."; }
-    }
-
     /// <summary>Roles activos (para el combo del formulario de usuario).</summary>
     public async Task<IReadOnlyList<RolDto>> RolesAsync(CancellationToken ct = default)
     {
-        var (datos, _) = await AdminListarAsync<RolDto>("roles");
+        var (datos, _) = await ListarRolesAdminAsync(incluirInactivos: false, ct);
         return datos ?? (IReadOnlyList<RolDto>)Array.Empty<RolDto>();
     }
 
@@ -764,7 +430,8 @@ public class ApiCliente
     {
         try
         {
-            var resp = await _http.GetAsync(url, ct);
+            using var request = CrearPeticionAutenticada(HttpMethod.Get, url);
+            using var resp = await _http.SendAsync(request, ct);
             if (resp.StatusCode == System.Net.HttpStatusCode.Unauthorized)
                 return (default, "Tu sesión expiró. Inicia sesión de nuevo.");
             if (!resp.IsSuccessStatusCode)
@@ -776,7 +443,8 @@ public class ApiCliente
         catch (TaskCanceledException) { return (default, "La conexión tardó demasiado."); }
     }
 
-    private static string Fecha(DateTimeOffset? d) => d is { } v ? v.ToString("yyyy-MM-dd") : "";
+    private static string Fecha(DateTimeOffset? d)
+        => d is { } v ? Uri.EscapeDataString(v.ToString("O")) : "";
 
     public Task<(ReporteCarteraResponse? datos, string? error)> ReporteCarteraAsync(
         long? idZona = null, long? idRuta = null, long? idEstatusVenta = null, CancellationToken ct = default)
@@ -789,53 +457,65 @@ public class ApiCliente
     }
 
     public Task<(ReportePagosResponse? datos, string? error)> ReportePagosAsync(
-        DateTimeOffset? desde, DateTimeOffset? hasta, long? idCobrador = null, CancellationToken ct = default)
+        DateTimeOffset? desde, DateTimeOffset? hasta, long? idCobrador = null,
+        long? idZona = null, long? idRuta = null, long? idMovimiento = null, CancellationToken ct = default)
     {
         var url = $"/api/reportes/pagos?desde={Fecha(desde)}&hasta={Fecha(hasta)}";
         if (idCobrador is { } c) url += $"&idCobrador={c}";
+        if (idZona is { } z) url += $"&idZona={z}";
+        if (idRuta is { } r) url += $"&idRuta={r}";
+        if (idMovimiento is { } m) url += $"&idMovimiento={m}";
         return GetReporteAsync<ReportePagosResponse>(url, ct);
     }
 
     public Task<(ReporteVentasResponse? datos, string? error)> ReporteVentasAsync(
-        DateTimeOffset? desde, DateTimeOffset? hasta, long? idVendedor = null, CancellationToken ct = default)
+        DateTimeOffset? desde, DateTimeOffset? hasta, long? idVendedor = null,
+        long? idZona = null, long? idRuta = null, CancellationToken ct = default)
     {
         var url = $"/api/reportes/ventas?desde={Fecha(desde)}&hasta={Fecha(hasta)}";
         if (idVendedor is { } v) url += $"&idVendedor={v}";
+        if (idZona is { } z) url += $"&idZona={z}";
+        if (idRuta is { } r) url += $"&idRuta={r}";
         return GetReporteAsync<ReporteVentasResponse>(url, ct);
     }
 
     public Task<(ReporteRecuperacionResponse? datos, string? error)> ReporteRecuperacionAsync(
-        DateTimeOffset? desde, DateTimeOffset? hasta, CancellationToken ct = default)
-        => GetReporteAsync<ReporteRecuperacionResponse>(
-            $"/api/reportes/recuperacion?desde={Fecha(desde)}&hasta={Fecha(hasta)}", ct);
+        DateTimeOffset? desde, DateTimeOffset? hasta,
+        long? idZona = null, long? idRuta = null, CancellationToken ct = default)
+    {
+        var url = $"/api/reportes/recuperacion?desde={Fecha(desde)}&hasta={Fecha(hasta)}";
+        if (idZona is { } z) url += $"&idZona={z}";
+        if (idRuta is { } r) url += $"&idRuta={r}";
+        return GetReporteAsync<ReporteRecuperacionResponse>(url, ct);
+    }
 
     public Task<(ReporteClientesResponse? datos, string? error)> ReporteClientesAsync(
-        long? idRuta = null, long? idClasificacion = null, bool incluirInactivos = false, CancellationToken ct = default)
+        long? idRuta = null, long? idClasificacion = null, bool incluirInactivos = false,
+        long? idZona = null, CancellationToken ct = default)
     {
         var url = $"/api/reportes/clientes?incluirInactivos={incluirInactivos.ToString().ToLowerInvariant()}";
         if (idRuta is { } r) url += $"&idRuta={r}";
         if (idClasificacion is { } c) url += $"&idClasificacion={c}";
+        if (idZona is { } z) url += $"&idZona={z}";
         return GetReporteAsync<ReporteClientesResponse>(url, ct);
     }
 
-    // ===================== Estado de cuenta =====================
-
-    public async Task<(EstadoCuentaResponse? datos, string? error)> EstadoCuentaAsync(long idCliente, CancellationToken ct = default)
+    public Task<(ReporteSeguimientoResponse? datos, string? error)> ReporteSeguimientoAsync(
+        long? idZona = null, DateTimeOffset? altaDesde = null, DateTimeOffset? altaHasta = null, CancellationToken ct = default)
     {
-        try
-        {
-            var resp = await _http.GetAsync($"/api/clientes/{idCliente}/estado-cuenta", ct);
-            if (resp.StatusCode == System.Net.HttpStatusCode.NotFound)
-                return (null, "No se encontró el cliente.");
-            if (resp.StatusCode == System.Net.HttpStatusCode.Unauthorized)
-                return (null, "Tu sesión expiró. Inicia sesión de nuevo.");
-            if (!resp.IsSuccessStatusCode)
-                return (null, $"Error del servidor ({(int)resp.StatusCode}).");
-            var datos = await resp.Content.ReadFromJsonAsync<EstadoCuentaResponse>(cancellationToken: ct);
-            return (datos, null);
-        }
-        catch (HttpRequestException ex) { return (null, "No se pudo conectar.\n" + ex.Message); }
-        catch (TaskCanceledException) { return (null, "La conexión tardó demasiado."); }
+        var url = "/api/reportes/seguimiento?_=1";
+        if (idZona is { } z) url += $"&idZona={z}";
+        if (altaDesde is { } d) url += $"&altaDesde={Fecha(d)}";
+        if (altaHasta is { } h) url += $"&altaHasta={Fecha(h)}";
+        return GetReporteAsync<ReporteSeguimientoResponse>(url, ct);
+    }
+
+    public Task<(DashboardResponse? datos, string? error)> DashboardAsync(
+        DateTimeOffset? desde, DateTimeOffset? hasta, long? idZona = null, CancellationToken ct = default)
+    {
+        var url = $"/api/reportes/dashboard?desde={Fecha(desde)}&hasta={Fecha(hasta)}";
+        if (idZona is { } z) url += $"&idZona={z}";
+        return GetReporteAsync<DashboardResponse>(url, ct);
     }
 
     // ===================== Cancelaciones =====================
@@ -858,7 +538,298 @@ public class ApiCliente
         catch (TaskCanceledException) { return "La conexión tardó demasiado."; }
     }
     
+    ////NUEVOS
+    
+    public async Task<string?> AdminBajaAsync(
+        string recurso,
+        long id,
+        CancellationToken ct = default)
+    {
+        try
+        {
+            using var request = CrearPeticionAutenticada(
+                HttpMethod.Delete,
+                $"/api/admin/{recurso}/{id}");
+
+            using var resp = await _http.SendAsync(request, ct);
+
+            return await ErrorSiFalla(resp, ct);
+        }
+        catch (HttpRequestException ex)
+        {
+            return "No se pudo conectar.\n" + ex.Message;
+        }
+        catch (TaskCanceledException)
+        {
+            return "La conexión tardó demasiado.";
+        }
+    }
+    public async Task<string?> AdminActualizarAsync(
+        string recurso,
+        long id,
+        object body,
+        CancellationToken ct = default)
+    {
+        try
+        {
+            using var request = CrearPeticionAutenticada(
+                HttpMethod.Put,
+                $"/api/admin/{recurso}/{id}");
+
+            request.Content = JsonContent.Create(body);
+
+            using var resp = await _http.SendAsync(request, ct);
+
+            return await ErrorSiFalla(resp, ct);
+        }
+        catch (HttpRequestException ex)
+        {
+            return "No se pudo conectar.\n" + ex.Message;
+        }
+        catch (TaskCanceledException)
+        {
+            return "La conexión tardó demasiado.";
+        }
+    }
+    
+    public async Task<string?> AdminCrearAsync(
+        string recurso,
+        object body,
+        CancellationToken ct = default)
+    {
+        try
+        {
+            using var request = CrearPeticionAutenticada(
+                HttpMethod.Post,
+                $"/api/admin/{recurso}");
+
+            request.Content = JsonContent.Create(body);
+
+            using var resp = await _http.SendAsync(request, ct);
+
+            return await ErrorSiFalla(resp, ct);
+        }
+        catch (HttpRequestException ex)
+        {
+            return "No se pudo conectar.\n" + ex.Message;
+        }
+        catch (TaskCanceledException)
+        {
+            return "La conexión tardó demasiado.";
+        }
+    }
     
     
     
+    // ===================== Cancelaciones =====================
+    
+  // =========================================================================
+    // 🟢 MÉTODOS PÚBLICOS ESPECÍFICOS (Los que consumirá tu código de Blazor)
+    // =========================================================================
+
+
+    // 1. Instanciamos la opción Web de manera estática y correcta una sola vez
+    private static readonly JsonSerializerOptions OpcionesWeb = new(JsonSerializerDefaults.Web);
+
+    private async Task<(List<T>? datos, string? error)> GetListaGenéricaAsync<T>(string url, CancellationToken ct)
+    {
+        try
+        {
+            using var request = CrearPeticionAutenticada(HttpMethod.Get, url);
+            using var resp = await _http.SendAsync(request, ct);
+
+            var (exito, error) = EvaluarEstatusComún(resp);
+            if (!exito) return (default, error); // 👈 Tipado correcto para tuplas con default
+
+            // Usamos la propiedad estática OpcionesWeb corregida
+            var datos = await resp.Content.ReadFromJsonAsync<List<T>>(OpcionesWeb, ct);
+            return (datos ?? new(), null);
+        }
+        catch (HttpRequestException ex) { return (default, $"Error de red: {ex.Message}"); }
+        catch (OperationCanceledException) { return (default, "La operación fue cancelada o expiró."); }
+    }
+
+    private async Task<(T? datos, string? error)> GetIndividualGenéricoAsync<T>(string url, CancellationToken ct)
+    {
+        try
+        {
+            using var request = CrearPeticionAutenticada(HttpMethod.Get, url);
+            using var resp = await _http.SendAsync(request, ct);
+
+            if (resp.StatusCode == HttpStatusCode.NotFound) return (default, null);
+
+            var (exito, error) = EvaluarEstatusComún(resp);
+            if (!exito) return (default, error);
+
+            var datos = await resp.Content.ReadFromJsonAsync<T>(OpcionesWeb, ct);
+            return (datos, null);
+        }
+        catch (HttpRequestException ex) { return (default, $"Error de red: {ex.Message}"); }
+        catch (OperationCanceledException) { return (default, "La operación fue cancelada."); }
+    }
+
+    private async Task<(TResponse? datos, string? error)> PostGenéricoAsync<TRequest, TResponse>(string url, TRequest body, CancellationToken ct)
+    {
+        try
+        {
+            using var request = CrearPeticionAutenticada(HttpMethod.Post, url);
+            request.Content = JsonContent.Create(body);
+            using var resp = await _http.SendAsync(request, ct);
+
+            if (resp.StatusCode == HttpStatusCode.BadRequest)
+            {
+                var err = await resp.Content.ReadFromJsonAsync<ErrorRespuesta>(OpcionesWeb, ct);
+                return (default, err?.Error ?? "Datos de petición inválidos.");
+            }
+
+            var (exito, error) = EvaluarEstatusComún(resp);
+            if (!exito) return (default, error);
+
+            var datos = await resp.Content.ReadFromJsonAsync<TResponse>(OpcionesWeb, ct);
+            return (datos, null);
+        }
+        catch (HttpRequestException ex) { return (default, $"Error de red: {ex.Message}"); }
+        catch (OperationCanceledException) { return (default, "La operación fue cancelada."); }
+    }
+
+    private async Task<(TResponse? datos, string? error)> PutGenéricoAsync<TRequest, TResponse>(string url, TRequest body, CancellationToken ct)
+    {
+        try
+        {
+            using var request = CrearPeticionAutenticada(HttpMethod.Put, url);
+            request.Content = JsonContent.Create(body);
+            using var resp = await _http.SendAsync(request, ct);
+
+            if (resp.StatusCode == HttpStatusCode.BadRequest || resp.StatusCode == HttpStatusCode.NotFound)
+            {
+                var err = await resp.Content.ReadFromJsonAsync<ErrorRespuesta>(OpcionesWeb, ct);
+                return (default, err?.Error ?? "No se pudo actualizar el registro.");
+            }
+
+            var (exito, error) = EvaluarEstatusComún(resp);
+            if (!exito) return (default, error);
+
+            var datos = await resp.Content.ReadFromJsonAsync<TResponse>(OpcionesWeb, ct);
+            return (datos, null);
+        }
+        catch (HttpRequestException ex) { return (default, $"Error de red: {ex.Message}"); }
+        catch (OperationCanceledException) { return (default, "La operación fue cancelada."); }
+    }
+
+    private async Task<(T? datos, string? error)> DeleteGenéricoAsync<T>(string url, CancellationToken ct)
+    {
+        try
+        {
+            using var request = CrearPeticionAutenticada(HttpMethod.Delete, url);
+            using var resp = await _http.SendAsync(request, ct);
+
+            if (resp.StatusCode == HttpStatusCode.NotFound)
+            {
+                var err = await resp.Content.ReadFromJsonAsync<ErrorRespuesta>(OpcionesWeb, ct);
+                return (default, err?.Error ?? "El registro no existe.");
+            }
+
+            var (exito, error) = EvaluarEstatusComún(resp);
+            if (!exito) return (default, error);
+
+            var datos = await resp.Content.ReadFromJsonAsync<T>(OpcionesWeb, ct);
+            return (datos, null);
+        }
+        catch (HttpRequestException ex) { return (default, $"Error de red: {ex.Message}"); }
+        catch (OperationCanceledException) { return (default, "La operación fue cancelada."); }
+    }
+
+
+    private (bool exito, string? error) EvaluarEstatusComún(HttpResponseMessage resp)
+    {
+        if (resp.StatusCode == HttpStatusCode.Unauthorized)
+            return (false, "Tu sesión expiró. Inicia sesión de nuevo.");
+        if (resp.StatusCode == HttpStatusCode.Forbidden)
+            return (false, "No tienes permisos para realizar esta acción.");
+        if (!resp.IsSuccessStatusCode)
+            return (false, $"Error del servidor ({(int)resp.StatusCode}).");return (true, null);
+        
+    }
+
+    // =========================================================================
+    // 🆕 Helpers para el sobre estándar ApiRespuesta<T>
+    // Leen el envelope y extraen .Resultado; en error arman el mensaje a partir
+    // de Mensaje + Detalles del propio sobre.
+    // =========================================================================
+
+    /// <summary>Extrae el mensaje de error legible de un sobre estándar de error.</summary>
+    private static string MensajeDeSobre<T>(ApiRespuesta<T>? sobre, string porDefecto)
+    {
+        if (sobre is null) return porDefecto;
+        var detalle = sobre.Detalles is { Count: > 0 }
+            ? string.Join(" ", sobre.Detalles.Where(d => !string.IsNullOrWhiteSpace(d)))
+            : null;
+        return !string.IsNullOrWhiteSpace(detalle) ? detalle
+            : !string.IsNullOrWhiteSpace(sobre.Mensaje) ? sobre.Mensaje
+            : porDefecto;
+    }
+
+    private async Task<(List<T>? datos, string? error)> GetSobreListaAsync<T>(string url, CancellationToken ct)
+    {
+        try
+        {
+            using var request = CrearPeticionAutenticada(HttpMethod.Get, url);
+            using var resp = await _http.SendAsync(request, ct);
+
+            var (exito, error) = EvaluarEstatusComún(resp);
+            if (!exito) return (default, error);
+
+            var sobre = await resp.Content.ReadFromJsonAsync<ApiRespuesta<List<T>>>(OpcionesWeb, ct);
+            return (sobre?.Resultado ?? new(), null);
+        }
+        catch (HttpRequestException ex) { return (default, $"Error de red: {ex.Message}"); }
+        catch (OperationCanceledException) { return (default, "La operación fue cancelada o expiró."); }
+    }
+
+    private async Task<(T? datos, string? error)> GetSobreIndividualAsync<T>(string url, CancellationToken ct)
+    {
+        try
+        {
+            using var request = CrearPeticionAutenticada(HttpMethod.Get, url);
+            using var resp = await _http.SendAsync(request, ct);
+
+            if (resp.StatusCode == HttpStatusCode.NotFound) return (default, null);
+
+            var (exito, error) = EvaluarEstatusComún(resp);
+            if (!exito) return (default, error);
+
+            var sobre = await resp.Content.ReadFromJsonAsync<ApiRespuesta<T>>(OpcionesWeb, ct);
+            return (sobre is not null ? sobre.Resultado : default, null);
+        }
+        catch (HttpRequestException ex) { return (default, $"Error de red: {ex.Message}"); }
+        catch (OperationCanceledException) { return (default, "La operación fue cancelada."); }
+    }
+
+    /// <summary>POST/PUT/DELETE que devuelven un sobre estándar con payload.</summary>
+    private async Task<(T? datos, string? error)> EnviarSobreAsync<T>(
+        HttpMethod metodo, string url, object? body, CancellationToken ct)
+    {
+        try
+        {
+            using var request = CrearPeticionAutenticada(metodo, url);
+            if (body is not null) request.Content = JsonContent.Create(body);
+            using var resp = await _http.SendAsync(request, ct);
+
+            if (resp.StatusCode is HttpStatusCode.BadRequest
+                or HttpStatusCode.NotFound
+                or HttpStatusCode.Conflict)
+            {
+                var errSobre = await resp.Content.ReadFromJsonAsync<ApiRespuesta<T>>(OpcionesWeb, ct);
+                return (default, MensajeDeSobre(errSobre, "No se pudo completar la operación."));
+            }
+
+            var (exito, error) = EvaluarEstatusComún(resp);
+            if (!exito) return (default, error);
+
+            var sobre = await resp.Content.ReadFromJsonAsync<ApiRespuesta<T>>(OpcionesWeb, ct);
+            return (sobre is not null ? sobre.Resultado : default, null);
+        }
+        catch (HttpRequestException ex) { return (default, $"Error de red: {ex.Message}"); }
+        catch (OperationCanceledException) { return (default, "La operación fue cancelada."); }
+    }
 }

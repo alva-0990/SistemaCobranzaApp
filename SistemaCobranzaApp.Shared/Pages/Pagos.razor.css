@@ -1,0 +1,202 @@
+/* ===================== Buscador ===================== */
+.barra-busqueda {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 8px;
+}
+
+.barra-busqueda .buscador-remarcado {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.buscador-remarcado ::deep .mud-input-outlined-border {
+    border-width: 2px;
+}
+
+/* Botón de buscar junto al input (no se encoge). */
+.boton-buscar {
+    white-space: nowrap;
+    flex: 0 0 auto;
+}
+
+/* En móvil: el buscador se apila (input arriba, botón grande abajo ocupando el ancho). */
+@media (max-width: 600px) {
+    .barra-busqueda {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .barra-busqueda .boton-buscar {
+        width: 100%;
+        height: 48px;
+        font-size: 1.05rem;
+    }
+}
+
+/* ===================== Pestañas remarcadas (mismo estilo que el resto de la app) ===================== */
+.tabs-remarcados ::deep .mud-tab {
+    opacity: 0.65;
+    font-weight: 500;
+    transition: opacity 0.15s ease, background-color 0.15s ease;
+}
+
+.tabs-remarcados ::deep .mud-tab.mud-tab-active {
+    opacity: 1;
+    font-weight: 800;
+    background-color: rgba(255, 255, 255, 0.18);
+    border-radius: 8px 8px 0 0;
+}
+
+.tabs-remarcados ::deep .mud-tab-slider {
+    height: 4px;
+}
+
+/* ===================== Secciones ===================== */
+.seccion-titulo {
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    font-size: 0.95rem;
+    color: var(--mud-palette-primary);
+}
+
+/* Encabezado de la sección de venta: título a la izquierda, botón de pago a la derecha. */
+.encabezado-venta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+/* Encabezado del detalle (título + botón Regresar). */
+.encabezado-detalle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.titulo-detalle {
+    font-weight: 800;
+}
+
+/* Botón de pago destacado (acción principal, cómodo para pantalla táctil / móvil). */
+.boton-pago-grande {
+    height: 56px;
+    font-size: 1.1rem;
+    font-weight: 700;
+}
+
+/* ===================== Escáner de QR ===================== */
+.qr-contenedor {
+    position: relative;
+    width: 100%;
+    max-width: 420px;
+    margin: 0 auto;
+    aspect-ratio: 1 / 1;
+    background: #000;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.qr-video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+/* Capa de invitación mostrada mientras la cámara no está activa. */
+.qr-overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 16px;
+    background: var(--mud-palette-background-grey);
+}
+
+/* Campo etiqueta/valor en una sola línea compacta. */
+.campo-linea {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 2px 0;
+    border-bottom: 1px dashed var(--mud-palette-divider);
+}
+
+.campo-linea:last-child {
+    border-bottom: none;
+}
+
+.campo-etiqueta {
+    color: var(--mud-palette-text-secondary);
+    font-size: 0.8rem;
+    white-space: nowrap;
+}
+
+.campo-valor {
+    font-size: 0.85rem;
+    font-weight: 500;
+    text-align: right;
+    word-break: break-word;
+}
+
+.chip-compacto {
+    height: 20px;
+}
+
+/* ===================== Bandas de resumen ===================== */
+.panel-resumen {
+    background-color: var(--mud-palette-background-grey);
+}
+
+.resumen-banda {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 24px;
+}
+
+.resumen-item {
+    display: flex;
+    flex-direction: column;
+}
+
+.resumen-etiqueta {
+    font-size: 0.75rem;
+    color: var(--mud-palette-text-secondary);
+}
+
+.resumen-valor {
+    font-weight: 700;
+    line-height: 1.2;
+}
+
+/* ===================== Saldos ===================== */
+.saldo-pendiente {
+    color: var(--mud-palette-error);
+}
+
+.saldo-liquidado {
+    color: var(--mud-palette-success);
+}
+
+/* ===================== Tablas ===================== */
+.fila-clicable {
+    cursor: pointer;
+}
+
+.fila-seleccionada {
+    background-color: var(--mud-palette-primary-hover);
+}
+
+.h-100 {
+    height: 100%;
+}

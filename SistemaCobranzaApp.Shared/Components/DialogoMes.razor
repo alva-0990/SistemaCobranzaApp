@@ -1,0 +1,81 @@
+@using MudBlazor
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6" Style="font-weight: 600;">
+            <MudIcon Icon="@Icono" Class="mr-2" Style="vertical-align: middle;" />
+            @Titulo
+        </MudText>
+    </TitleContent>
+
+    <DialogContent>
+        <MudForm @ref="_form" @bind-IsValid="@_formValido">
+            <MudGrid>
+                @* Número de meses *@
+                <MudItem xs="12" sm="4">
+                    <MudNumericField T="int"
+                                     Label="Núm. de meses"
+                                     @bind-Value="Modelo.NumMeses"
+                                     Min="1"
+                                     Required="true"
+                                     RequiredError="El número de meses es obligatorio."
+                                     Variant="Variant.Outlined"
+                                     Margin="Margin.Dense" />
+                </MudItem>
+
+                @* Descripción *@
+                <MudItem xs="12" sm="8">
+                    <MudTextField T="string"
+                                  Label="Descripción"
+                                  @bind-Value="Modelo.Descripcion"
+                                  Required="true"
+                                  RequiredError="La descripción es obligatoria."
+                                  Variant="Variant.Outlined"
+                                  Margin="Margin.Dense" />
+                </MudItem>
+
+                @* Estatus *@
+                <MudItem xs="12" Class="d-flex align-center">
+                    <MudSwitch T="bool"
+                               @bind-Value="Modelo.Activo"
+                               Color="Color.Primary"
+                               Label="@(Modelo.Activo ? "Estatus: Activo" : "Estatus: Inactivo")" />
+                </MudItem>
+            </MudGrid>
+        </MudForm>
+    </DialogContent>
+
+    <DialogActions>
+        <MudButton OnClick="Cancelar" Variant="Variant.Text" Color="Color.Default">Cancelar</MudButton>
+        <MudButton OnClick="Guardar" Variant="Variant.Filled" Color="Color.Primary" Disabled="@(!_formValido)">
+            Guardar
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter] public string Titulo { get; set; } = "Gestionar plazo";
+    [Parameter] public string Icono { get; set; } = Icons.Material.Filled.CalendarMonth;
+    [Parameter] public FormModel Modelo { get; set; } = new();
+
+    private MudForm _form = null!;
+    private bool _formValido;
+
+    private void Cancelar() => MudDialog.Cancel();
+
+    private async Task Guardar()
+    {
+        await _form.Validate();
+        if (_formValido)
+            MudDialog.Close(DialogResult.Ok(Modelo));
+    }
+
+    public class FormModel
+    {
+        public int NumMeses { get; set; } = 1;
+        public string Descripcion { get; set; } = string.Empty;
+        public bool Activo { get; set; } = true;
+    }
+}

@@ -8,7 +8,7 @@ namespace SistemaCobranzaApp.Infrastructure.Cobranza;
 
 /// <summary>
 /// Estado de cuenta consolidado de un cliente: datos del cliente, sus ventas
-/// (no canceladas) con saldo, historial de pagos y totales.
+/// (no canceladas) con saldo, historial de pagos y totales bajo el esquema de cuotas.
 /// </summary>
 public class ServicioEstadoCuenta
 {
@@ -30,7 +30,7 @@ public class ServicioEstadoCuenta
 
         // Ventas (no canceladas) del cliente.
         var ventasFilas = await (from v in _db.Ventas.AsNoTracking()
-                                 where v.IdCliente == idCliente && v.IdEstatusVenta != EstatusVentaIds.Cancelada
+                                 where v.IdCliente == idCliente
                                  join ev in _db.EstatusVenta.AsNoTracking() on v.IdEstatusVenta equals ev.IdEstatusVenta into evj
                                  from ev in evj.DefaultIfEmpty()
                                  orderby v.FechaCompra descending
@@ -38,9 +38,13 @@ public class ServicioEstadoCuenta
 
         var ventas = ventasFilas.Select(x =>
         {
-            var saldo = CalculoCobranza.CalcularSaldoAnterior(x.v.TotalFinal, x.v.Enganche, x.v.TotalAbonos);
+            // El saldo autoritativo es SaldoPendiente (lo mantiene el trigger de cobranza e incluye
+            // ajustes/condonaciones). Calcularlo con Total-Enganche-Abonado ignoraría esos ajustes
+            // y haría que ventas ya liquidadas aparezcan con saldo.
+            var saldo = x.v.SaldoPendiente;
+
             return new EstadoCuentaVentaDto(
-                x.v.IdVenta, x.v.CodigoVenta, x.v.TotalFinal, x.v.Enganche, x.v.TotalAbonos,
+                x.v.IdVenta, x.v.CodigoVenta, x.v.TotalFinal, x.v.Enganche, x.v.TotalAbonado,
                 saldo, x.ev?.Descripcion, x.v.FechaCompra, x.v.FechaUltimoPago);
         }).ToList();
 
@@ -54,16 +58,17 @@ public class ServicioEstadoCuenta
                                p.IdPago, p.FolioPago, p.IdVenta, p.MontoAbona, p.SaldoActual,
                                cob != null ? cob.Nombre : null, p.FechaPago)).ToListAsync(ct);
 
-        // Totales (lógica pura).
-        var totales = CalculoEstadoCuenta.CalcularTotales(
-            ventasFilas.Select(x => new CalculoEstadoCuenta.VentaResumen(
-                x.v.TotalFinal, x.v.Enganche, x.v.TotalAbonos)));
+        // Totales de cabecera. El saldo total usa SaldoPendiente autoritativo (consistente con la
+        // lista de ventas) para que las cuentas liquidadas por ajuste/condonación no sumen saldo.
+        var totalVendido = ventasFilas.Sum(x => x.v.TotalFinal);
+        var totalPagado = ventasFilas.Sum(x => x.v.TotalAbonado);
+        var saldoTotal = ventasFilas.Sum(x => x.v.SaldoPendiente);
 
         var nombre = BusquedaHelper.NombreCompleto(
             clienteFila.c.Nombre, clienteFila.c.ApPaterno, clienteFila.c.ApMaterno);
 
         return new EstadoCuentaResponse(
             clienteFila.c.IdCliente, nombre, clienteFila.r?.Descripcion, clienteFila.z?.Descripcion,
-            totales.TotalVendido, totales.TotalPagado, totales.SaldoTotal, ventas, pagos);
+            totalVendido, totalPagado, saldoTotal, ventas, pagos);
     }
 }

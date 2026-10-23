@@ -1,41 +1,346 @@
-﻿@inherits LayoutComponentBase
+@inherits LayoutComponentBase
+@implements IDisposable
+@using MudBlazor
+@using Microsoft.AspNetCore.Components.Routing
 @using SistemaCobranzaApp.Shared.Services
+@using SistemaCobranzaApp.Shared.Theme
+@using SistemaCobranzaApp.Shared.Components
+@using SistemaCobranzaApp.Shared.Dtos
+@inject IDialogService Dialogos
+@inject ISnackbar Snackbar
 @inject ApiCliente ApiClienteService
 @inject NavigationManager NavigationManagerService
+@inject IFormFactor FormFactor
+@inject ServicioJornadaLocal Jornada
+@inject EstadoEmpresaGlobal EmpresaGlobal 
 
-<div class="page">
-    <div class="sidebar">
+<MudAppBar Elevation="1">
+    @* El botón de menú (drawer) solo aplica en web; en móvil se usa la barra inferior. *@
+    @if (!EsEntornoMovil)
+    {
+        <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" Edge="Edge.Start" OnClick="@((e) => DrawerToggle())" />
+    }
+    @if (AppTheme.ObtenerLogo(EmpresaGlobal.Identidad, ObtenerModoOscuroActivo()) is { } logo)
+    {
+        <img src="@logo" alt="Logo de la empresa" style="width: 36px; height: 36px; object-fit: contain; margin-left: 12px;" />
+    }
+    <MudText Typo="Typo.h6" Class="ml-3" Style="font-weight: 600;">
+        @AppTheme.ObtenerNombre(EmpresaGlobal.Identidad, EsEntornoMovil)
+
+    </MudText>
+
+    <MudSpacer />
+
+    @if (ApiClienteService.Autenticado)
+    {
+        @* Aviso offline: indica que se trabaja sin conexión y hasta qué hora es válida la
+           sesión (el token JWT). Solo visible sin internet; al recuperar señal el token se
+           renueva y SesionCambiada vuelve a renderizar esta barra con la nueva hora. *@
+        @if (!Jornada.ConInternet && ApiClienteService.Sesion is { } sesionActiva)
+        {
+            <MudChip T="string" Color="Color.Warning" Size="Size.Small" Variant="Variant.Filled"
+                     Icon="@Icons.Material.Filled.CloudOff" Class="mr-2"
+                     title="@($"Trabajando sin conexión. Sesión válida hasta las {sesionActiva.Expira.ToLocalTime():HH:mm}.")">
+                @if (EsEntornoMovil)
+                {
+                    @sesionActiva.Expira.ToLocalTime().ToString("HH:mm")
+                }
+                else
+                {
+                    <span>Sin conexión · sesión hasta @sesionActiva.Expira.ToLocalTime().ToString("HH:mm")</span>
+                }
+            </MudChip>
+        }
+
+        @* Toggle de tema: ícono en ambos entornos. *@
+        <MudIconButton Icon="@(ObtenerModoOscuroActivo() ? Icons.Material.Filled.LightMode : Icons.Material.Filled.DarkMode)"
+                       Color="Color.Inherit"
+                       Class="mr-1"
+                       OnClick="@ToggleDarkMode" />
+
+        <MudMenu Icon="@(EsEntornoMovil ? Icons.Material.Filled.AccountCircle : null)"
+                 Label="@(EsEntornoMovil ? null : ApiClienteService.Sesion?.Usuario)"
+                 StartIcon="@(EsEntornoMovil ? null : Icons.Material.Filled.AccountCircle)"
+                 Color="Color.Inherit" Variant="Variant.Text" title="Mi cuenta"
+                 AnchorOrigin="Origin.BottomRight" TransformOrigin="Origin.TopRight">
+            <MudMenuItem Icon="@Icons.Material.Filled.ManageAccounts" OnClick="ActualizarPerfil">Actualizar perfil</MudMenuItem>
+            <MudMenuItem Icon="@Icons.Material.Filled.Lock" OnClick="ActualizarPassword">Actualizar contraseña</MudMenuItem>
+            <MudDivider />
+            <MudMenuItem Icon="@Icons.Material.Filled.Logout" OnClick="ManejarCerrarSesion">Cerrar sesión</MudMenuItem>
+        </MudMenu>
+    }
+</MudAppBar>
+
+@* Drawer lateral: solo en web. En móvil se reemplaza por la barra inferior. *@
+@if (!EsEntornoMovil)
+{
+    <MudDrawer @bind-Open="_drawerOpen"
+               Variant="DrawerVariant.Responsive"
+               ClipMode="DrawerClipMode.Always"
+               Elevation="2">
         <NavMenu />
-    </div>
+    </MudDrawer>
+}
 
-    <main>
-        <!-- Barra superior ejecutiva -->
-        <div class="top-row px-4" style="display: flex; justify-content: flex-end; align-items: center; gap: 16px; border-bottom: 1px solid #E5E7EB; background-color: #FFFFFF;">
-            @if (ApiClienteService.Autenticado)
-            {
-                <span style="font-size: 14px; color: #4B5563; font-weight: 500;">
-                    Usuario: <strong style="color: #111827;">@ApiClienteService.Sesion?.Usuario</strong>
-                </span>
-                <button @onclick="ManejarCerrarSesion" 
-                        style="background-color: #FEF2F2; color: #991B1B; border: 1px solid #FCA5A5; padding: 6px 12px; border-radius: 4px; font-size: 13px; font-weight: 600; cursor: pointer; transition: background 0.2s;">
-                    Cerrar sesión
-                </button>
-            }
+<MudMainContent Style="min-height: 100dvh; display: flex; flex-direction: column;">
+    <MudContainer MaxWidth="MaxWidth.Large" Style="flex: 1;" Class="@(EsEntornoMovil ? "my-4 pt-2 pb-nav-movil" : "my-4 pt-2")">
+        @Body
+    </MudContainer>
+    @if (!EsEntornoMovil)
+    {
+        <PieAplicacion />
+    }
+</MudMainContent>
+
+@* ===== Bottom Navigation (solo móvil / Android) — estándar Material ===== *@
+@if (EsEntornoMovil && ApiClienteService.Autenticado && Jornada.Disponible && Jornada.EsUsuarioCampo)
+{
+    <nav class="bottom-nav-movil">
+        <NavLink class="bottom-nav-item" href="jornada" Match="NavLinkMatch.All">
+            <MudIcon Icon="@Icons.Material.Filled.Assignment" />
+            <span>Mi jornada</span>
+        </NavLink>
+        <NavLink class="bottom-nav-item" href="@(ApiClienteService.Sesion?.IdRol == 3 ? "jornada/ventas" : "jornada/cobranza")">
+            <MudIcon Icon="@Icons.Material.Filled.Search" />
+            <span>@(ApiClienteService.Sesion?.IdRol == 3 ? "Clientes y ventas" : "Cobranza")</span>
+        </NavLink>
+        <NavLink class="bottom-nav-item" href="jornada/reportes">
+            <MudIcon Icon="@Icons.Material.Filled.Assessment" />
+            <span>Reportes</span>
+        </NavLink>
+    </nav>
+}
+else if (EsEntornoMovil && ApiClienteService.Autenticado)
+{
+    <nav class="bottom-nav-movil">
+        <!-- ACCESOS PRINCIPALES DE OPERACIÓN DIARIA -->
+        <NavLink class="bottom-nav-item" href="" Match="NavLinkMatch.All">
+            <MudIcon Icon="@Icons.Material.Filled.Home" Size="Size.Medium" />
+            <span class="bottom-nav-label">Home</span>
+        </NavLink>
+        
+        <NavLink class="bottom-nav-item" href="clientes">
+            <MudIcon Icon="@Icons.Material.Filled.People" Size="Size.Medium" />
+            <span class="bottom-nav-label">Clientes</span>
+        </NavLink>
+        
+        <NavLink class="bottom-nav-item" href="pagos">
+            <MudIcon Icon="@Icons.Material.Filled.Payments" Size="Size.Medium" />
+            <span class="bottom-nav-label">Pagos</span>
+        </NavLink>
+
+        <NavLink class="bottom-nav-item" href="reportes">
+            <MudIcon Icon="@Icons.Material.Filled.Assessment" Size="Size.Medium" />
+            <span class="bottom-nav-label">Reportes</span>
+        </NavLink>
+
+        <!-- "Más": Abre la hoja inferior con control de rutas, catálogos y reportes -->
+        <button type="button" class="bottom-nav-item @(_mostrarMas ? "active" : "")" @onclick="AlternarMas">
+            <MudIcon Icon="@Icons.Material.Filled.MoreHoriz" Size="Size.Medium" />
+            <span class="bottom-nav-label">Más</span>
+        </button>
+    </nav>
+
+    @* Hoja emergente del botón "Más". Overlay propio + z-index por encima de la barra
+       (la barra usa 1300). Evita el popover de MudBlazor, poco fiable dentro de un
+       <nav> fijo en el WebView de Android. *@
+    @if (_mostrarMas)
+    {
+        <div class="mas-overlay" @onclick="CerrarMas"></div>
+        <div class="mas-sheet">
+            <!-- Continuación de Operación Diaria -->
+            <button type="button" class="mas-item" @onclick="@(() => IrA("reversion-pagos"))">
+                <MudIcon Icon="@Icons.Material.Filled.HistoryToggleOff" Size="Size.Medium" Class="mr-3" />
+                <span>Reversión de Pagos</span>
+            </button>
+            <button type="button" class="mas-item" @onclick="@(() => IrA("pagos-comisiones"))">
+                <MudIcon Icon="@Icons.Material.Filled.PriceCheck" Size="Size.Medium" Class="mr-3" />
+                <span>Pago Comisión Vendedores</span>
+            </button>
+
+            <!-- Separador Visual opcional o espacio para Zonas y Rutas -->
+            <hr class="mas-divider" style="border: 0; border-top: 1px solid var(--mud-palette-lines); margin: 8px 0;" />
+
+            <button type="button" class="mas-item" @onclick="@(() => IrA("zonas-rutas"))">
+                <MudIcon Icon="@Icons.Material.Filled.AltRoute" Size="Size.Medium" Class="mr-3" />
+                <span>Control de Zonas y Rutas</span>
+            </button>
+            <button type="button" class="mas-item" @onclick="@(() => IrA("vendedores-cobradores"))">
+                <MudIcon Icon="@Icons.Material.Filled.Badge" Size="Size.Medium" Class="mr-3" />
+                <span>Asignación de Vendedores</span>
+            </button>
+
+            <!-- Productos e Inventario -->
+            <button type="button" class="mas-item" @onclick="@(() => IrA("productos"))">
+                <MudIcon Icon="@Icons.Material.Filled.LocalOffer" Size="Size.Medium" Class="mr-3" />
+                <span>Productos</span>
+            </button>
+            <button type="button" class="mas-item" @onclick="@(() => IrA("inventario"))">
+                <MudIcon Icon="@Icons.Material.Filled.Inventory2" Size="Size.Medium" Class="mr-3" />
+                <span>Inventario</span>
+            </button>
+
+            <!-- Catálogos Reales y Reglas -->
+            <button type="button" class="mas-item" @onclick="@(() => IrA("cartera-clientes"))">
+                <MudIcon Icon="@Icons.Material.Filled.Rule" Size="Size.Medium" Class="mr-3" />
+                <span>Calificación de Clientes (B/M/R)</span>
+            </button>
+            <button type="button" class="mas-item" @onclick="@(() => IrA("operaciones-ventas"))">
+                <MudIcon Icon="@Icons.Material.Filled.SettingsApplications" Size="Size.Medium" Class="mr-3" />
+                <span>Reglas de Venta y Crédito</span>
+            </button>
+            
+            <!-- Reportes y Sistema -->
+            <button type="button" class="mas-item" @onclick="@(() => IrA("gastos"))">
+                <MudIcon Icon="@Icons.Material.Filled.PriceChange" Size="Size.Medium" Class="mr-3" />
+                <span>Gastos</span>
+            </button>
+            
+            <button type="button" class="mas-item" @onclick="@(() => IrA("roles-usuarios"))">
+                <MudIcon Icon="@Icons.Material.Filled.GroupAdd" Size="Size.Medium" Class="mr-3" />
+                <span>Roles y Usuarios</span>
+            </button>
+            <button type="button" class="mas-item" @onclick="@(() => IrA("parametros"))">
+                <MudIcon Icon="@Icons.Material.Filled.Tune" Size="Size.Medium" Class="mr-3" />
+                <span>Parámetros Generales</span>
+            </button>            
+            <button type="button" class="mas-item" @onclick="@(() => IrA("empresa"))">
+                <MudIcon Icon="@Icons.Material.Filled.Business" Size="Size.Medium" Class="mr-3" />
+                <span>Datos de la Empresa</span>
+            </button>
         </div>
+    }
+}
 
-        <article class="content px-4">
-            @Body
-        </article>
-    </main>
-</div>
+}
 
 @code {
+    private bool _drawerOpen; // Arranca cerrado; en móvil el usuario lo abre con el botón ☰.
+    private bool _isDarkMode; // Estado local para cuando corre en Android
+    private bool _mostrarMas; // Hoja "Más" de la barra inferior (solo móvil).
+
+    // Nos suscribimos al cambio de sesión para re-renderizar el layout (barra inferior en móvil,
+    // acciones de la AppBar) cuando el usuario inicia o cierra sesión. En el WebView de Android el
+    // layout no se recrea al navegar de /login a /, por lo que sin esto el menú no aparecía.
+    protected override void OnInitialized()
+    {
+        ApiClienteService.SesionCambiada += OnSesionCambiada;
+        EmpresaGlobal.OnCambio += OnSesionCambiada;
+        // Reaccionar a cambios de conectividad (y de la jornada local) para mostrar/ocultar
+        // el aviso "sin conexión" en cuanto se pierde o recupera la señal.
+        Jornada.Cambio += OnSesionCambiada;
+        // Además, re-renderizamos en cada navegación: al pasar de /login a / el estado de
+        // autenticación ya es definitivo y así la barra inferior (menú móvil) se evalúa de nuevo.
+        NavigationManagerService.LocationChanged += OnLocationChanged;
+    }
+
+    private void OnSesionCambiada() => InvokeAsync(StateHasChanged);
+
+    private void OnLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e)
+        => InvokeAsync(StateHasChanged);
+
+    public void Dispose()
+    {
+        ApiClienteService.SesionCambiada -= OnSesionCambiada;
+        EmpresaGlobal.OnCambio -= OnSesionCambiada;
+        Jornada.Cambio -= OnSesionCambiada;
+        NavigationManagerService.LocationChanged -= OnLocationChanged;
+    }
+
+    private void AlternarMas() => _mostrarMas = !_mostrarMas;
+
+    private void CerrarMas() => _mostrarMas = false;
+
+    private void IrA(string ruta)
+    {
+        _mostrarMas = false;
+        NavigationManagerService.NavigateTo(ruta);
+    }
+
+    // Detección de entorno móvil basada en el form factor real del dispositivo.
+    // MAUI (Android/iOS) -> "Phone"/"Tablet"; Web -> "Web"; escritorio -> "Desktop".
+    private bool EsEntornoMovil
+    {
+        get
+        {
+            var ff = FormFactor.GetFormFactor();
+            return !ff.Equals("Web", StringComparison.OrdinalIgnoreCase)
+                   && !ff.Equals("Desktop", StringComparison.OrdinalIgnoreCase);
+        }
+    }
+
+    // Tu parámetro original de la Web (Ahora es seguro si viene null)
+    [CascadingParameter] 
+    public Routes? RoutesContainer { get; set; }
+
+    private bool ObtenerModoOscuroActivo()
+    {
+        // Si estamos en Web usa el contenedor, si estamos en Android usa el estado local
+        return RoutesContainer != null ? RoutesContainer.IsDarkMode : _isDarkMode;
+    }
+
+    private void DrawerToggle()
+    {
+        _drawerOpen = !_drawerOpen;
+    }
+
+    private void ToggleDarkMode()
+    {
+        if (RoutesContainer != null)
+        {
+            RoutesContainer.IsDarkMode = !RoutesContainer.IsDarkMode;
+        }
+        else
+        {
+            _isDarkMode = !_isDarkMode;
+            StateHasChanged();
+        }
+    }
+
+    private DialogOptions OpcionesCuenta => new()
+    {
+        FullScreen = EsEntornoMovil,
+        FullWidth = true,
+        MaxWidth = MaxWidth.Small,
+        CloseButton = false,
+        BackdropClick = false,
+        CloseOnEscapeKey = false
+    };
+
+    private async Task ActualizarPerfil()
+    {
+        var (perfil, error) = await ApiClienteService.ObtenerPerfilAsync();
+        if (error is not null || perfil is null)
+        {
+            Snackbar.Add(error ?? "No se pudo cargar el perfil.", Severity.Error);
+            return;
+        }
+        var parametros = new DialogParameters<DialogoUsuario>
+        {
+            { x => x.Titulo, "Actualizar perfil" },
+            { x => x.Icono, Icons.Material.Filled.ManageAccounts },
+            { x => x.EsPerfil, true },
+            { x => x.ClaseDialogo, "dialogo-usuario-fullscreen" },
+            { x => x.Modelo, new DialogoUsuario.FormModel
+                { Usuario = perfil.Usuario, NombreCompleto = perfil.NombreCompleto } },
+            { x => x.GuardarModelo, new Func<DialogoUsuario.FormModel, Task<string?>>(m =>
+                ApiClienteService.ActualizarPerfilAsync(new(m.Usuario.Trim(), m.NombreCompleto.Trim()))) }
+        };
+        var dialogo = await Dialogos.ShowAsync<DialogoUsuario>("Actualizar perfil", parametros, OpcionesCuenta);
+        var resultado = await dialogo.Result;
+        if (resultado is { Canceled: false }) Snackbar.Add("Perfil actualizado.", Severity.Success);
+    }
+
+    private async Task ActualizarPassword()
+    {
+        var dialogo = await Dialogos.ShowAsync<DialogoPassword>("Actualizar contraseña", OpcionesCuenta);
+        var resultado = await dialogo.Result;
+        if (resultado is { Canceled: false }) Snackbar.Add("Contraseña actualizada.", Severity.Success);
+    }
+
     private async Task ManejarCerrarSesion()
     {
-        // 1. Limpiamos la sesión en memoria y el almacenamiento híbrido (Local o Secure)
         await ApiClienteService.CerrarSesionAsync();
-
-        // 2. Redirigimos al Login de forma inmediata
         NavigationManagerService.NavigateTo("/login");
     }
 }

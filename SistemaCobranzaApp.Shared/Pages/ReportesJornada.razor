@@ -1,0 +1,360 @@
+@page "/jornada/reportes"
+@implements IDisposable
+@using MudBlazor
+@using SistemaCobranzaApp.Domain.Comun
+@using SistemaCobranzaApp.Shared.Dtos
+@using SistemaCobranzaApp.Shared.Services
+@inject ServicioJornadaLocal Jornada
+@inject ApiCliente Api
+@inject ISnackbar Snackbar
+@inject NavigationManager Nav
+@inject IDialogService Dialogo
+@inject ServicioImpresionTicket Impresion
+@inject IFormFactor FormFactor
+@inject EstadoEmpresaGlobal EmpresaGlobal
+
+<div class="ma-2">
+
+    <MudAlert Severity="Severity.Info" Dense="true" Class="mb-2">
+        Corte del día con las operaciones que capturaste hoy en este dispositivo.
+        Los totales son locales y central los confirma al sincronizar.
+    </MudAlert>
+
+    <!-- Encabezado -->
+    <MudPaper Elevation="2" Class="pa-3 mb-2">
+        <div class="encabezado-reporte">
+            <div class="d-flex align-center gap-2">
+                <MudIcon Icon="@Icons.Material.Filled.Assessment" Color="Color.Primary" />
+                <MudText Typo="Typo.h6" Class="titulo-reporte">
+                    @(EsVendedor ? "Reporte de ventas del día" : "Reporte de pagos del día")
+                </MudText>
+            </div>
+            <div class="d-flex flex-wrap gap-2">
+                @if (EsVendedor)
+                {
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small"
+                               StartIcon="@Icons.Material.Filled.Receipt"
+                               OnClick="ImprimirReporteColocacionAsync"
+                               Disabled="@(_imprimiendo || _totalOperaciones == 0)">
+                        Reporte de colocación
+                    </MudButton>
+                    <MudButton Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small"
+                               StartIcon="@Icons.Material.Filled.Summarize"
+                               OnClick="ImprimirResumenVentaAsync"
+                               Disabled="@(_imprimiendo || _totalOperaciones == 0)">
+                        Resumen de jornada
+                    </MudButton>
+                }
+                else
+                {
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small"
+                               StartIcon="@Icons.Material.Filled.Receipt"
+                               OnClick="ImprimirReporteRecaudacionAsync"
+                               Disabled="@(_imprimiendo || _totalOperaciones == 0)">
+                        Reporte de recaudación
+                    </MudButton>
+                    <MudButton Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small"
+                               StartIcon="@Icons.Material.Filled.Summarize"
+                               OnClick="ImprimirResumenCobroAsync"
+                               Disabled="@(_imprimiendo || _totalOperaciones == 0)">
+                        Resumen de jornada
+                    </MudButton>
+                }
+            </div>
+        </div>
+        <MudText Typo="Typo.caption" Color="Color.Secondary">
+            @(Api.Sesion?.NombreCompleto) · @FechaProyecto.Hoy.ToString("dd/MM/yyyy")
+        </MudText>
+    </MudPaper>
+
+    @if (EsVendedor)
+    {
+        <!-- ===================== VENTAS ===================== -->
+        <MudPaper Elevation="0" Outlined="true" Class="pa-3">
+            <div class="d-flex flex-wrap justify-space-between align-center mb-2">
+                <div class="seccion-titulo">
+                    <MudIcon Icon="@Icons.Material.Filled.PointOfSale" Size="Size.Small" Class="mr-1" />
+                    Ventas capturadas hoy (@_ventas.Count)
+                </div>
+                <MudChip T="string" Color="Color.Success" Variant="Variant.Filled">
+                    Total vendido: @_totalVentas.ToString("C2")
+                </MudChip>
+            </div>
+
+            <MudTable Items="_ventas" Hover="true" Dense="true" Breakpoint="Breakpoint.Sm"
+                      Elevation="0" RowsPerPage="20" T="FilaVenta">
+                <HeaderContent>
+                    <MudTh>Código</MudTh>
+                    <MudTh>Cliente</MudTh>
+                    <MudTh>Producto(s)</MudTh>
+                    <MudTh Style="text-align:right;">Total</MudTh>
+                    <MudTh>Hora</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Código"><b>@context.Codigo</b></MudTd>
+                    <MudTd DataLabel="Cliente">@context.Cliente</MudTd>
+                    <MudTd DataLabel="Producto(s)">@context.Productos</MudTd>
+                    <MudTd DataLabel="Total" Style="text-align:right;"><b>@context.Total.ToString("C2")</b></MudTd>
+                    <MudTd DataLabel="Hora">@context.Fecha.EnZonaProyecto().DateTime.ToString("HH:mm")</MudTd>
+                </RowTemplate>
+                <NoRecordsContent>
+                    <div class="pa-4 text-center">
+                        <MudIcon Icon="@Icons.Material.Filled.Inbox" Color="Color.Secondary" />
+                        <MudText Color="Color.Secondary" Typo="Typo.body2" Class="mt-1">No capturaste ventas hoy en este dispositivo.</MudText>
+                    </div>
+                </NoRecordsContent>
+                <FooterContent>
+                    <MudTFootRow>
+                        <MudTd colspan="3"><b>Total (@_ventas.Count ventas)</b></MudTd>
+                        <MudTd Style="text-align:right;"><b>@_totalVentas.ToString("C2")</b></MudTd>
+                        <MudTd></MudTd>
+                    </MudTFootRow>
+                </FooterContent>
+            </MudTable>
+        </MudPaper>
+    }
+    else
+    {
+        <!-- ===================== PAGOS ===================== -->
+        <MudGrid Spacing="2" Class="mb-2">
+            <MudItem xs="6">
+                <MudPaper Elevation="0" Outlined="true" Class="pa-3 text-center">
+                    <div class="resumen-etiqueta">Número de pagos</div>
+                    <MudText Typo="Typo.h5" Color="Color.Primary" Class="resumen-valor">@_pagos.Count</MudText>
+                </MudPaper>
+            </MudItem>
+            <MudItem xs="6">
+                <MudPaper Elevation="0" Outlined="true" Class="pa-3 text-center">
+                    <div class="resumen-etiqueta">Total cobrado</div>
+                    <MudText Typo="Typo.h5" Color="Color.Success" Class="resumen-valor">@_totalPagos.ToString("C2")</MudText>
+                </MudPaper>
+            </MudItem>
+        </MudGrid>
+
+        <MudPaper Elevation="0" Outlined="true" Class="pa-3">
+            <div class="seccion-titulo mb-2">
+                <MudIcon Icon="@Icons.Material.Filled.Payments" Size="Size.Small" Class="mr-1" />
+                Pagos capturados hoy (@_pagos.Count)
+            </div>
+
+            <MudTable Items="_pagos" Hover="true" Dense="true" Breakpoint="Breakpoint.Sm"
+                      Elevation="0" RowsPerPage="20" T="FilaPago">
+                <HeaderContent>
+                    <MudTh>Venta</MudTh>
+                    <MudTh>Cliente</MudTh>
+                    <MudTh Style="text-align:right;">Abono</MudTh>
+                    <MudTh>Hora</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Venta"><b>@context.Codigo</b></MudTd>
+                    <MudTd DataLabel="Cliente">@context.Cliente</MudTd>
+                    <MudTd DataLabel="Abono" Style="text-align:right;"><b>@context.Abono.ToString("C2")</b></MudTd>
+                    <MudTd DataLabel="Hora">@context.Fecha.EnZonaProyecto().DateTime.ToString("HH:mm")</MudTd>
+                </RowTemplate>
+                <NoRecordsContent>
+                    <div class="pa-4 text-center">
+                        <MudIcon Icon="@Icons.Material.Filled.MoneyOff" Color="Color.Secondary" />
+                        <MudText Color="Color.Secondary" Typo="Typo.body2" Class="mt-1">No capturaste pagos hoy en este dispositivo.</MudText>
+                    </div>
+                </NoRecordsContent>
+                <FooterContent>
+                    <MudTFootRow>
+                        <MudTd colspan="2"><b>Total (@_pagos.Count pagos)</b></MudTd>
+                        <MudTd Style="text-align:right;"><b>@_totalPagos.ToString("C2")</b></MudTd>
+                        <MudTd></MudTd>
+                    </MudTFootRow>
+                </FooterContent>
+            </MudTable>
+        </MudPaper>
+    }
+</div>
+
+<style>
+    .encabezado-reporte {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        flex-wrap: wrap;
+    }
+    .titulo-reporte { font-weight: 800; }
+    .seccion-titulo {
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        font-size: 0.95rem;
+        color: var(--mud-palette-primary);
+    }
+    .resumen-etiqueta { font-size: 0.8rem; color: var(--mud-palette-text-secondary); }
+    .resumen-valor { font-weight: 800; line-height: 1.2; }
+</style>
+
+@code {
+    // ----- Modelos de fila (solo para la vista/ticket, no tocan la lógica existente) -----
+    private sealed record FilaVenta(string Codigo, string Cliente, string Productos, decimal Total, decimal Enganche, DateTimeOffset Fecha);
+    private sealed record FilaPago(string Codigo, string Cliente, decimal Abono, DateTimeOffset Fecha);
+
+    private List<FilaVenta> _ventas = new();
+    private List<FilaPago> _pagos = new();
+    private decimal _totalVentas;
+    private decimal _totalPagos;
+    private int _totalOperaciones;
+    private bool _imprimiendo;
+
+    private bool EsVendedor => Api.Sesion?.IdRol == 3;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Api.CargarSesionDesdeAlmacenamientoAsync();
+        if (!Api.Autenticado) { Nav.NavigateTo("/login"); return; }
+        await Jornada.CargarAsync();
+        // Solo usuarios de campo (vendedor/cobrador) con una jornada descargada.
+        if (!Jornada.Disponible || !Jornada.EsUsuarioCampo || Jornada.Estado.Descarga is null)
+        { Nav.NavigateTo("/jornada"); return; }
+        Jornada.Cambio += AlCambiar;
+        Cargar();
+    }
+
+    private void AlCambiar() => _ = InvokeAsync(() => { Cargar(); StateHasChanged(); });
+
+    // Construye los reportes únicamente con las operaciones capturadas HOY en este dispositivo.
+    private void Cargar()
+    {
+        var hoy = FechaProyecto.Hoy;
+        var d = Jornada.Estado.Descarga;
+
+        // Operaciones locales (capturadas en el dispositivo) cuya fecha de captura es hoy.
+        var operacionesHoy = Jornada.Estado.Operaciones
+            .Where(o => o.FechaCaptura.EnZonaProyecto().Date == hoy)
+            .ToList();
+
+        if (EsVendedor)
+        {
+            _ventas = operacionesHoy
+                .Where(o => o.Venta is not null)
+                .Select(o =>
+                {
+                    var req = o.Venta!;
+                    var cliente = Jornada.ClientesDisponibles().FirstOrDefault(c => c.IdCliente == req.IdCliente);
+                    var total = req.TotalFinal + o.SaldoArrastre;
+                    var productos = string.Join(", ", req.Detalles.Select(l =>
+                    {
+                        var nombre = d?.Productos.FirstOrDefault(p => p.Id == l.IdProducto)?.Descripcion ?? $"Producto #{l.IdProducto}";
+                        return l.Cantidad > 1 ? $"{nombre} (x{l.Cantidad})" : nombre;
+                    }));
+                    var codigo = o.VentaCentral?.CodigoVenta ?? req.CodigoVenta ?? $"MOV-{o.Uuid:N}".ToUpperInvariant();
+                    return new FilaVenta(codigo, cliente?.NombreCompleto ?? "Cliente", productos, total, req.Enganche, o.FechaCaptura);
+                })
+                .OrderBy(f => f.Fecha)
+                .ToList();
+            _totalVentas = _ventas.Sum(f => f.Total);
+            _totalOperaciones = _ventas.Count;
+        }
+        else
+        {
+            _pagos = operacionesHoy
+                .Where(o => o.Pago is not null)
+                .Select(o =>
+                {
+                    var pago = o.Pago!;
+                    var venta = d?.Ventas.FirstOrDefault(v => v.IdVenta == pago.IdVenta);
+                    var cliente = venta is null ? null
+                        : Jornada.ClientesDisponibles().FirstOrDefault(c => c.IdCliente == venta.IdCliente);
+                    var codigo = venta?.CodigoVenta ?? $"V{pago.IdVenta}";
+                    return new FilaPago(codigo, cliente?.NombreCompleto ?? "Cliente", pago.MontoAbona, o.FechaCaptura);
+                })
+                .OrderBy(f => f.Fecha)
+                .ToList();
+            _totalPagos = _pagos.Sum(f => f.Abono);
+            _totalOperaciones = _pagos.Count;
+        }
+    }
+
+    // ===================== Impresión de los cortes de jornada =====================
+    // Cada corte se imprime desde su propio botón, por separado (no van juntos).
+    // El vendedor imprime COLOCACIÓN (detalle) y RESUMEN; el cobrador RECAUDACIÓN y RESUMEN.
+
+    private async Task ImprimirReporteRecaudacionAsync()
+        => await ImprimirAsync(async imp => await Impresion.ImprimirCorteCobroReporteAsync(imp, ConstruirCorteCobro()));
+
+    private async Task ImprimirResumenCobroAsync()
+        => await ImprimirAsync(async imp => await Impresion.ImprimirCorteCobroResumenAsync(imp, ConstruirCorteCobro()));
+
+    private async Task ImprimirReporteColocacionAsync()
+        => await ImprimirAsync(async imp => await Impresion.ImprimirCorteVentaReporteAsync(imp, ConstruirCorteVenta()));
+
+    private async Task ImprimirResumenVentaAsync()
+        => await ImprimirAsync(async imp => await Impresion.ImprimirCorteVentaResumenAsync(imp, ConstruirCorteVenta()));
+
+    // Flujo común: selecciona impresora Bluetooth y ejecuta la impresión del corte indicado.
+    private async Task ImprimirAsync(Func<ImpresoraBluetoothDto, Task<bool>> imprimir)
+    {
+        if (_imprimiendo || _totalOperaciones == 0) return;
+        _imprimiendo = true;
+        try
+        {
+            var dialogo = await Dialogo.ShowAsync<Components.ImpresoraBluetoothDialog>("Imprimir corte",
+                new DialogOptions { FullScreen = EsEntornoMovil, CloseButton = true, FullWidth = true, MaxWidth = MaxWidth.Small });
+            if (await dialogo.Result is not { Canceled: false, Data: ImpresoraBluetoothDto impresora }) return;
+            var ok = await imprimir(impresora);
+            Snackbar.Add(ok ? "Corte impreso." : "No se pudo imprimir. Verifica la impresora e inténtalo de nuevo.",
+                ok ? Severity.Success : Severity.Warning);
+        }
+        catch (Exception ex) { Snackbar.Add($"Error al imprimir: {ex.Message}", Severity.Warning); }
+        finally { _imprimiendo = false; }
+    }
+
+    private string Negocio()
+    {
+        var nombreCorto = EmpresaGlobal.Info?.NombreCorto ?? EmpresaGlobal.Identidad?.NombreCorto;
+        return string.IsNullOrWhiteSpace(nombreCorto) ? "Sistema de Cobranza" : nombreCorto;
+    }
+
+    // Corte de COBRO: una línea por pago capturado hoy; total de transacciones y efectivo recaudado.
+    private TicketCorteCobroDto ConstruirCorteCobro()
+    {
+        var movimientos = _pagos
+            .Select(p => new TicketCorteCobroLineaDto(p.Codigo, p.Abono))
+            .ToList();
+
+        return new TicketCorteCobroDto(
+            NombreNegocio: Negocio(),
+            Fecha: FechaProyecto.Ahora.DateTime,
+            Zona: Api.Sesion?.Zona,
+            Cobrador: Api.Sesion?.NombreCompleto ?? "Usuario",
+            Movimientos: movimientos,
+            TotalTransacciones: _pagos.Count,
+            TotalEfectivoRecaudado: _totalPagos);
+    }
+
+    // Corte de VENTA: una línea por venta capturada hoy (valor comercial + enganche);
+    // totales de ventas, valor colocado y enganches recaudados.
+    private TicketCorteVentaDto ConstruirCorteVenta()
+    {
+        var ventas = _ventas
+            .Select(v => new TicketCorteVentaLineaDto(v.Codigo, v.Total, v.Enganche))
+            .ToList();
+
+        return new TicketCorteVentaDto(
+            NombreNegocio: Negocio(),
+            Fecha: FechaProyecto.Ahora.DateTime,
+            Zona: Api.Sesion?.Zona,
+            Vendedor: Api.Sesion?.NombreCompleto ?? "Usuario",
+            Ventas: ventas,
+            TotalVentasRealizadas: _ventas.Count,
+            TotalValorComercial: _ventas.Sum(v => v.Total),
+            TotalEnganches: _ventas.Sum(v => v.Enganche));
+    }
+
+    private bool EsEntornoMovil
+    {
+        get
+        {
+            var ff = FormFactor.GetFormFactor();
+            return !ff.Equals("Web", StringComparison.OrdinalIgnoreCase)
+                   && !ff.Equals("Desktop", StringComparison.OrdinalIgnoreCase);
+        }
+    }
+
+    public void Dispose() => Jornada.Cambio -= AlCambiar;
+}

@@ -1,0 +1,534 @@
+@page "/jornada/cobranza"
+
+@using MudBlazor
+@using SistemaCobranzaApp.Shared.Dtos
+@using SistemaCobranzaApp.Shared.Components
+
+<div class="ma-2">
+    @if (ModoJornada)
+    {
+        <MudAlert Severity="Severity.Info" Dense="true" Class="mb-2">
+            Consultas de la jornada descargada. Los pagos se guardan en el dispositivo y central los confirma al sincronizar.
+        </MudAlert>
+    }
+
+
+    <!-- ===================== Buscador (dos pestañas) — se oculta al abrir una cuenta ===================== -->
+    @if (Cliente is null)
+    {
+    <MudTabs Elevation="2" Rounded="true" Color="Color.Primary" ApplyEffectsToContainer="true"
+             PanelClass="pa-0 pt-4" SliderColor="Color.Warning" Class="mb-2 tabs-remarcados">
+
+        <!-- Pestaña 1: por cliente (Id o nombre/apellidos) -->
+        <MudTabPanel Text="Cliente" Icon="@Icons.Material.Filled.PersonSearch">
+            <MudPaper Elevation="0" Class="pa-4">
+                <div class="barra-busqueda">
+                    <MudTextField T="string"
+                                  @bind-Value="BusquedaCliente"
+                                  Immediate="true"
+                                  OnKeyUp="OnKeyUpCliente"
+                                  Placeholder="Id del cliente, nombre y apellidos..."
+                                  Variant="Variant.Outlined"
+                                  Adornment="Adornment.Start"
+                                  AdornmentIcon="@Icons.Material.Filled.Search"
+                                  AdornmentColor="Color.Primary"
+                                  Clearable="true"
+                                  Class="buscador-remarcado" />
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                               StartIcon="@Icons.Material.Filled.Search"
+                               OnClick="BuscarClienteAsync" Class="boton-buscar">
+                        Buscar
+                    </MudButton>
+                </div>
+                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                    Escribe el <b>Id del cliente</b> o su <b>nombre y apellidos</b>.
+                </MudText>
+            </MudPaper>
+        </MudTabPanel>
+
+        <!-- Pestaña 2: por venta (Id de venta) -->
+        <MudTabPanel Text="Venta" Icon="@Icons.Material.Filled.ReceiptLong">
+            <MudPaper Elevation="0" Class="pa-4">
+                <div class="barra-busqueda">
+                    <MudTextField T="string"
+                                  @bind-Value="BusquedaVenta"
+                                  Immediate="true"
+                                  OnKeyUp="OnKeyUpVenta"
+                                  Placeholder="Id de la venta o código..."
+                                  Variant="Variant.Outlined"
+                                  Adornment="Adornment.Start"
+                                  AdornmentIcon="@Icons.Material.Filled.Search"
+                                  AdornmentColor="Color.Primary"
+                                  Clearable="true"
+                                  Class="buscador-remarcado" />
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                               StartIcon="@Icons.Material.Filled.Search"
+                               OnClick="BuscarVentaAsync" Class="boton-buscar">
+                        Buscar
+                    </MudButton>
+                </div>
+                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                    Escribe el <b>Id de la venta</b> (o su código). Se mostrará la cuenta del cliente dueño.
+                </MudText>
+            </MudPaper>
+        </MudTabPanel>
+
+        <!-- Pestaña 3: por QR (lee el folio de la venta con la cámara) -->
+        <MudTabPanel Text="QR" Icon="@Icons.Material.Filled.QrCodeScanner">
+            <MudPaper Elevation="0" Class="pa-4">
+                <div class="qr-contenedor">
+                    <video id="pagos-qr-video" class="qr-video" muted playsinline></video>
+
+                    @if (!QrEscaneando)
+                    {
+                        <div class="qr-overlay">
+                            <MudIcon Icon="@Icons.Material.Filled.QrCodeScanner" Size="Size.Large" Color="Color.Primary" />
+                            <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mt-1 mb-2">
+                                Apunta la cámara al código QR del ticket.
+                            </MudText>
+                            <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                                       StartIcon="@Icons.Material.Filled.PhotoCamera"
+                                       OnClick="IniciarEscaneoQrAsync">
+                                Activar cámara
+                            </MudButton>
+                        </div>
+                    }
+                </div>
+
+                @if (QrEscaneando)
+                {
+                    <div class="d-flex justify-center mt-2">
+                        <MudButton Variant="Variant.Outlined" Color="Color.Default" Size="Size.Small"
+                                   StartIcon="@Icons.Material.Filled.Stop"
+                                   OnClick="DetenerEscaneoQrAsync">
+                            Detener cámara
+                        </MudButton>
+                    </div>
+                }
+
+                @if (!string.IsNullOrWhiteSpace(QrError))
+                {
+                    <MudAlert Severity="Severity.Warning" Dense="true" Class="mt-2" Variant="Variant.Outlined">
+                        @QrError
+                    </MudAlert>
+                }
+
+                <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-2 d-block">
+                    Al leer el QR se buscará automáticamente la venta.
+                </MudText>
+            </MudPaper>
+        </MudTabPanel>
+    </MudTabs>
+    }
+
+    @if (Cargando)
+    {
+        <div class="d-flex justify-center pa-8">
+            <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+        </div>
+    }
+    else if (!HaBuscado)
+    {
+        <MudPaper Elevation="0" Outlined="true" Class="pa-8 text-center">
+            <MudIcon Icon="@Icons.Material.Filled.Payments" Size="Size.Large" Color="Color.Secondary" />
+            <MudText Typo="Typo.h6" Class="mt-2">Consulta los pagos de una cuenta</MudText>
+            <MudText Color="Color.Secondary">
+                Busca por Id de cliente, nombre y apellidos o Id de venta para comenzar.
+            </MudText>
+        </MudPaper>
+    }
+    else if (Cliente is null && ClientesEncontrados.Count == 0)
+    {
+        <MudPaper Elevation="0" Outlined="true" Class="pa-8 text-center">
+            <MudIcon Icon="@Icons.Material.Filled.SearchOff" Size="Size.Large" Color="Color.Secondary" />
+            <MudText Typo="Typo.h6" Class="mt-2">
+                No se encontró ninguna coincidencia para "@UltimaBusqueda".
+            </MudText>
+            <MudButton Variant="Variant.Outlined" Color="Color.Default" Class="mt-3" Size="Size.Small"
+                       StartIcon="@Icons.Material.Filled.Search" OnClick="NuevaBusqueda">
+                Nueva búsqueda
+            </MudButton>
+        </MudPaper>
+    }
+    else if (Cliente is null && ClientesEncontrados.Count > 0)
+    {
+        <!-- Varios candidatos por nombre: el usuario elige uno. -->
+        <MudPaper Elevation="0" Outlined="true" Class="pa-3">
+            <div class="seccion-titulo mb-2">
+                <MudIcon Icon="@Icons.Material.Filled.PeopleAlt" Size="Size.Small" Class="mr-1" />
+                Clientes encontrados (@ClientesEncontrados.Count)
+            </div>
+            <MudTable Items="ClientesEncontrados" Hover="true" Dense="true" Breakpoint="Breakpoint.Sm"
+                      Elevation="0" RowsPerPage="10" T="ClienteDto"
+                      OnRowClick="@((TableRowClickEventArgs<ClienteDto> e) => SeleccionarClienteAsync(e.Item!.IdCliente))"
+                      RowClass="fila-clicable">
+                <HeaderContent>
+                    <MudTh Style="width:8%;">ID</MudTh>
+                    <MudTh>Nombre</MudTh>
+                    <MudTh Style="width:16%;">Teléfono</MudTh>
+                    <MudTh>Dirección</MudTh>
+                    <MudTh Style="width:12%;">Ruta</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="ID">@context.IdCliente</MudTd>
+                    <MudTd DataLabel="Nombre"><b>@context.NombreCompleto</b></MudTd>
+                    <MudTd DataLabel="Teléfono">@Mostrar(context.TelefonoPrincipal)</MudTd>
+                    <MudTd DataLabel="Dirección">@Mostrar(context.Direccion)</MudTd>
+                    <MudTd DataLabel="Ruta">@Mostrar(context.Ruta)</MudTd>
+                </RowTemplate>
+                <PagerContent>
+                    <MudTablePager InfoFormat="{first_item}-{last_item} de {all_items}" RowsPerPageString="Filas:" />
+                </PagerContent>
+            </MudTable>
+        </MudPaper>
+    }
+    else if (Cliente is not null)
+    {
+        var c = Cliente;
+
+        <!-- Encabezado con botón Regresar (vuelve al buscador). -->
+        <MudPaper Elevation="2" Class="pa-3 mb-2">
+            <div class="encabezado-detalle">
+                <div class="d-flex align-center gap-2">
+                    <MudIcon Icon="@Icons.Material.Filled.Payments" Color="Color.Primary" />
+                    <MudText Typo="Typo.h6" Class="titulo-detalle">
+                        @(BusquedaPorVenta ? "Pago de la venta" : "Pagos del cliente")
+                    </MudText>
+                </div>
+                <MudButton Variant="Variant.Outlined" Color="Color.Default" Size="Size.Small"
+                           StartIcon="@Icons.Material.Filled.ArrowBack"
+                           OnClick="Regresar">
+                    Regresar
+                </MudButton>
+            </div>
+        </MudPaper>
+
+        <!-- ===================== Datos del cliente ===================== -->
+        <MudGrid Spacing="2" Class="mb-2">
+            <MudItem xs="12" md="6">
+                <MudPaper Elevation="0" Outlined="true" Class="pa-3 h-100">
+                    <div class="seccion-titulo mb-2">
+                        <MudIcon Icon="@Icons.Material.Filled.Badge" Size="Size.Small" Class="mr-1" />
+                        Datos del Cliente
+                    </div>
+                    @Campo("ID", c.IdCliente.ToString())
+                    @Campo("Nombre", c.NombreCompleto)
+                    @Campo("Tel. principal", Mostrar(c.TelefonoPrincipal))
+                    @Campo("Tel. secundario", Mostrar(c.TelefonoSecundario))
+                    @Campo("Correo", Mostrar(c.Email))
+                    @Campo("Vendedor", Mostrar(c.VendedorNombre))
+                </MudPaper>
+            </MudItem>
+
+            <MudItem xs="12" md="6">
+                <MudPaper Elevation="0" Outlined="true" Class="pa-3 h-100">
+                    <div class="seccion-titulo mb-2">
+                        <MudIcon Icon="@Icons.Material.Filled.Home" Size="Size.Small" Class="mr-1" />
+                        Domicilio del Cliente
+                    </div>
+                    @Campo("Dirección", Mostrar(c.Direccion))
+                    @Campo("Código postal", Mostrar(c.CodigoPostal))
+                    @Campo("Ruta", Mostrar(c.Ruta))
+                    @Campo("Zona", Mostrar(EstadoCuenta?.Zona))
+                    @Campo("Referencia", Mostrar(c.ReferenciaUbicacion))
+                </MudPaper>
+            </MudItem>
+        </MudGrid>
+
+        <!-- ===================== Vista intermedia: selección de venta ===================== -->
+        @* Solo cuando el cliente tiene VARIAS ventas con saldo y aún no se eligió una.
+           Si tiene una sola, el code-behind abre su detalle directamente. *@
+        @if (Venta is null && !CargandoVenta && VentasConSaldo.Count > 1)
+        {
+            <MudPaper Elevation="0" Outlined="true" Class="pa-3 mb-2">
+                <div class="seccion-titulo mb-2">
+                    <MudIcon Icon="@Icons.Material.Filled.ReceiptLong" Size="Size.Small" Class="mr-1" />
+                    Este cliente tiene @VentasConSaldo.Count ventas con saldo — selecciona una para registrar el pago
+                </div>
+                <MudTable Items="VentasConSaldo" Hover="true" Dense="true" Breakpoint="Breakpoint.Sm" Elevation="0"
+                          RowsPerPage="10" T="EstadoCuentaVentaDto"
+                          OnRowClick="OnFilaVentaClick"
+                          RowClass="fila-clicable">
+                    <HeaderContent>
+                        <MudTh Style="width:9%;">Venta</MudTh>
+                        <MudTh>Código</MudTh>
+                        <MudTh>Fecha</MudTh>
+                        <MudTh>Estado</MudTh>
+                        <MudTh Style="text-align:right;">Total</MudTh>
+                        <MudTh Style="text-align:right;">Abonos</MudTh>
+                        <MudTh Style="text-align:right;">Saldo</MudTh>
+                        <MudTh>Último pago</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd DataLabel="Venta">@context.IdVenta</MudTd>
+                        <MudTd DataLabel="Código"><b>@(context.CodigoVenta ?? "—")</b></MudTd>
+                        <MudTd DataLabel="Fecha">@context.FechaCompra.EnZonaProyecto().DateTime.ToString("dd/MM/yyyy")</MudTd>
+                        <MudTd DataLabel="Estado">
+                            <MudChip T="string" Size="Size.Small" Variant="Variant.Text" Color="Color.Primary" Class="chip-compacto">
+                                @(context.Estado ?? "—")
+                            </MudChip>
+                        </MudTd>
+                        <MudTd DataLabel="Total" Style="text-align:right;">@context.TotalFinal.ToString("C2")</MudTd>
+                        <MudTd DataLabel="Abonos" Style="text-align:right;">@context.TotalAbonos.ToString("C2")</MudTd>
+                        <MudTd DataLabel="Saldo" Style="text-align:right;">
+                            <b class="saldo-pendiente">@context.Saldo.ToString("C2")</b>
+                        </MudTd>
+                        <MudTd DataLabel="Último pago">
+                            @(context.FechaUltimoPago is null ? "—" : context.FechaUltimoPago.Value.EnZonaProyecto().DateTime.ToString("dd/MM/yyyy"))
+                        </MudTd>
+                    </RowTemplate>
+                    <PagerContent>
+                        <MudTablePager InfoFormat="{first_item}-{last_item} de {all_items}" RowsPerPageString="Filas:" />
+                    </PagerContent>
+                </MudTable>
+            </MudPaper>
+        }
+        else if (Venta is null && !CargandoVenta && VentasConSaldo.Count == 0)
+        {
+            <MudPaper Elevation="0" Outlined="true" Class="pa-6 text-center">
+                <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Size="Size.Large" Color="Color.Success" />
+                <MudText Typo="Typo.h6" Class="mt-2">Este cliente no tiene ventas con saldo pendiente.</MudText>
+                <MudText Color="Color.Secondary">No hay cuentas por cobrar para registrar un pago.</MudText>
+            </MudPaper>
+        }
+
+        <!-- ===================== Detalle de la venta seleccionada ===================== -->
+        @if (CargandoVenta)
+        {
+            <div class="d-flex justify-center pa-6">
+                <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+            </div>
+        }
+        else if (Venta is not null)
+        {
+            var v = Venta;
+
+            <!-- Acción principal: registrar pago (botón grande, pensado para móvil). -->
+            @if (PuedeRegistrarPago)
+            {
+                <MudButton Variant="Variant.Filled" Color="Color.Success" Size="Size.Large"
+                           FullWidth="true"
+                           StartIcon="@Icons.Material.Filled.Payments"
+                           OnClick="AbrirDialogoPago"
+                           Class="boton-pago-grande mb-2">
+                    Registrar pago
+                </MudButton>
+            }
+
+            @if (ModoJornada)
+            {
+                @foreach (var op in Jornada.Estado.Operaciones.Where(o => o.Pago?.IdVenta == v.IdVenta && !o.Aplicada))
+                {
+                    <MudAlert Severity="@(op.Error is null ? Severity.Info : Severity.Warning)" Class="mb-2">
+                        Abono local: @op.Pago!.MontoAbona.ToString("C2") · @(op.Error ?? "Pendiente de confirmación") · @op.Uuid.ToString("N")
+                        <MudButton StartIcon="@Icons.Material.Filled.Print" OnClick="@(() => _impresion!.ImprimirAsync(op.Uuid))">Imprimir ticket</MudButton>
+                    </MudAlert>
+                }
+            }
+
+            <!-- Datos de la venta -->
+            <MudPaper Elevation="0" Outlined="true" Class="pa-3 mb-2">
+                <div class="encabezado-venta mb-2">
+                    <div class="seccion-titulo">
+                        <MudIcon Icon="@Icons.Material.Filled.Sell" Size="Size.Small" Class="mr-1" />
+                        Datos de la Venta @(v.CodigoVenta is null ? $"#{v.IdVenta}" : $"— {v.CodigoVenta}")
+                    </div>
+                </div>
+                <MudGrid Spacing="2">
+                    <MudItem xs="12" md="6">
+                        @Campo("Venta", v.IdVenta.ToString())
+                        @Campo("Código", Mostrar(v.CodigoVenta))
+                        @Campo("Fecha compra", v.FechaCompra.EnZonaProyecto().DateTime.ToString("dd/MM/yyyy"))
+                        @Campo("Condición", v.DescripcionCondicion)
+                        @Campo("Estatus", v.DescripcionEstatus)
+                        @Campo("Vendedor", Mostrar(v.NombreVendedor))
+                    </MudItem>
+                    <MudItem xs="12" md="6">
+                        @Campo("Frecuencia", Mostrar(v.DescripcionFrecuencia))
+                        @Campo("N.° de cuotas", v.NumeroCuotas.ToString())
+                        @Campo("Cuota fija", v.MontoCuotaFija.ToString("C2"))
+                        @Campo("Tasa de interés", $"{v.TasaInteres:0.##}%")
+                        @Campo("Primer vencimiento", v.FechaPrimerVence is null ? "—" : v.FechaPrimerVence.Value.EnZonaProyecto().DateTime.ToString("dd/MM/yyyy"))
+                        @Campo("Último pago", v.FechaUltimoPago is null ? "—" : v.FechaUltimoPago.Value.EnZonaProyecto().DateTime.ToString("dd/MM/yyyy"))
+                    </MudItem>
+                </MudGrid>
+            </MudPaper>
+
+            <!-- Resumen de la venta + productos (agrupados en una misma tarjeta) -->
+            <MudPaper Elevation="0" Outlined="true" Class="pa-3 mb-2 panel-resumen">
+                <div class="seccion-titulo mb-2">
+                    <MudIcon Icon="@Icons.Material.Filled.Summarize" Size="Size.Small" Class="mr-1" />
+                    Resumen de la Venta
+                </div>
+                <div class="resumen-banda">
+                    @Metrica("Subtotal", v.Subtotal, Color.Default)
+                    @Metrica("Descuento", v.DescuentoGlobal, Color.Warning)
+                    @Metrica("Total final", v.TotalFinal, Color.Default)
+                    @Metrica("Enganche", v.Enganche, Color.Info)
+                    @Metrica("Financiado", v.MontoFinanciado, Color.Default)
+                    @Metrica("Abonado", v.TotalAbonado, Color.Success)
+                    @Metrica("Saldo pendiente", v.SaldoPendiente, v.SaldoPendiente > 0 ? Color.Error : Color.Success)
+                </div>
+
+                <MudDivider Class="my-3" />
+
+                <div class="seccion-titulo mb-2">
+                    <MudIcon Icon="@Icons.Material.Filled.Inventory2" Size="Size.Small" Class="mr-1" />
+                    Productos de la Venta
+                </div>
+                <MudTable Items="@(v.Detalles ?? new())" Hover="true" Dense="true" Breakpoint="Breakpoint.Sm"
+                          Elevation="0" RowsPerPage="10" T="DetalleVentaDto">
+                    <HeaderContent>
+                        <MudTh Style="width:10%;">#</MudTh>
+                        <MudTh>Producto</MudTh>
+                        <MudTh Style="width:12%; text-align:right;">Cantidad</MudTh>
+                        <MudTh Style="width:16%; text-align:right;">Precio</MudTh>
+                        <MudTh Style="width:16%; text-align:right;">Importe</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd DataLabel="#">@context.IdProducto</MudTd>
+                        <MudTd DataLabel="Producto"><b>@context.NombreProducto</b></MudTd>
+                        <MudTd DataLabel="Cantidad" Style="text-align:right;">@context.Cantidad</MudTd>
+                        <MudTd DataLabel="Precio" Style="text-align:right;">@context.PrecioCobrado.ToString("C2")</MudTd>
+                        <MudTd DataLabel="Importe" Style="text-align:right;">@context.Importe.ToString("C2")</MudTd>
+                    </RowTemplate>
+                    <NoRecordsContent>
+                        <div class="pa-3 text-center">
+                            <MudText Color="Color.Secondary" Typo="Typo.body2">Sin productos registrados.</MudText>
+                        </div>
+                    </NoRecordsContent>
+                </MudTable>
+            </MudPaper>
+
+            <!-- Tabla de pagos (historial de abonos) -->
+            <MudPaper Elevation="0" Outlined="true" Class="pa-3 mb-2">
+                <div class="seccion-titulo mb-2">
+                    <MudIcon Icon="@Icons.Material.Filled.Payments" Size="Size.Small" Class="mr-1" />
+                    Pagos de la Venta (@PagosVenta.Count)
+                </div>
+                <MudTable Items="PagosVenta" Hover="true" Dense="true" Breakpoint="Breakpoint.Sm"
+                          Elevation="0" RowsPerPage="10" T="PagoHistoricoDto">
+                    <HeaderContent>
+                        <MudTh Style="width:8%;">#</MudTh>
+                        <MudTh>Folio</MudTh>
+                        <MudTh>Fecha</MudTh>
+                        <MudTh>Movimiento</MudTh>
+                        <MudTh>Cobrador</MudTh>
+                        <MudTh Style="text-align:right;">Saldo ant.</MudTh>
+                        <MudTh Style="text-align:right;">Abono</MudTh>
+                        <MudTh Style="text-align:right;">Saldo act.</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd DataLabel="#">@context.IdPago</MudTd>
+                        <MudTd DataLabel="Folio"><b>@Mostrar(context.FolioPago)</b></MudTd>
+                        <MudTd DataLabel="Fecha">@context.FechaPago.EnZonaProyecto().DateTime.ToString("dd/MM/yyyy HH:mm")</MudTd>
+                        <MudTd DataLabel="Movimiento">@Mostrar(context.Movimiento)</MudTd>
+                        <MudTd DataLabel="Cobrador">@Mostrar(context.Cobrador)</MudTd>
+                        <MudTd DataLabel="Saldo ant." Style="text-align:right;">@context.SaldoAnterior.ToString("C2")</MudTd>
+                        <MudTd DataLabel="Abono" Style="text-align:right;"><b>@context.MontoAbona.ToString("C2")</b></MudTd>
+                        <MudTd DataLabel="Saldo act." Style="text-align:right;">@context.SaldoActual.ToString("C2")</MudTd>
+                    </RowTemplate>
+                    <NoRecordsContent>
+                        <div class="pa-3 text-center">
+                            <MudIcon Icon="@Icons.Material.Filled.MoneyOff" Color="Color.Secondary" />
+                            <MudText Color="Color.Secondary" Typo="Typo.body2" Class="mt-1">Esta venta aún no tiene pagos.</MudText>
+                        </div>
+                    </NoRecordsContent>
+                    <PagerContent>
+                        <MudTablePager InfoFormat="{first_item}-{last_item} de {all_items}" RowsPerPageString="Filas:" />
+                    </PagerContent>
+                </MudTable>
+            </MudPaper>
+
+            <!-- Plan de cuotas (tabla de amortización) -->
+            <MudPaper Elevation="0" Outlined="true" Class="pa-3 mb-2">
+                <div class="seccion-titulo mb-2">
+                    <MudIcon Icon="@Icons.Material.Filled.EventRepeat" Size="Size.Small" Class="mr-1" />
+                    Plan de Cuotas (@(v.Cuotas?.Count ?? 0))
+                </div>
+                <MudTable Items="@(v.Cuotas ?? new())" Hover="true" Dense="true" Breakpoint="Breakpoint.Sm"
+                          Elevation="0" RowsPerPage="12" T="VentaCuotaDto">
+                    <HeaderContent>
+                        <MudTh Style="width:10%;">Cuota</MudTh>
+                        <MudTh>Vencimiento</MudTh>
+                        <MudTh Style="text-align:right;">Monto</MudTh>
+                        <MudTh Style="text-align:right;">Interés</MudTh>
+                        <MudTh Style="text-align:right;">Saldo cuota</MudTh>
+                        <MudTh Style="text-align:center;">Estatus</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd DataLabel="Cuota">@context.NumeroCuota</MudTd>
+                        <MudTd DataLabel="Vencimiento">@context.FechaVencimiento.EnZonaProyecto().DateTime.ToString("dd/MM/yyyy")</MudTd>
+                        <MudTd DataLabel="Monto" Style="text-align:right;">@context.MontoCuota.ToString("C2")</MudTd>
+                        <MudTd DataLabel="Interés" Style="text-align:right;">@context.MontoInteres.ToString("C2")</MudTd>
+                        <MudTd DataLabel="Saldo cuota" Style="text-align:right;">@context.SaldoCuota.ToString("C2")</MudTd>
+                        <MudTd DataLabel="Estatus" Style="text-align:center;">
+                            <MudChip T="string" Size="Size.Small" Variant="Variant.Filled" Color="@ColorCuota(context.EstatusCuota)" Class="chip-compacto">
+                                @context.EstatusCuota
+                            </MudChip>
+                        </MudTd>
+                    </RowTemplate>
+                    <NoRecordsContent>
+                        <div class="pa-3 text-center">
+                            <MudText Color="Color.Secondary" Typo="Typo.body2">Esta venta no tiene plan de cuotas (venta de contado o sin financiamiento).</MudText>
+                        </div>
+                    </NoRecordsContent>
+                    <PagerContent>
+                        <MudTablePager InfoFormat="{first_item}-{last_item} de {all_items}" RowsPerPageString="Filas:" />
+                    </PagerContent>
+                </MudTable>
+            </MudPaper>
+
+            <!-- Planes promocionales de liquidación -->
+            @if (v.PlanesPromocionales is { Count: > 0 })
+            {
+                <MudPaper Elevation="0" Outlined="true" Class="pa-3 mb-2">
+                    <div class="seccion-titulo mb-2">
+                        <MudIcon Icon="@Icons.Material.Filled.Discount" Size="Size.Small" Class="mr-1" />
+                        Planes de Liquidación Anticipada
+                    </div>
+                    <MudTable Items="v.PlanesPromocionales" Hover="true" Dense="true" Breakpoint="Breakpoint.Sm"
+                              Elevation="0" RowsPerPage="10" T="VentaPlanDto">
+                        <HeaderContent>
+                            <MudTh Style="width:20%;">Meses</MudTh>
+                            <MudTh Style="text-align:right;">Monto de liquidación</MudTh>
+                            <MudTh Style="text-align:center;">Activo</MudTh>
+                        </HeaderContent>
+                        <RowTemplate>
+                            <MudTd DataLabel="Meses">@context.NumeroMeses</MudTd>
+                            <MudTd DataLabel="Monto de liquidación" Style="text-align:right;">@context.MontoLiquidacion.ToString("C2")</MudTd>
+                            <MudTd DataLabel="Activo" Style="text-align:center;">
+                                <MudChip T="string" Size="Size.Small" Variant="Variant.Filled"
+                                         Color="@(context.Activo ? Color.Success : Color.Default)" Class="chip-compacto">
+                                    @(context.Activo ? "Sí" : "No")
+                                </MudChip>
+                            </MudTd>
+                        </RowTemplate>
+                    </MudTable>
+                </MudPaper>
+            }
+        }
+    }
+</div>
+
+@{
+    // Campo compacto: etiqueta a la izquierda, valor a la derecha, en una sola línea.
+    RenderFragment Campo(string etiqueta, string valor) => __builder =>
+    {
+        <div class="campo-linea">
+            <span class="campo-etiqueta">@etiqueta</span>
+            <span class="campo-valor">@valor</span>
+        </div>
+    };
+
+    // Métrica monetaria compacta para las bandas de resumen.
+    RenderFragment Metrica(string etiqueta, decimal monto, Color color) => __builder =>
+    {
+        <div class="resumen-item">
+            <span class="resumen-etiqueta">@etiqueta</span>
+            <MudText Typo="Typo.subtitle1" Color="@color" Class="resumen-valor">@monto.ToString("C2")</MudText>
+        </div>
+    };
+}
+
+<ImpresionJornada @ref="_impresion" />

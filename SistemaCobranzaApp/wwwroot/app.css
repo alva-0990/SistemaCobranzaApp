@@ -1,3 +1,18 @@
+/* ==========================================================================
+   Variables de área segura.
+   Valor por defecto: env(safe-area-inset-*) para iOS y WebViews de Android
+   que SÍ propagan los insets. En Android, MainActivity reescribe estas
+   variables en :root con los WindowInsets nativos reales (ver index.html),
+   porque env() es poco fiable entre fabricantes (p. ej. Motorola lo reporta
+   como 0 e invade las barras del sistema). El valor nativo gana cuando existe.
+   ========================================================================== */
+:root {
+    --sai-top: env(safe-area-inset-top, 0px);
+    --sai-bottom: env(safe-area-inset-bottom, 0px);
+    --sai-left: env(safe-area-inset-left, 0px);
+    --sai-right: env(safe-area-inset-right, 0px);
+}
+
 .status-bar-safe-area {
     display: none;
 }
@@ -7,13 +22,152 @@
         display: flex;
         position: sticky;
         top: 0;
-        height: env(safe-area-inset-top);
+        height: var(--sai-top);
         background-color: #f7f7f7;
         width: 100%;
         z-index: 1;
     }
 
     .flex-column, .navbar-brand {
-        padding-left: env(safe-area-inset-left);
+        padding-left: var(--sai-left);
     }
+}
+
+/* ==========================================================================
+   Safe area para el WebView de Android (Chromium).
+   El viewport usa viewport-fit=cover, por lo que el contenido queda debajo
+   de la barra de estado del sistema. Empujamos la MudAppBar (fija en top:0)
+   y el contenido principal por debajo del área segura superior/laterales.
+   ========================================================================== */
+.mud-appbar {
+    padding-top: var(--sai-top) !important;
+    box-sizing: content-box;
+    padding-left: var(--sai-left);
+    padding-right: var(--sai-right);
+}
+
+/* La MudAppBar 'fixed' tiene una altura estándar; al sumarle el inset,
+   el contenido principal debe bajar la misma cantidad para no quedar tapado. */
+.mud-main-content {
+    padding-top: calc(var(--mud-appbar-height, 64px) + var(--sai-top)) !important;
+}
+
+/* El drawer también debe respetar el área segura superior. */
+.mud-drawer {
+    padding-top: var(--sai-top);
+}
+
+/* ==========================================================================
+   Bottom Navigation (solo móvil / Android) — patrón Material Design.
+   Barra fija en la parte inferior con 3 destinos. Respeta el gesto de
+   navegación de Android con safe-area-inset-bottom.
+   ========================================================================== */
+.bottom-nav-movil {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 1300; /* por encima del contenido */
+    display: flex;
+    justify-content: space-around;
+    align-items: stretch;
+    background-color: #ffffff;
+    border-top: 1px solid #e0e0e0;
+    box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.08);
+    padding-bottom: var(--sai-bottom);
+    padding-left: var(--sai-left);
+    padding-right: var(--sai-right);
+    height: calc(64px + var(--sai-bottom));
+}
+
+.bottom-nav-item {
+    flex: 1 1 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    text-decoration: none;
+    color: #6b7280;            /* inactivo: gris */
+    padding: 8px 4px;
+    font-size: 12px;
+    line-height: 1;
+    transition: color 0.15s ease;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.bottom-nav-item .mud-icon-root {
+    font-size: 24px;
+    height: 24px;
+    width: 24px;
+}
+
+.bottom-nav-label {
+    font-weight: 500;
+}
+
+/* Estado activo: NavLink añade la clase 'active' a la ruta actual. */
+.bottom-nav-item.active {
+    color: #1e3a8a;            /* activo: azul de marca */
+}
+
+/* Espacio inferior para que la barra no tape el último contenido. */
+.pb-nav-movil {
+    padding-bottom: calc(72px + var(--sai-bottom)) !important;
+}
+
+/* El ítem "Más" es un <button>: neutralizamos los estilos nativos del botón
+   para que se vea idéntico a los NavLink de la barra. */
+button.bottom-nav-item {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-family: inherit;
+}
+
+/* ==========================================================================
+   Hoja "Más": menú emergente anclado sobre la barra inferior.
+   Overlay para cerrar al tocar fuera + hoja con z-index por encima de la barra.
+   ========================================================================== */
+.mas-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1310;              /* sobre la barra (1300) */
+    background: rgba(0, 0, 0, 0.32);
+}
+
+.mas-sheet {
+    position: fixed;
+    left: 8px;
+    right: 8px;
+    bottom: calc(64px + var(--sai-bottom) + 8px); /* justo encima de la barra */
+    z-index: 1320;             /* sobre el overlay */
+    background: #ffffff;
+    border-radius: 12px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+    padding: 6px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.mas-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    width: 100%;
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 15px;
+    color: #1f2937;
+    text-align: left;
+    padding: 14px 12px;
+    border-radius: 8px;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.mas-item:active {
+    background-color: #eef2ff;
 }

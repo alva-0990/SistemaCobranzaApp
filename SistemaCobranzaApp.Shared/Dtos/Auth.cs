@@ -9,4 +9,10 @@ public record LoginResponse(
     string Usuario,
     string NombreCompleto,
     long? IdRol,
-    string? Rol);
+    string? Rol,
+    long? IdZona,
+    string? Zona
+    );
+
+public record ActualizarPerfilRequest(string Usuario, string NombreCompleto);
+public record ActualizarPasswordRequest(string NuevaPassword, string ConfirmacionPassword);

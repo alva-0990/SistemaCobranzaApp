@@ -1,0 +1,101 @@
+@using MudBlazor
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6" Style="font-weight: 600;">
+            <MudIcon Icon="@Icons.Material.Filled.Tune" Class="mr-2" Style="vertical-align: middle;" />
+            @Titulo
+        </MudText>
+    </TitleContent>
+
+    <DialogContent>
+        <MudForm @ref="_form" @bind-IsValid="@_formValido">
+            <MudGrid>
+                @* Clave (solo editable en alta) *@
+                <MudItem xs="12">
+                    <MudTextField T="string"
+                                  Label="Clave"
+                                  @bind-Value="Modelo.Clave"
+                                  Disabled="@(!EsNuevo)"
+                                  Required="@EsNuevo"
+                                  RequiredError="La clave es obligatoria."
+                                  HelperText="@(EsNuevo ? "Se guardará en MAYÚSCULAS. Ej.: PROMO_PAGOS_CONSECUTIVOS_ACTIVA" : "La clave no se puede modificar.")"
+                                  Variant="Variant.Outlined"
+                                  Margin="Margin.Dense" />
+                </MudItem>
+
+                @* Descripción *@
+                <MudItem xs="12">
+                    <MudTextField T="string"
+                                  Label="Descripción"
+                                  @bind-Value="Modelo.Descripcion"
+                                  Required="true"
+                                  RequiredError="La descripción es obligatoria."
+                                  Variant="Variant.Outlined"
+                                  Margin="Margin.Dense" />
+                </MudItem>
+
+                @* Valor numérico *@
+                <MudItem xs="12" sm="6">
+                    <MudNumericField T="decimal?"
+                                     Label="Valor numérico"
+                                     @bind-Value="Modelo.ValorNumerico"
+                                     Format="0.####"
+                                     HelperText="Opcional. Ej.: meta de pagos (5)."
+                                     Clearable="true"
+                                     Variant="Variant.Outlined"
+                                     Margin="Margin.Dense" />
+                </MudItem>
+
+                @* Valor de texto *@
+                <MudItem xs="12" sm="6">
+                    <MudTextField T="string"
+                                  Label="Valor de texto"
+                                  @bind-Value="Modelo.ValorTexto"
+                                  HelperText="Opcional. Ej.: SI / NO."
+                                  Variant="Variant.Outlined"
+                                  Margin="Margin.Dense" />
+                </MudItem>
+            </MudGrid>
+
+            <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-2">
+                Debes capturar al menos un valor numérico o un valor de texto.
+            </MudText>
+        </MudForm>
+    </DialogContent>
+
+    <DialogActions>
+        <MudButton OnClick="Cancelar" Variant="Variant.Text" Color="Color.Default">Cancelar</MudButton>
+        <MudButton OnClick="Guardar" Variant="Variant.Filled" Color="Color.Primary" Disabled="@(!_formValido)">
+            Guardar
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter] public string Titulo { get; set; } = "Parámetro del sistema";
+    [Parameter] public bool EsNuevo { get; set; }
+    [Parameter] public FormModel Modelo { get; set; } = new();
+
+    private MudForm _form = null!;
+    private bool _formValido;
+
+    private void Cancelar() => MudDialog.Cancel();
+
+    private async Task Guardar()
+    {
+        await _form.Validate();
+        if (_formValido)
+            MudDialog.Close(DialogResult.Ok(Modelo));
+    }
+
+    public class FormModel
+    {
+        public string Clave { get; set; } = string.Empty;
+        public string Descripcion { get; set; } = string.Empty;
+        public decimal? ValorNumerico { get; set; }
+        public string? ValorTexto { get; set; }
+    }
+}

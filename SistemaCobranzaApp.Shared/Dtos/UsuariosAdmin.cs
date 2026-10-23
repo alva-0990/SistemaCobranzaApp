@@ -17,7 +17,8 @@ public record ActualizarUsuarioRequest(
     string Usuario,
     string NombreCompleto,
     long? IdRol,
-    string? Password);
+    string? Password,
+    bool Activo = true);
 
 /// <summary>Usuario expuesto al cliente. NUNCA incluye PasswordHash.</summary>
 public record UsuarioDto(
@@ -32,5 +33,5 @@ public record UsuarioDto(
 // ---- Roles ----
 
 public record CrearRolRequest(string Descripcion);
-public record ActualizarRolRequest(string Descripcion);
+public record ActualizarRolRequest(string Descripcion, bool Activo = true);
 public record RolDto(long IdRol, string Descripcion, bool Activo);

@@ -1,0 +1,206 @@
+@using MudBlazor
+@using SistemaCobranzaApp.Shared.Dtos
+
+<MudDialog Class="@ClaseDialogo">
+    <TitleContent>
+        <MudText Typo="Typo.h6" Style="font-weight: 600;">
+            <MudIcon Icon="@Icono" Class="mr-2" Style="vertical-align: middle;" />
+            @Titulo
+        </MudText>
+    </TitleContent>
+
+    <DialogContent>
+        <MudForm @ref="_form" @bind-IsValid="@_formValido">
+            <MudGrid>
+                <!-- Datos personales -->
+                <MudItem xs="12" sm="4">
+                    <MudTextField T="string" Label="Nombre" @bind-Value="Modelo.Nombre"
+                                  Required="true" RequiredError="El nombre es obligatorio."
+                                  Variant="Variant.Outlined" Margin="Margin.Dense" />
+                </MudItem>
+                <MudItem xs="12" sm="4">
+                    <MudTextField T="string" Label="Apellido paterno" @bind-Value="Modelo.ApPaterno"
+                                  Variant="Variant.Outlined" Margin="Margin.Dense" />
+                </MudItem>
+                <MudItem xs="12" sm="4">
+                    <MudTextField T="string" Label="Apellido materno" @bind-Value="Modelo.ApMaterno"
+                                  Variant="Variant.Outlined" Margin="Margin.Dense" />
+                </MudItem>
+
+                <!-- Contacto -->
+                <MudItem xs="12" sm="6">
+                    <MudTextField T="string" Label="Teléfono principal" @bind-Value="Modelo.TelefonoPrincipal"
+                                  Required="true" RequiredError="El teléfono principal es obligatorio."
+                                  Variant="Variant.Outlined" Margin="Margin.Dense" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField T="string" Label="Teléfono secundario" @bind-Value="Modelo.TelefonoSecundario"
+                                  Variant="Variant.Outlined" Margin="Margin.Dense" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField T="string" Label="Email" @bind-Value="Modelo.Email"
+                                  Variant="Variant.Outlined" Margin="Margin.Dense" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField T="string" Label="Código postal" @bind-Value="Modelo.CodigoPostal"
+                                  Variant="Variant.Outlined" Margin="Margin.Dense" />
+                </MudItem>
+
+                <!-- Ubicación -->
+                <MudItem xs="12">
+                    <MudTextField T="string" Label="Dirección" @bind-Value="Modelo.Direccion"
+                                  Required="true" RequiredError="La dirección es obligatoria."
+                                  Variant="Variant.Outlined" Margin="Margin.Dense" />
+                </MudItem>
+                <MudItem xs="12">
+                    <MudTextField T="string" Label="Referencia de ubicación" @bind-Value="Modelo.ReferenciaUbicacion"
+                                  Variant="Variant.Outlined" Margin="Margin.Dense" />
+                </MudItem>
+
+                <!-- Asignación territorial: Zona -> Ruta / Vendedor -->
+                <MudItem xs="12" sm="4">
+                    <MudSelect T="long?" Label="Zona" Value="_idZona" ValueChanged="OnZonaChanged"
+                               Required="true" RequiredError="La zona es obligatoria."
+                               Variant="Variant.Outlined" Margin="Margin.Dense"
+                              >
+                        @foreach (var z in Zonas)
+                        {
+                            <MudSelectItem T="long?" Value="@z.IdZona">@z.Descripcion</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" sm="4">
+                    <MudSelect T="long?" Label="Ruta" @bind-Value="Modelo.IdRuta"
+                               Required="true" RequiredError="La ruta es obligatoria."
+                               Disabled="@(_idZona is null)"
+                               HelperText="@(_idZona is null ? "Selecciona una zona primero." : null)"
+                               Variant="Variant.Outlined" Margin="Margin.Dense"
+                              >
+                        @foreach (var r in RutasFiltradas)
+                        {
+                            <MudSelectItem T="long?" Value="@r.IdRuta">@r.Descripcion</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" sm="4">
+                    <MudSelect T="long?" Label="Vendedor" @bind-Value="Modelo.IdVendedor"
+                               Clearable="true"
+                               Disabled="@(_idZona is null)"
+                               HelperText="@(_idZona is null ? "Selecciona una zona primero." : null)"
+                               Variant="Variant.Outlined" Margin="Margin.Dense"
+                              >
+                        @foreach (var v in VendedoresFiltrados)
+                        {
+                            <MudSelectItem T="long?" Value="@v.IdVendedor">@v.Nombre</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+
+                <MudItem xs="12" sm="6">
+                    <MudSelect T="long?" Label="Clasificación" @bind-Value="Modelo.IdClasificacion"
+                               Clearable="true" Variant="Variant.Outlined" Margin="Margin.Dense"
+                              >
+                        @foreach (var c in Clasificaciones)
+                        {
+                            <MudSelectItem T="long?" Value="@c.IdClasificaionCliente">@c.Descripcion</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+
+                <MudItem xs="12">
+                    <MudTextField T="string" Label="Observaciones" @bind-Value="Modelo.Observaciones"
+                                  Lines="2" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                </MudItem>
+
+                @if (!EsNuevo)
+                {
+                    <MudItem xs="12" Class="d-flex align-center">
+                        <MudSwitch T="bool" @bind-Value="Modelo.Activo" Color="Color.Primary"
+                                   Label="@(Modelo.Activo ? "Estatus: Activo" : "Estatus: Inactivo")" />
+                    </MudItem>
+                }
+            </MudGrid>
+        </MudForm>
+    </DialogContent>
+
+    <DialogActions>
+        <MudButton OnClick="Cancelar" Variant="Variant.Text" Color="Color.Default">Cancelar</MudButton>
+        <MudButton OnClick="Guardar" Variant="Variant.Filled" Color="Color.Primary" Disabled="@(!_formValido)">
+            Guardar
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter] public string Titulo { get; set; } = "Gestionar cliente";
+    [Parameter] public string Icono { get; set; } = Icons.Material.Filled.PersonAddAlt;
+    [Parameter] public bool EsNuevo { get; set; }
+    [Parameter] public FormModel Modelo { get; set; } = new();
+    [Parameter] public IReadOnlyList<ZonaDto> Zonas { get; set; } = new List<ZonaDto>();
+    [Parameter] public IReadOnlyList<RutaAdminDto> Rutas { get; set; } = new List<RutaAdminDto>();
+    [Parameter] public IReadOnlyList<VendedorDto> Vendedores { get; set; } = new List<VendedorDto>();
+    [Parameter] public IReadOnlyList<ClasificaionClienteDto> Clasificaciones { get; set; } = new List<ClasificaionClienteDto>();
+
+    /// <summary>Clase CSS extra aplicada al contenedor del diálogo (p. ej. safe-area en móvil a pantalla completa).</summary>
+    [Parameter] public string? ClaseDialogo { get; set; }
+
+    private MudForm _form = null!;
+    private bool _formValido;
+    private long? _idZona;
+
+    protected override void OnInitialized()
+    {
+        // En edición, derivamos la zona a partir de la ruta ya asignada al cliente.
+        if (Modelo.IdRuta is { } idRuta)
+            _idZona = Rutas.FirstOrDefault(r => r.IdRuta == idRuta)?.IdZona;
+    }
+
+    // Rutas de la zona seleccionada (o vacío si no hay zona).
+    private IEnumerable<RutaAdminDto> RutasFiltradas
+        => _idZona is { } z ? Rutas.Where(r => r.IdZona == z) : Enumerable.Empty<RutaAdminDto>();
+
+    // Vendedores de la zona seleccionada (o vacío si no hay zona).
+    private IEnumerable<VendedorDto> VendedoresFiltrados
+        => _idZona is { } z ? Vendedores.Where(v => v.IdZona == z) : Enumerable.Empty<VendedorDto>();
+
+    private void OnZonaChanged(long? nuevaZona)
+    {
+        _idZona = nuevaZona;
+        // Si la ruta/vendedor seleccionados ya no pertenecen a la zona, se limpian.
+        if (Modelo.IdRuta is { } r && Rutas.FirstOrDefault(x => x.IdRuta == r)?.IdZona != nuevaZona)
+            Modelo.IdRuta = null;
+        if (Modelo.IdVendedor is { } v && Vendedores.FirstOrDefault(x => x.IdVendedor == v)?.IdZona != nuevaZona)
+            Modelo.IdVendedor = null;
+    }
+
+    private void Cancelar() => MudDialog.Cancel();
+
+    private async Task Guardar()
+    {
+        await _form.Validate();
+        if (_formValido)
+            MudDialog.Close(DialogResult.Ok(Modelo));
+    }
+
+    public class FormModel
+    {
+        public string Nombre { get; set; } = string.Empty;
+        public string? ApPaterno { get; set; }
+        public string? ApMaterno { get; set; }
+        public string TelefonoPrincipal { get; set; } = string.Empty;
+        public string? TelefonoSecundario { get; set; }
+        public string? Email { get; set; }
+        public string Direccion { get; set; } = string.Empty;
+        public string? CodigoPostal { get; set; }
+        public string? ReferenciaUbicacion { get; set; }
+        public decimal? Latitud { get; set; }
+        public decimal? Longitud { get; set; }
+        public long? IdRuta { get; set; }
+        public long? IdVendedor { get; set; }
+        public long? IdClasificacion { get; set; }
+        public string? Observaciones { get; set; }
+        public bool Activo { get; set; } = true;
+    }
+}

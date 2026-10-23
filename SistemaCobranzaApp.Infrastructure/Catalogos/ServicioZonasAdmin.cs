@@ -4,6 +4,7 @@ using SistemaCobranzaApp.Domain.Entidades;
 using SistemaCobranzaApp.Domain.Enums;
 using SistemaCobranzaApp.Infrastructure.Persistencia;
 using SistemaCobranzaApp.Shared.Dtos;
+using SistemaCobranzaApp.Shared.Logging;
 
 namespace SistemaCobranzaApp.Infrastructure.Catalogos;
 
@@ -21,23 +22,75 @@ public class ResultadoZona
 
 public class ServicioZonasAdmin
 {
+    private const string Proceso = "ServicioZonasAdmin (BD)";
+
     private readonly CobranzaDbContext _db;
+    private readonly IServicioLog _log;
 
-    public ServicioZonasAdmin(CobranzaDbContext db) => _db = db;
-
-    public Task<List<ZonaDto>> ListarAsync(bool incluirInactivas, CancellationToken ct = default)
+    public ServicioZonasAdmin(CobranzaDbContext db, IServicioLog log)
     {
-        var q = _db.Zonas.AsNoTracking().AsQueryable();
-        if (!incluirInactivas) q = q.Where(z => z.Estatus == Estatus.Activo);
-        return q.OrderBy(z => z.Descripcion)
-            .Select(z => new ZonaDto(z.IdZona, z.Descripcion, z.Estatus == Estatus.Activo))
-            .ToListAsync(ct);
+        _db = db;
+        _log = log;
     }
 
+    // 1. Listado operativo (Solo activas para los selectores/combos comunes)
+    public async Task<List<ZonaDto>> ListarActivasAsync(CancellationToken ct = default)
+    {
+        try
+        {
+            return await _db.Zonas
+                .AsNoTracking()
+                .Where(z => z.Estatus == Estatus.Activo)
+                .OrderBy(z => z.Descripcion)
+                .Select(z => new ZonaDto(z.IdZona, z.Descripcion, true))
+                .ToListAsync(ct);
+        }
+        catch (Exception ex)
+        {
+            _log.Error(Proceso, ex);
+            _log.Error(Proceso, "Error en la base de datos al obtener las zonas activas.");
+            throw;
+        }
+    }
+
+    // 2. Listado de administración (Trae absolutamente todo)
+    public async Task<List<ZonaDto>> ListarTodasAsync(CancellationToken ct = default)
+    {
+        try
+        {
+            return await _db.Zonas
+                .AsNoTracking()
+                .IgnoreQueryFilters() // Rompe el filtro global para el panel de administración
+                .OrderBy(z => z.Descripcion)
+                .Select(z => new ZonaDto(z.IdZona, z.Descripcion, z.Estatus == Estatus.Activo))
+                .ToListAsync(ct);
+        }
+        catch (Exception ex)
+        {
+            _log.Error(Proceso, ex);
+            _log.Error(Proceso, "Error en la base de datos al obtener las zonas.");
+            throw;
+        }
+    }
+
+    // 3. Obtener por ID (Permite ver el detalle de zonas inactivas)
     public async Task<ZonaDto?> ObtenerAsync(long id, CancellationToken ct = default)
     {
-        var z = await _db.Zonas.AsNoTracking().FirstOrDefaultAsync(x => x.IdZona == id, ct);
-        return z is null ? null : new ZonaDto(z.IdZona, z.Descripcion, z.Estatus == Estatus.Activo);
+        try
+        {
+            var z = await _db.Zonas
+                .AsNoTracking()
+                .IgnoreQueryFilters() // Permite al admin auditar o inspeccionar zonas inactivas
+                .FirstOrDefaultAsync(x => x.IdZona == id, ct);
+
+            return z is null ? null : new ZonaDto(z.IdZona, z.Descripcion, z.Estatus == Estatus.Activo);
+        }
+        catch (Exception ex)
+        {
+            _log.Error(Proceso, ex, datos: new { id });
+            _log.Error(Proceso, $"Error en la base de datos al obtener la zona #{id}.");
+            throw;
+        }
     }
 
     public async Task<ResultadoZona> CrearAsync(string descripcion, CancellationToken ct = default)
@@ -46,39 +99,68 @@ public class ServicioZonasAdmin
         if (error is not null) return ResultadoZona.Fallo(error);
 
         var desc = descripcion.Trim();
-        if (await _db.Zonas.AnyAsync(z => z.Descripcion == desc, ct))
-            return ResultadoZona.Fallo("Ya existe una zona con esa descripción.");
 
-        var zona = new Zona { Descripcion = desc, Estatus = Estatus.Activo };
-        _db.Zonas.Add(zona);
-        await _db.SaveChangesAsync(ct);
-        return ResultadoZona.Ok(new ZonaDto(zona.IdZona, zona.Descripcion, true));
+        try
+        {
+            // Buscamos ignorando filtros por si quieren recrear una zona que ya existía inactiva
+            if (await _db.Zonas.IgnoreQueryFilters().AnyAsync(z => z.Descripcion == desc, ct))
+                return ResultadoZona.Fallo("Ya existe una zona con esa descripción.");
+
+            var zona = new Zona { Descripcion = desc, Estatus = Estatus.Activo };
+            _db.Zonas.Add(zona);
+            await _db.SaveChangesAsync(ct);
+            return ResultadoZona.Ok(new ZonaDto(zona.IdZona, zona.Descripcion, true));
+        }
+        catch (Exception ex)
+        {
+            _log.Error(Proceso, ex, datos: new { descripcion = desc });
+            return ResultadoZona.Fallo("Error en la base de datos al crear la zona.");
+        }
     }
 
-    public async Task<ResultadoZona> ActualizarAsync(long id, string descripcion, CancellationToken ct = default)
+    // 4. Actualizar (Permite reactivar o corregir zonas inactivas)
+    public async Task<ResultadoZona> ActualizarAsync(long id, string descripcion, bool activo, CancellationToken ct = default)
     {
         var error = ValidacionCatalogo.ValidarTextoRequerido(descripcion, "La descripción");
         if (error is not null) return ResultadoZona.Fallo(error);
 
-        var zona = await _db.Zonas.FirstOrDefaultAsync(z => z.IdZona == id, ct);
-        if (zona is null) return ResultadoZona.NoExiste($"No se encontró la zona #{id}.");
+        try
+        {
+            var zona = await _db.Zonas.IgnoreQueryFilters().FirstOrDefaultAsync(z => z.IdZona == id, ct);
+            if (zona is null) return ResultadoZona.NoExiste($"No se encontró la zona #{id}.");
 
-        var desc = descripcion.Trim();
-        if (await _db.Zonas.AnyAsync(z => z.Descripcion == desc && z.IdZona != id, ct))
-            return ResultadoZona.Fallo("Ya existe otra zona con esa descripción.");
+            var desc = descripcion.Trim();
+            if (await _db.Zonas.IgnoreQueryFilters().AnyAsync(z => z.Descripcion == desc && z.IdZona != id, ct))
+                return ResultadoZona.Fallo("Ya existe otra zona con esa descripción.");
 
-        zona.Descripcion = desc;
-        await _db.SaveChangesAsync(ct);
-        return ResultadoZona.Ok(new ZonaDto(zona.IdZona, zona.Descripcion, zona.Estatus == Estatus.Activo));
+            zona.Descripcion = desc;
+            zona.Estatus = activo ? Estatus.Activo : Estatus.Inactivo;
+            await _db.SaveChangesAsync(ct);
+            return ResultadoZona.Ok(new ZonaDto(zona.IdZona, zona.Descripcion, zona.Estatus == Estatus.Activo));
+        }
+        catch (Exception ex)
+        {
+            _log.Error(Proceso, ex, datos: new { id, descripcion });
+            return ResultadoZona.Fallo("Error en la base de datos al actualizar la zona.");
+        }
     }
 
+    // 5. Dar de Baja (Permite interactuar con el registro si ya estaba filtrado)
     public async Task<ResultadoZona> DarDeBajaAsync(long id, CancellationToken ct = default)
     {
-        var zona = await _db.Zonas.FirstOrDefaultAsync(z => z.IdZona == id, ct);
-        if (zona is null) return ResultadoZona.NoExiste($"No se encontró la zona #{id}.");
+        try
+        {
+            var zona = await _db.Zonas.IgnoreQueryFilters().FirstOrDefaultAsync(z => z.IdZona == id, ct);
+            if (zona is null) return ResultadoZona.NoExiste($"No se encontró la zona #{id}.");
 
-        zona.Estatus = Estatus.Inactivo;
-        await _db.SaveChangesAsync(ct);
-        return ResultadoZona.Ok(new ZonaDto(zona.IdZona, zona.Descripcion, false));
+            zona.Estatus = Estatus.Inactivo;
+            await _db.SaveChangesAsync(ct);
+            return ResultadoZona.Ok(new ZonaDto(zona.IdZona, zona.Descripcion, false));
+        }
+        catch (Exception ex)
+        {
+            _log.Error(Proceso, ex, datos: new { id });
+            return ResultadoZona.Fallo("Error en la base de datos al dar de baja la zona.");
+        }
     }
 }

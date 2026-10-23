@@ -1,0 +1,101 @@
+@using MudBlazor
+@using SistemaCobranzaApp.Shared.Dtos
+
+<MudDialog>
+
+    <DialogContent>
+
+        <MudTextField @bind-Value="_nombre"
+                      Label="Nombre"
+                      Variant="Variant.Outlined"
+                      Required="true"
+                      Immediate="true"
+                      MaxLength="100"
+                      Class="mb-4" />
+
+        <MudSelect T="long?"
+                   @bind-Value="_idZona"
+                   Label="Zona"
+                   Variant="Variant.Outlined"
+                   Required="true"
+                   Clearable="true">
+
+            @foreach (var zona in Zonas)
+            {
+                <MudSelectItem T="long?"
+                               Value="@((long?)zona.Id)">
+                    @zona.Descripcion
+                </MudSelectItem>
+            }
+
+        </MudSelect>
+
+    </DialogContent>
+
+    <DialogActions>
+
+        <MudButton Variant="Variant.Text"
+                   OnClick="Cancelar">
+            Cancelar
+        </MudButton>
+
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   Disabled="@(!PuedeGuardar)"
+                   OnClick="Guardar">
+            Guardar
+        </MudButton>
+
+    </DialogActions>
+
+</MudDialog>
+
+@code {
+
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter]
+    public string Nombre { get; set; } = string.Empty;
+
+    [Parameter]
+    public long? IdZona { get; set; }
+
+    [Parameter]
+    public List<CatalogoItemDto> Zonas { get; set; } = new();
+
+    private string _nombre = string.Empty;
+    private long? _idZona;
+
+    private bool PuedeGuardar =>
+        !string.IsNullOrWhiteSpace(_nombre) &&
+        _idZona.HasValue &&
+        _idZona.Value > 0;
+
+    protected override void OnInitialized()
+    {
+        _nombre = Nombre;
+        _idZona = IdZona;
+    }
+
+    private void Cancelar()
+    {
+        MudDialog.Cancel();
+    }
+
+    private void Guardar()
+    {
+        if (!PuedeGuardar)
+            return;
+
+        MudDialog.Close(
+            DialogResult.Ok(
+                new PersonaZonaDialogResult(
+                    _nombre.Trim(),
+                    _idZona)));
+    }
+
+    private sealed record PersonaZonaDialogResult(
+        string Nombre,
+        long? IdZona);
+}

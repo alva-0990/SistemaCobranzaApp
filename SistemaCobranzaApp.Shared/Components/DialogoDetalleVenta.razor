@@ -1,0 +1,219 @@
+@using MudBlazor
+@using SistemaCobranzaApp.Shared.Dtos
+@using SistemaCobranzaApp.Shared.Services
+@inject ApiCliente Api
+
+<MudDialog>
+    <DialogContent>
+        @if (_cargando)
+        {
+            <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+        }
+        else if (_error is not null)
+        {
+            <MudAlert Severity="Severity.Error">@_error</MudAlert>
+            <MudButton OnClick="Cargar">Reintentar</MudButton>
+        }
+        else if (_venta is { } venta)
+        {
+            <!-- Resumen de la cuenta (banda compacta con estado y montos de color) -->
+            <MudPaper Elevation="0" Outlined="true" Class="pa-3 mb-3 panel-resumen">
+                <div class="resumen-encabezado mb-2">
+                    <div class="d-flex align-center gap-2">
+                        <MudIcon Icon="@Icons.Material.Filled.ReceiptLong" Color="Color.Primary" />
+                        <MudText Typo="Typo.subtitle1" Class="resumen-folio">Detalle de la cuenta</MudText>
+                    </div>
+                    <MudChip T="string" Size="Size.Small" Variant="Variant.Filled"
+                             Color="@ColorEstado(venta.DescripcionEstatus)" Class="chip-compacto">
+                        @(venta.DescripcionEstatus ?? "—")
+                    </MudChip>
+                </div>
+                <div class="resumen-banda">
+                    @Metrica("Total", venta.TotalFinal, Color.Default)
+                    @Metrica("Enganche", venta.Enganche, Color.Info)
+                    @Metrica("Saldo pendiente", venta.SaldoPendiente, venta.SaldoPendiente > 0 ? Color.Error : Color.Success)
+                </div>
+                @if (LimpiarObservaciones(venta.Observaciones) is { } observacionVisible)
+                {
+                    <MudText Typo="Typo.body2" Class="mt-2 resumen-nota">@observacionVisible</MudText>
+                }
+            </MudPaper>
+
+            <!-- Productos -->
+            <MudPaper Elevation="0" Outlined="true" Class="pa-3 mb-3">
+                <div class="seccion-titulo mb-2">
+                    <MudIcon Icon="@Icons.Material.Filled.Inventory2" Size="Size.Small" Class="mr-1" />
+                    Productos
+                </div>
+                <MudTable T="DetalleVentaDto" Items="_detalles" Dense="true" Hover="true" Elevation="0" Breakpoint="Breakpoint.Sm">
+                    <HeaderContent>
+                        <MudTh>Producto</MudTh>
+                        <MudTh Style="text-align:right;">Cantidad</MudTh>
+                        <MudTh Style="text-align:right;">Precio</MudTh>
+                        <MudTh Style="text-align:right;">Importe</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd DataLabel="Producto">@context.NombreProducto</MudTd>
+                        <MudTd DataLabel="Cantidad" Style="text-align:right;">@context.Cantidad</MudTd>
+                        <MudTd DataLabel="Precio" Style="text-align:right;">@context.PrecioCobrado.ToString("C2")</MudTd>
+                        <MudTd DataLabel="Importe" Style="text-align:right;"><b>@context.Importe.ToString("C2")</b></MudTd>
+                    </RowTemplate>
+                    <NoRecordsContent>
+                        <div class="pa-3 text-center">
+                            <MudIcon Icon="@Icons.Material.Filled.Inbox" Color="Color.Secondary" />
+                            <MudText Color="Color.Secondary" Typo="Typo.body2" Class="mt-1">Sin productos registrados.</MudText>
+                        </div>
+                    </NoRecordsContent>
+                </MudTable>
+            </MudPaper>
+
+            <!-- Pagos -->
+            <MudPaper Elevation="0" Outlined="true" Class="pa-3">
+                <div class="seccion-titulo mb-2">
+                    <MudIcon Icon="@Icons.Material.Filled.Payments" Size="Size.Small" Class="mr-1" />
+                    Pagos
+                </div>
+                <MudTable T="PagoHistoricoDto" Items="_pagos" Dense="true" Hover="true" Elevation="0" Breakpoint="Breakpoint.Sm">
+                    <HeaderContent>
+                        <MudTh>Folio</MudTh>
+                        <MudTh>Fecha</MudTh>
+                        <MudTh>Movimiento</MudTh>
+                        <MudTh Style="text-align:right;">Abono</MudTh>
+                        <MudTh Style="text-align:right;">Saldo</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd DataLabel="Folio">@(context.FolioPago ?? $"#{context.IdPago}")</MudTd>
+                        <MudTd DataLabel="Fecha">@context.FechaPago.EnZonaProyecto().DateTime.ToString("dd/MM/yyyy HH:mm")</MudTd>
+                        <MudTd DataLabel="Movimiento">@context.Movimiento</MudTd>
+                        <MudTd DataLabel="Abono" Style="text-align:right;"><b class="monto-abono">@context.MontoAbona.ToString("C2")</b></MudTd>
+                        <MudTd DataLabel="Saldo" Style="text-align:right;">
+                            <b class="@(context.SaldoActual > 0 ? "saldo-pendiente" : "saldo-liquidado")">@context.SaldoActual.ToString("C2")</b>
+                        </MudTd>
+                    </RowTemplate>
+                    <NoRecordsContent>
+                        <div class="pa-3 text-center">
+                            <MudIcon Icon="@Icons.Material.Filled.MoneyOff" Color="Color.Secondary" />
+                            <MudText Color="Color.Secondary" Typo="Typo.body2" Class="mt-1">Sin pagos registrados.</MudText>
+                        </div>
+                    </NoRecordsContent>
+                </MudTable>
+            </MudPaper>
+        }
+    </DialogContent>
+    <DialogActions><MudButton OnClick="Cerrar" Color="Color.Primary">Cerrar</MudButton></DialogActions>
+</MudDialog>
+
+@{
+    // Métrica monetaria compacta para la banda de resumen.
+    RenderFragment Metrica(string etiqueta, decimal monto, Color color) => __builder =>
+    {
+        <div class="resumen-item">
+            <span class="resumen-etiqueta">@etiqueta</span>
+            <MudText Typo="Typo.subtitle1" Color="@color" Class="resumen-valor">@monto.ToString("C2")</MudText>
+        </div>
+    };
+}
+
+<style>
+    .seccion-titulo {
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        font-size: 0.95rem;
+        color: var(--mud-palette-primary);
+    }
+
+    .chip-compacto { height: 22px; }
+
+    /* Banda de resumen de la cuenta. */
+    .panel-resumen { background-color: var(--mud-palette-background-grey); }
+    .resumen-encabezado {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        flex-wrap: wrap;
+    }
+    .resumen-folio { font-weight: 800; }
+    .resumen-banda {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 24px;
+    }
+    .resumen-item { display: flex; flex-direction: column; }
+    .resumen-etiqueta { font-size: 0.75rem; color: var(--mud-palette-text-secondary); }
+    .resumen-valor { font-weight: 700; line-height: 1.2; }
+    .resumen-nota { color: var(--mud-palette-text-secondary); font-style: italic; }
+
+    .monto-abono { color: var(--mud-palette-success); }
+    .saldo-pendiente { color: var(--mud-palette-error); }
+    .saldo-liquidado { color: var(--mud-palette-success); }
+</style>
+
+@code {
+    [Parameter] public long IdVenta { get; set; }
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = null!;
+    private VentaDto? _venta;
+    private List<PagoHistoricoDto> _pagos = new();
+    private List<DetalleVentaDto> _detalles = new();
+    private bool _cargando = true;
+    private string? _error;
+    protected override Task OnInitializedAsync() => Cargar();
+    private async Task Cargar()
+    {
+        _cargando = true;
+        _error = null;
+        try
+        {
+            var venta = Api.ObtenerVentaAdminAsync(IdVenta);
+            var pagos = Api.ObtenerHistorialPagosAdminAsync(IdVenta);
+            await Task.WhenAll(venta, pagos);
+            var v = await venta;
+            var p = await pagos;
+            _error = v.error ?? p.error;
+            _venta = v.datos;
+            _pagos = p.datos ?? new();
+            _detalles = _venta?.Detalles ?? new();
+            if (_venta is null) _error ??= "No se encontró la venta.";
+        }
+        catch { _error = "No se pudo cargar el detalle de la venta. Intenta de nuevo."; }
+        finally { _cargando = false; }
+    }
+    private void Cerrar() => MudDialog.Cancel();
+
+    // Asigna un color al chip de estado según la descripción del estatus de la venta.
+    private static Color ColorEstado(string? estado)
+    {
+        if (string.IsNullOrWhiteSpace(estado)) return Color.Default;
+        var e = estado.ToUpperInvariant();
+        if (e.Contains("PAGAD") || e.Contains("LIQUID")) return Color.Success;
+        if (e.Contains("PENDIENTE") || e.Contains("ACTIV")) return Color.Warning;
+        if (e.Contains("CANCEL") || e.Contains("VENCID")) return Color.Error;
+        return Color.Primary;
+    }
+
+    // Oculta las notas internas del sistema que no deben mostrarse al usuario:
+    // la marca de alta automática y el sello técnico de cargo por liquidación de renovaciones.
+    private static string? LimpiarObservaciones(string? observaciones)
+    {
+        if (string.IsNullOrWhiteSpace(observaciones)) return null;
+
+        var texto = observaciones;
+
+        // Eliminar el bloque "[CARGO POR LIQUIDACIÓN: ...]" que agrega el procedimiento de renovación.
+        var inicioCargo = texto.IndexOf("[CARGO POR LIQUIDACIÓN", StringComparison.OrdinalIgnoreCase);
+        if (inicioCargo >= 0)
+        {
+            var finCargo = texto.IndexOf(']', inicioCargo);
+            texto = finCargo >= 0
+                ? texto.Remove(inicioCargo, finCargo - inicioCargo + 1)
+                : texto[..inicioCargo];
+        }
+
+        // Quitar la nota de alta estándar generada por el panel.
+        texto = texto.Replace("Alta desde panel Blazor Multiplataforma.", string.Empty);
+
+        texto = texto.Trim();
+        return string.IsNullOrWhiteSpace(texto) ? null : texto;
+    }
+}

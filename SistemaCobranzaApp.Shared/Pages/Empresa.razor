@@ -1,0 +1,471 @@
+
+@page "/empresa"
+
+@using MudBlazor
+@using SistemaCobranzaApp.Shared.Theme
+@using SistemaCobranzaApp.Shared.Dtos
+@using SistemaCobranzaApp.Shared.Services
+@using SistemaCobranzaApp.Shared.Components
+
+@inject ApiCliente Api
+@inject IDialogService Dialogo
+@inject ISnackbar Snackbar
+@inject IFormFactor FormFactor
+@inject EstadoEmpresaGlobal EmpresaGlobal 
+
+<PageTitle>Información de la Empresa</PageTitle>
+
+<div class="empresa-contenedor">
+
+    <MudPaper Elevation="1" Class="pa-4 mb-4">
+        <div class="empresa-encabezado">
+            <div class="d-flex align-center gap-3">
+                <MudAvatar Color="Color.Primary" Variant="Variant.Filled">
+                    <MudIcon Icon="@Icons.Material.Filled.Business" />
+                </MudAvatar>
+
+                <div>
+                    <MudText Typo="Typo.h5">
+                        <b>Información de la Empresa</b>
+                    </MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">
+                        Datos generales, contacto y configuración fiscal.
+                    </MudText>
+                </div>
+            </div>
+
+            <MudButton Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       StartIcon="@Icons.Material.Filled.Edit"
+                       OnClick="EditarEmpresa"
+                       Disabled="@(_empresa is null || _cargando)">
+                Editar empresa
+            </MudButton>
+        </div>
+    </MudPaper>
+
+    @if (_cargando)
+    {
+        <div class="d-flex flex-column align-center pa-8">
+            <MudProgressCircular Indeterminate="true"
+                                 Color="Color.Primary"
+                                 Size="Size.Large" />
+            <MudText Typo="Typo.body2" Class="mt-3">
+                Consultando información...
+            </MudText>
+        </div>
+    }
+    else if (_empresa is not null)
+    {
+        <MudGrid Spacing="3">
+
+            <MudItem xs="12">
+                <MudPaper Outlined="true" Class="pa-4">
+                    <div class="empresa-identidad">
+                        @if (!string.IsNullOrWhiteSpace(AppTheme.ObtenerLogo(EmpresaGlobal.Identidad)))
+                        {
+                            <MudImage Src="@AppTheme.ObtenerLogo(EmpresaGlobal.Identidad)"
+                                      Alt="Logo de la empresa"
+                                      Width="100"
+                                      Height="100"
+                                      ObjectFit="ObjectFit.Contain"
+                                      Class="empresa-logo" />
+                        }
+                        else
+                        {
+                            <MudAvatar Size="Size.Large"
+                                       Color="Color.Primary"
+                                       Variant="Variant.Outlined">
+                                <MudIcon Icon="@Icons.Material.Filled.Business"
+                                         Size="Size.Large" />
+                            </MudAvatar>
+                        }
+
+                        <div class="empresa-identidad-texto">
+                            <MudText Typo="Typo.h5">
+                                <b>@AppTheme.ObtenerNombre(EmpresaGlobal.Identidad)</b>
+                            </MudText>
+                            <MudText Typo="Typo.body1">
+                                @Mostrar(_empresa.RazonSocial)
+                            </MudText>
+                            <MudText Typo="Typo.body2"
+                                     Color="Color.Secondary">
+                                @Mostrar(_empresa.Lema)
+                            </MudText>
+                            <MudChip T="string"
+                                     Color="Color.Success"
+                                     Variant="Variant.Outlined"
+                                     Size="Size.Small">
+                                Registro #@_empresa.Id
+                            </MudChip>
+                        </div>
+                    </div>
+                </MudPaper>
+            </MudItem>
+
+            <MudItem xs="12" md="6">
+                <MudPaper Outlined="true" Class="pa-4 h-100">
+                    <div class="empresa-seccion">
+                        <MudIcon Icon="@Icons.Material.Filled.Badge"
+                                 Color="Color.Primary" />
+                        <MudText Typo="Typo.subtitle1">
+                            <b>Datos generales</b>
+                        </MudText>
+                    </div>
+
+                    @Campo("Razón social", _empresa.RazonSocial)
+                    @Campo("Nombre comercial", _empresa.NombreComercial)
+                    @Campo("Nombre corto", _empresa.NombreCorto)
+                    @Campo("RFC / NIT", _empresa.Rfc_o_Nit)
+                    @Campo("Régimen fiscal", _empresa.RegimenFiscal)
+                    @Campo("Año de fundación",
+                        _empresa.AnioFundacion == 0
+                            ? "—"
+                            : _empresa.AnioFundacion.ToString())
+                </MudPaper>
+            </MudItem>
+
+            <MudItem xs="12" md="6">
+                <MudPaper Outlined="true" Class="pa-4 h-100">
+                    <div class="empresa-seccion">
+                        <MudIcon Icon="@Icons.Material.Filled.ContactPhone"
+                                 Color="Color.Primary" />
+                        <MudText Typo="Typo.subtitle1">
+                            <b>Contacto</b>
+                        </MudText>
+                    </div>
+
+                    @Campo("Teléfono principal", _empresa.TelefonoPrincipal)
+                    @Campo("Teléfono secundario", _empresa.TelefonoSecundario)
+                    @Campo("Correo de contacto", _empresa.CorreoContacto)
+                    @Campo("Correo de soporte", _empresa.CorreoSoporte)
+                    @Campo("Sitio web", _empresa.SitioWeb)
+                    @Campo("Horario de atención", _empresa.HorarioAtencion)
+                </MudPaper>
+            </MudItem>
+
+            <MudItem xs="12" md="6">
+                <MudPaper Outlined="true" Class="pa-4 h-100">
+                    <div class="empresa-seccion">
+                        <MudIcon Icon="@Icons.Material.Filled.LocationOn"
+                                 Color="Color.Primary" />
+                        <MudText Typo="Typo.subtitle1">
+                            <b>Domicilio</b>
+                        </MudText>
+                    </div>
+
+                    @Campo("Calle", _empresa.Calle)
+                    @Campo("Número exterior", _empresa.NumeroExterior)
+                    @Campo("Número interior", _empresa.NumeroInterior)
+                    @Campo("Colonia", _empresa.Colonia)
+                    @Campo("Código postal", _empresa.CodigoPostal)
+                    @Campo("Ciudad", _empresa.Ciudad)
+                    @Campo("Estado / provincia", _empresa.Estado_o_Provincia)
+                    @Campo("País", _empresa.Pais)
+                </MudPaper>
+            </MudItem>
+
+            <MudItem xs="12" md="6">
+                <MudPaper Outlined="true" Class="pa-4 h-100">
+                    <div class="empresa-seccion">
+                        <MudIcon Icon="@Icons.Material.Filled.Settings"
+                                 Color="Color.Primary" />
+                        <MudText Typo="Typo.subtitle1">
+                            <b>Configuración comercial</b>
+                        </MudText>
+                    </div>
+
+                    @Campo("Moneda", _empresa.MonedaPorDefecto)
+                    @Campo("Símbolo monetario", _empresa.SimboloMoneda)
+
+                    <div class="empresa-campo">
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">
+                            Porcentaje de impuesto
+                        </MudText>
+                        <MudText Typo="Typo.body1">
+                            <b>@_empresa.PorcentajeImpuesto.ToString("N2") %</b>
+                        </MudText>
+                    </div>
+
+                    <MudDivider Class="my-3" />
+
+                    <MudText Typo="Typo.subtitle2" Class="mb-2">
+                        <b>Redes sociales</b>
+                    </MudText>
+
+                    @Campo("Facebook", _empresa.FacebookUrl)
+                    @Campo("Instagram", _empresa.InstagramUrl)
+                    @Campo("LinkedIn", _empresa.LinkedinUrl)
+
+                    @if (!string.IsNullOrWhiteSpace(_empresa.LogoBlancoUrl))
+                    {
+                        <MudDivider Class="my-3" />
+                        <MudText Typo="Typo.subtitle2">
+                            Logo para fondos oscuros
+                        </MudText>
+                        <MudImage Src="@_empresa.LogoBlancoUrl"
+                                  Alt="Logo blanco"
+                                  Height="65"
+                                  ObjectFit="ObjectFit.Contain"
+                                  Class="mt-2" />
+                    }
+                </MudPaper>
+            </MudItem>
+
+        </MudGrid>
+    }
+    else
+    {
+        <MudPaper Outlined="true" Class="pa-6 text-center">
+            <MudIcon Icon="@Icons.Material.Filled.Business"
+                     Size="Size.Large"
+                     Color="Color.Secondary" />
+            <MudText Typo="Typo.h6" Class="mt-2">
+                No hay información de empresa
+            </MudText>
+            <MudText Typo="Typo.body2" Color="Color.Secondary">
+                Registra los datos generales para configurar tu empresa.
+            </MudText>
+            <MudButton Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       StartIcon="@Icons.Material.Filled.AddBusiness"
+                       Class="mt-4"
+                       OnClick="CrearEmpresa">
+                Registrar empresa
+            </MudButton>
+        </MudPaper>
+    }
+
+</div>
+
+@code {
+    private EmpresaDto? _empresa;
+    private bool _cargando = true;
+    private bool _inicializado;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CargarEmpresaAsync();
+
+        // Si no existe el registro, abrir automáticamente el formulario.
+        if (_empresa is null && !_cargando)
+        {
+            await AbrirDialogoEmpresaAsync(esEdicion: false);
+        }
+    }
+
+    private async Task CargarEmpresaAsync()
+    {
+        _cargando = true;
+        StateHasChanged();
+
+        try
+        {
+            var (datos, error) = await Api.ObtenerEmpresaOperativaAsync();
+
+            // Si hay un error y no es un 404 (base de datos vacía), reportamos la falla
+            if (error is not null)
+            {
+                if (!error.Contains("404"))
+                {
+                    Snackbar.Add(error, Severity.Error);
+                }
+            
+                _empresa = null;
+                EmpresaGlobal.Limpiar(); // Sincroniza el estado global en vacío
+                return;
+            }
+
+            _empresa = datos;
+
+            if (_empresa is not null)
+            {
+                EmpresaGlobal.Actualizar(_empresa); // ✏️ Almacena los datos en las variables globales al instante
+            }
+            else
+            {
+                EmpresaGlobal.Limpiar();
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(
+                $"No fue posible consultar la empresa: {ex.Message}",
+                Severity.Error);
+        
+            EmpresaGlobal.Limpiar();
+        }
+        finally
+        {
+            _cargando = false;
+            StateHasChanged();
+        }
+    }
+
+
+    private Task CrearEmpresa()
+        => AbrirDialogoEmpresaAsync(esEdicion: false);
+
+    private Task EditarEmpresa()
+        => AbrirDialogoEmpresaAsync(esEdicion: true);
+
+    private async Task AbrirDialogoEmpresaAsync(bool esEdicion)
+    {
+        if (_inicializado)
+            return;
+
+        _inicializado = true;
+
+        var movil = EsEntornoMovil;
+
+        var opciones = movil
+            ? new DialogOptions
+            {
+                FullScreen = true,
+                CloseButton = true,
+                BackdropClick = false,
+                CloseOnEscapeKey = false
+            }
+            : new DialogOptions
+            {
+                MaxWidth = MaxWidth.Large,
+                FullWidth = true,
+                CloseButton = esEdicion,
+                BackdropClick = esEdicion,
+                CloseOnEscapeKey = esEdicion
+            };
+
+        try
+        {
+            var parametros = new DialogParameters<DialogoEmpresa>
+            {
+                { x => x.Empresa, esEdicion ? _empresa : null },
+                { x => x.EsEdicion, esEdicion }
+            };
+
+            var titulo = esEdicion
+                ? "Editar información de la empresa"
+                : "Registrar empresa";
+
+            var dialogo = await Dialogo.ShowAsync<DialogoEmpresa>(
+                titulo, parametros, opciones);
+
+            var resultado = await dialogo.Result;
+
+            if (resultado is { Canceled: false, Data: true })
+            {
+                await CargarEmpresaAsync();
+
+                Snackbar.Add(
+                    "La información de la empresa se guardó correctamente.",
+                    Severity.Success);
+            }
+        }
+        finally
+        {
+            _inicializado = false;
+        }
+    }
+
+    private bool EsEntornoMovil
+    {
+        get
+        {
+            var factor = FormFactor.GetFormFactor();
+
+            return !factor.Equals("Web", StringComparison.OrdinalIgnoreCase)
+                   && !factor.Equals("Desktop", StringComparison.OrdinalIgnoreCase);
+        }
+    }
+
+    private static string Mostrar(string? valor)
+        => string.IsNullOrWhiteSpace(valor) ? "—" : valor;
+
+    private static RenderFragment Campo(string etiqueta, string? valor)
+        => @<div class="empresa-campo">
+                <MudText Typo="Typo.body2" Color="Color.Secondary">
+                    @etiqueta
+                </MudText>
+                <MudText Typo="Typo.body1" Class="empresa-valor">
+                    @Mostrar(valor)
+                </MudText>
+            </div>;
+}
+
+<style>
+    .empresa-contenedor {
+        padding: 12px;
+        max-width: 1600px;
+        margin: 0 auto;
+    }
+
+    .empresa-encabezado {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 16px;
+    }
+
+    .empresa-identidad {
+        display: flex;
+        align-items: center;
+        gap: 20px;
+        flex-wrap: wrap;
+    }
+
+    .empresa-identidad-texto {
+        min-width: 0;
+        overflow-wrap: anywhere;
+    }
+
+    .empresa-logo {
+        object-fit: contain;
+        border-radius: 8px;
+    }
+
+    .empresa-seccion {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 18px;
+    }
+
+    .empresa-campo {
+        padding: 10px 0;
+        border-bottom: 1px dashed var(--mud-palette-divider);
+        min-width: 0;
+    }
+
+    .empresa-campo:last-child {
+        border-bottom: none;
+    }
+
+    .empresa-valor {
+        font-weight: 500;
+        overflow-wrap: anywhere;
+    }
+
+    .h-100 {
+        height: 100%;
+    }
+
+    @@media (max-width: 600px) {
+        .empresa-contenedor {
+            padding: 8px;
+        }
+
+        .empresa-encabezado {
+            align-items: stretch;
+        }
+
+        .empresa-encabezado > .mud-button-root {
+            width: 100%;
+        }
+
+        .empresa-identidad {
+            align-items: flex-start;
+            gap: 12px;
+        }
+    }
+</style>

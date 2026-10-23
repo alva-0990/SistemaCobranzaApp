@@ -1,118 +1,422 @@
 ﻿@page "/"
+@using MudBlazor
 @using SistemaCobranzaApp.Shared.Services
 @using SistemaCobranzaApp.Shared.Dtos
 @inject ApiCliente ApiClienteService
 @inject NavigationManager NavigationManagerService
+@inject ISnackbar Snackbar
 
-<div class="cartera-container">
-    <div class="header-cartera">
-        <h3>Mi Cartera de Cobranza</h3>
-        <p class="usuario-cobrador">Cobrador: <strong>@ApiClienteService.Sesion?.Usuario</strong></p>
+@* ============================================================================
+   PANEL DE CONTROL ADMINISTRATIVO
+   ----------------------------------------------------------------------------
+   KPIs, gráficas y resumen por zona alimentados con datos reales del backend
+   (GET /api/reportes/dashboard). Mantiene el diseño visual aprobado.
+   ============================================================================ *@
+
+<div class="dashboard">
+
+    <!-- Encabezado -->
+    <div class="dash-header mb-3">
+        <div>
+            <MudText Typo="Typo.h5" Class="dash-titulo">Panel de control</MudText>
+            <MudText Typo="Typo.body2" Color="Color.Secondary">
+                Resumen general de ventas y cobranza
+            </MudText>
+        </div>
+        @if (_cargando)
+        {
+            <MudProgressCircular Indeterminate="true" Color="Color.Primary" Size="Size.Small" />
+        }
     </div>
 
-    @if (!_inicializado || _cargando)
-    {
-        <div class="loading-state">
-            <div class="spinner-blue"></div>
-            <p>Cargando y validando credenciales de cartera...</p>
-        </div>
-    }
-    else if (!string.IsNullOrEmpty(_error))
-    {
-        <div class="error-box">
-            <p>@_error</p>
-            <button @onclick="CargarCartera" class="btn-reintentar">Reintentar</button>
-        </div>
-    }
-    else if (_cartera?.Cuentas == null || !_cartera.Cuentas.Any())
-    {
-        <div class="empty-state">
-            <p>No tienes cuentas asignadas con saldo pendiente.</p>
-        </div>
-    }
-    else
-    {
-        <div class="resumen-valores">
-            <div class="card-resumen">
-                <span class="resumen-titulo">Total a Cobrar</span>
-                <strong class="resumen-monto">@_cartera.SaldoTotal.ToString("C")</strong>
+    <!-- ===================== Filtros (colapsables) ===================== -->
+    <MudPaper Elevation="0" Outlined="true" Class="pa-3 mb-3">
+        <div class="seccion-titulo filtros-header" @onclick="@(() => _filtrosAbiertos = !_filtrosAbiertos)">
+            <div class="d-flex align-center">
+                <MudIcon Icon="@Icons.Material.Filled.FilterAlt" Size="Size.Small" Class="mr-1" />
+                Filtros
             </div>
-            <div class="card-resumen">
-                <span class="resumen-titulo">Clientes</span>
-                <strong class="resumen-monto">@_cartera.Total</strong>
-            </div>
+            <MudIconButton Icon="@(_filtrosAbiertos ? Icons.Material.Filled.ExpandLess : Icons.Material.Filled.ExpandMore)"
+                           Size="Size.Small"
+                           OnClick="@(() => _filtrosAbiertos = !_filtrosAbiertos)" />
         </div>
 
-        <div class="lista-clientes">
-            @foreach (var cuenta in _cartera.Cuentas)
-            {
-                <div class="cliente-item">
-                    <div class="cliente-info">
-                        <h4>@cuenta.Cliente</h4>
-                        <p class="venta-codigo">Ref: @cuenta.CodigoVenta</p>
-                        @if (!string.IsNullOrEmpty(cuenta.Ruta))
+        <MudCollapse Expanded="_filtrosAbiertos">
+            <MudGrid Spacing="2" Class="mt-1">
+                <MudItem xs="12" sm="6" md="3">
+                    <MudDatePicker Label="Desde" @bind-Date="_desde" Variant="Variant.Outlined" />
+                </MudItem>
+                <MudItem xs="12" sm="6" md="3">
+                    <MudDatePicker Label="Hasta" @bind-Date="_hasta" Variant="Variant.Outlined" />
+                </MudItem>
+                <MudItem xs="12" sm="6" md="3">
+                    <MudSelect T="long?" Label="Zona" @bind-Value="_idZona" Variant="Variant.Outlined" Clearable="true">
+                        <MudSelectItem T="long?" Value="@((long?)null)">Todas las zonas</MudSelectItem>
+                        @foreach (var z in _zonas)
                         {
-                            <span class="badge-ruta">Ruta: @cuenta.Ruta</span>
+                            <MudSelectItem T="long?" Value="@((long?)z.IdZona)">@z.Descripcion</MudSelectItem>
                         }
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" sm="6" md="3">
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true"
+                               StartIcon="@Icons.Material.Filled.Search" Class="boton-aplicar"
+                               OnClick="GenerarAsync" Disabled="_cargando">
+                        Aplicar
+                    </MudButton>
+                </MudItem>
+            </MudGrid>
+        </MudCollapse>
+    </MudPaper>
+
+    <!-- ===================== Indicadores (KPIs) ===================== -->
+    <MudGrid Spacing="3" Class="mb-1">
+        @Kpi("Ventas totales", _kpis.VentasTotales.ToString("C2"), Icons.Material.Filled.PointOfSale, "kpi-azul",
+             $"{_kpis.PorcentajeRecuperacionGlobal.ToString("0.#")}% de recuperación")
+        @Kpi("Total cobrado", _kpis.TotalCobrado.ToString("C2"), Icons.Material.Filled.Payments, "kpi-verde",
+             "Cobranza en el periodo")
+        @Kpi("Saldo por cobrar", _kpis.SaldoPorCobrar.ToString("C2"), Icons.Material.Filled.AccountBalanceWallet, "kpi-ambar",
+             $"{_kpis.CuentasConSaldo} cuentas con saldo")
+        @Kpi("Cobrado hoy", _kpis.CobradoHoy.ToString("C2"), Icons.Material.Filled.Today, "kpi-morado",
+             $"{_kpis.PagosHoy} pagos registrados")
+    </MudGrid>
+
+    <!-- ===================== Gráficas ===================== -->
+    <MudGrid Spacing="3" Class="mt-1 mb-1">
+        <!-- Ventas por zona -->
+        <MudItem xs="12" md="6">
+            <MudPaper Elevation="0" Outlined="true" Class="pa-3 h-100">
+                <div class="seccion-titulo mb-2">
+                    <MudIcon Icon="@Icons.Material.Filled.BarChart" Size="Size.Small" Class="mr-1" />
+                    Ventas totales por zona
+                </div>
+                <MudChart T="double" ChartType="ChartType.Bar" ChartSeries="_serieVentasZona" XAxisLabels="_zonasArray"
+                          Width="100%" Height="260px" ChartOptions="_opcionesBarras" />
+                @LeyendaZonas(_datos?.VentasPorZona)
+            </MudPaper>
+        </MudItem>
+
+        <!-- Cobranza por zona -->
+        <MudItem xs="12" md="6">
+            <MudPaper Elevation="0" Outlined="true" Class="pa-3 h-100">
+                <div class="seccion-titulo mb-2">
+                    <MudIcon Icon="@Icons.Material.Filled.StackedBarChart" Size="Size.Small" Class="mr-1" />
+                    Cobranza por zona
+                </div>
+                <MudChart T="double" ChartType="ChartType.Bar" ChartSeries="_serieCobranzaZona" XAxisLabels="_zonasCobranzaArray"
+                          Width="100%" Height="260px" ChartOptions="_opcionesBarras" />
+                @LeyendaZonas(_datos?.CobranzaPorZona)
+            </MudPaper>
+        </MudItem>
+
+        <!-- Cobranza por día -->
+        <MudItem xs="12">
+            <MudPaper Elevation="0" Outlined="true" Class="pa-3 h-100">
+                <div class="seccion-titulo mb-2">
+                    <MudIcon Icon="@Icons.Material.Filled.ShowChart" Size="Size.Small" Class="mr-1" />
+                    Cobranza por día
+                </div>
+                <MudChart T="double" ChartType="ChartType.Line" ChartSeries="_serieCobranzaDia" XAxisLabels="_diasArray"
+                          Width="100%" Height="280px" ChartOptions="_opcionesLinea" />
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+
+    <!-- ===================== Tabla de resumen ===================== -->
+    <MudPaper Elevation="0" Outlined="true" Class="pa-3 mt-1">
+        <div class="seccion-titulo mb-2">
+            <MudIcon Icon="@Icons.Material.Filled.TableChart" Size="Size.Small" Class="mr-1" />
+            Resumen por zona, vendedor y cobrador
+        </div>
+        <MudTable Items="_resumen" Hover="true" Dense="true" Breakpoint="Breakpoint.Sm" Elevation="0" T="FilaResumen">
+            <HeaderContent>
+                <MudTh>Zona</MudTh>
+                <MudTh>Vendedor</MudTh>
+                <MudTh>Cobrador</MudTh>
+                <MudTh Style="text-align:right;">Total vendido</MudTh>
+                <MudTh Style="text-align:right;">Total cobrado</MudTh>
+                <MudTh Style="text-align:right;">Saldo pendiente</MudTh>
+                <MudTh Style="text-align:center;">% recuperación</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="Zona"><b>@context.Zona</b></MudTd>
+                <MudTd DataLabel="Vendedor">@context.Vendedor</MudTd>
+                <MudTd DataLabel="Cobrador">@context.Cobrador</MudTd>
+                <MudTd DataLabel="Total vendido" Style="text-align:right;">@context.TotalVendido.ToString("C2")</MudTd>
+                <MudTd DataLabel="Total cobrado" Style="text-align:right;">@context.TotalCobrado.ToString("C2")</MudTd>
+                <MudTd DataLabel="Saldo pendiente" Style="text-align:right;">
+                    <b class="@(context.Saldo > 0 ? "txt-rojo" : "txt-verde")">@context.Saldo.ToString("C2")</b>
+                </MudTd>
+                <MudTd DataLabel="% recuperación" Style="text-align:center;">
+                    <div class="recuperacion-celda">
+                        <MudProgressLinear Value="@((double)context.Recuperacion)" Color="@ColorRecuperacion(context.Recuperacion)"
+                                           Rounded="true" Class="recuperacion-barra" />
+                        <span class="recuperacion-texto">@context.Recuperacion.ToString("0.#")%</span>
                     </div>
-                    <div class="cliente-saldo">
-                        <span class="saldo-monto">@cuenta.SaldoPendiente.ToString("C")</span>
-                        <button class="btn-pago" @onclick="() => IrAPago(cuenta.IdVenta)">Cobrar</button>
-                    </div>
+                </MudTd>
+            </RowTemplate>
+            <FooterContent>
+                <MudTFootRow>
+                    <MudTd colspan="3"><b>Totales</b></MudTd>
+                    <MudTd Style="text-align:right;"><b>@_resumen.Sum(r => r.TotalVendido).ToString("C2")</b></MudTd>
+                    <MudTd Style="text-align:right;"><b>@_resumen.Sum(r => r.TotalCobrado).ToString("C2")</b></MudTd>
+                    <MudTd Style="text-align:right;"><b class="txt-rojo">@_resumen.Sum(r => r.Saldo).ToString("C2")</b></MudTd>
+                    <MudTd Style="text-align:center;"><b>@PromedioRecuperacion.ToString("0.#")%</b></MudTd>
+                </MudTFootRow>
+            </FooterContent>
+        </MudTable>
+    </MudPaper>
+
+</div>
+
+@{
+    // Tarjeta KPI reutilizable (icono + valor + subtítulo), con clase de color.
+    RenderFragment Kpi(string titulo, string valor, string icono, string clase, string subtitulo) => __builder =>
+    {
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Elevation="0" Class="@($"kpi-card {clase}")">
+                <div class="kpi-icono"><MudIcon Icon="@icono" Size="Size.Large" /></div>
+                <div class="kpi-cuerpo">
+                    <div class="kpi-titulo">@titulo</div>
+                    <div class="kpi-valor">@valor</div>
+                    <div class="kpi-sub">@subtitulo</div>
+                </div>
+            </MudPaper>
+        </MudItem>
+    };
+
+    // Leyenda de zonas bajo cada gráfica de barras: muestra el color (igual al de la barra),
+    // el nombre de la zona y su monto, para que cada barra quede identificada aunque el eje
+    // recorte las etiquetas largas.
+    RenderFragment LeyendaZonas(IReadOnlyList<DashboardSerieZona>? series) => __builder =>
+    {
+        if (series is null || series.Count == 0) return;
+
+        <div class="leyenda-zonas">
+            @for (var i = 0; i < series.Count; i++)
+            {
+                var s = series[i];
+                var color = _paletaZonas[i % _paletaZonas.Length];
+                <div class="leyenda-item">
+                    <span class="leyenda-color" style="@($"background:{color};")"></span>
+                    <span class="leyenda-nombre">@s.Zona</span>
+                    <span class="leyenda-monto">@s.Monto.ToString("C2")</span>
                 </div>
             }
         </div>
+    };
+}
+
+<style>
+    .dashboard { padding: 4px; }
+
+    .dash-header {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 12px;
+        flex-wrap: wrap;
     }
-</div>
+    .dash-titulo { font-weight: 800; }
+
+    .seccion-titulo {
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        font-size: 0.95rem;
+        color: var(--mud-palette-primary);
+    }
+
+    /* Cabecera de filtros: clicable para colapsar/expandir. */
+    .filtros-header {
+        justify-content: space-between;
+        cursor: pointer;
+        user-select: none;
+    }
+
+    /* El botón "Aplicar" toma el mismo alto que los inputs outlined (56px). */
+    .boton-aplicar {
+        height: 56px;
+    }
+
+    .h-100 { height: 100%; }
+
+    /* ---------- Tarjetas KPI ---------- */
+    .kpi-card {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        padding: 18px;
+        border-radius: 14px;
+        color: #fff;
+        min-height: 104px;
+        box-shadow: 0 6px 18px rgba(0,0,0,0.12);
+    }
+    .kpi-icono {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 52px; height: 52px;
+        border-radius: 12px;
+        background: rgba(255,255,255,0.18);
+    }
+    .kpi-cuerpo { display: flex; flex-direction: column; line-height: 1.15; }
+    .kpi-titulo { font-size: 0.8rem; opacity: 0.92; }
+    .kpi-valor { font-size: 1.5rem; font-weight: 800; }
+    .kpi-sub { font-size: 0.72rem; opacity: 0.85; margin-top: 2px; }
+
+    .kpi-azul   { background: linear-gradient(135deg, #2F7D5C 0%, #256A4D 100%); }
+    .kpi-verde  { background: linear-gradient(135deg, #3BA776 0%, #2F7D5C 100%); }
+    .kpi-ambar  { background: linear-gradient(135deg, #C99A3E 0%, #B5862F 100%); }
+    .kpi-morado { background: linear-gradient(135deg, #5B6ABF 0%, #434F97 100%); }
+
+    /* ---------- Tabla ---------- */
+    .txt-rojo { color: var(--mud-palette-error); }
+    .txt-verde { color: var(--mud-palette-success); }
+
+    .recuperacion-celda {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        min-width: 140px;
+    }
+    .recuperacion-barra { flex: 1; height: 8px; }
+    .recuperacion-texto { font-size: 0.78rem; font-weight: 700; min-width: 42px; text-align: right; }
+
+    /* ---------- Leyenda de zonas bajo las gráficas de barras ---------- */
+    .leyenda-zonas {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px 16px;
+        margin-top: 10px;
+        padding-top: 10px;
+        border-top: 1px solid var(--mud-palette-divider);
+    }
+    .leyenda-item {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 0.8rem;
+    }
+    .leyenda-color {
+        width: 12px;
+        height: 12px;
+        border-radius: 3px;
+        flex-shrink: 0;
+    }
+    .leyenda-nombre { color: var(--mud-palette-text-primary); }
+    .leyenda-monto { font-weight: 700; color: var(--mud-palette-text-secondary); }
+</style>
 
 @code {
-    private bool _inicializado;
-    private bool _cargando = true;
-    private string? _error;
-    private CarteraResponse? _cartera;
+    // ===================== Estado de filtros =====================
+    private DateTime? _desde = FechaProyecto.Hoy.AddDays(-30);
+    private DateTime? _hasta = FechaProyecto.Hoy;
+    private long? _idZona;
+    private bool _filtrosAbiertos = false;
 
-    protected override Task OnInitializedAsync()
+    private bool _cargando;
+
+    // Catálogo de zonas (combo de filtro).
+    private List<ZonaDto> _zonas = new();
+
+    // ===================== Datos del dashboard =====================
+    private DashboardResponse? _datos;
+
+    // KPIs presentables (con fallback a ceros mientras carga).
+    private KpisVista _kpis = KpisVista.Vacio;
+
+    // Gráfica: ventas por zona (barras).
+    private List<ChartSeries<double>> _serieVentasZona = new()
     {
-        return Task.CompletedTask;
+        new ChartSeries<double> { Name = "Ventas", Data = Array.Empty<double>() }
+    };
+
+    // Gráfica: cobranza por zona (barras).
+    private List<ChartSeries<double>> _serieCobranzaZona = new()
+    {
+        new ChartSeries<double> { Name = "Cobrado", Data = Array.Empty<double>() }
+    };
+
+    // Gráfica: cobranza por día (línea).
+    private List<ChartSeries<double>> _serieCobranzaDia = new()
+    {
+        new ChartSeries<double> { Name = "Cobrado", Data = Array.Empty<double>() }
+    };
+
+    private string[] _zonasArray = Array.Empty<string>();         // etiquetas de la gráfica de ventas por zona
+    private string[] _zonasCobranzaArray = Array.Empty<string>(); // etiquetas de la gráfica de cobranza por zona
+    private string[] _diasArray = Array.Empty<string>();
+
+    // Paleta compartida entre las barras y la leyenda de zonas (mismos colores).
+    private static readonly string[] _paletaZonas =
+        { "#2F7D5C", "#C99A3E", "#5B6ABF", "#3BA776", "#B5862F" };
+
+    private readonly ChartOptions _opcionesBarras = new()
+    {
+        ShowLegend = false,
+        ShowToolTips = true,
+        ChartPalette = _paletaZonas
+    };
+
+    private readonly ChartOptions _opcionesLinea = new()
+    {
+        ShowLegend = false,
+        ShowToolTips = true,
+        ChartPalette = new[] { "#2F7D5C", "#C99A3E" }
+    };
+
+    // Tabla resumen (proyección de DashboardResumenFila para la vista).
+    private sealed record FilaResumen(string Zona, string Vendedor, string Cobrador,
+        decimal TotalVendido, decimal TotalCobrado, decimal Saldo, decimal Recuperacion);
+
+    private List<FilaResumen> _resumen = new();
+
+    private decimal PromedioRecuperacion =>
+        _resumen.Count == 0 ? 0 : Math.Round(_resumen.Average(r => r.Recuperacion), 1);
+
+    private static Color ColorRecuperacion(decimal pct) =>
+        pct >= 80 ? Color.Success : pct >= 70 ? Color.Warning : Color.Error;
+
+    // ===================== Ciclo de vida =====================
+
+    protected override async Task OnInitializedAsync()
+    {
+        await ApiClienteService.CargarSesionDesdeAlmacenamientoAsync();
+        if (!ApiClienteService.Autenticado)
+        {
+            NavigationManagerService.NavigateTo("/login");
+            return;
+        }
+
+        await CargarZonasAsync();
+        await GenerarAsync();
     }
 
-    protected override async Task OnAfterRenderAsync(bool firstRender)
+    // Carga suave del combo de zonas; si falla, el combo queda vacío (se puede filtrar igual por "Todas").
+    private async Task CargarZonasAsync()
     {
-        if (firstRender)
-        {
-            if (!ApiClienteService.Autenticado)
-            {
-                await ApiClienteService.CargarSesionDesdeAlmacenamientoAsync();
-            }
+        var (datos, _) = await ApiClienteService.ListarZonasOperativasAsync();
+        _zonas = datos ?? new();
+    }
 
-            if (!ApiClienteService.Autenticado)
+    // ===================== Generación =====================
+
+    private async Task GenerarAsync()
+    {
+        if (_cargando) return;
+        _cargando = true;
+        try
+        {
+            var (datos, error) = await ApiClienteService.DashboardAsync(ADesde(_desde), AHasta(_hasta), _idZona);
+            if (error is not null)
             {
-                NavigationManagerService.NavigateTo("/login");
+                Snackbar.Add(error, Severity.Error);
                 return;
             }
 
-            _inicializado = true;
-            await CargarCartera();
-            StateHasChanged();
-        }
-    }
-
-    private async Task CargarCartera()
-    {
-        _cargando = true;
-        _error = null;
-        
-        try
-        {
-            var (datos, err) = await ApiClienteService.ConsultarCarteraAsync(soloConSaldo: true);
-            if (err != null)
-            {
-                _error = err;
-            }
-            else
-            {
-                _cartera = datos;
-            }
+            _datos = datos;
+            Mapear();
         }
         finally
         {
@@ -120,8 +424,85 @@
         }
     }
 
-    private void IrAPago(long idVenta)
+    // Traduce la respuesta del backend a las estructuras que consumen las gráficas y la tabla.
+    private void Mapear()
     {
-        NavigationManagerService.NavigateTo($"/registrar-pago/{idVenta}");
+        if (_datos is null) return;
+
+        // KPIs
+        var recuperacionGlobal = _datos.Kpis.VentasTotales > 0
+            ? _datos.Kpis.TotalCobrado / _datos.Kpis.VentasTotales * 100m
+            : 0m;
+        _kpis = new KpisVista(
+            _datos.Kpis.VentasTotales,
+            _datos.Kpis.TotalCobrado,
+            _datos.Kpis.SaldoPorCobrar,
+            _datos.Kpis.CobradoHoy,
+            _datos.Kpis.CuentasConSaldo,
+            _datos.Kpis.PagosHoy,
+            recuperacionGlobal < 0 ? 0m : recuperacionGlobal);
+
+        // Ventas por zona
+        _zonasArray = _datos.VentasPorZona.Select(z => z.Zona).ToArray();
+        _serieVentasZona = new()
+        {
+            new ChartSeries<double>
+            {
+                Name = "Ventas",
+                Data = _datos.VentasPorZona.Select(z => (double)z.Monto).ToArray()
+            }
+        };
+
+        // Cobranza por zona
+        _zonasCobranzaArray = _datos.CobranzaPorZona.Select(z => z.Zona).ToArray();
+        _serieCobranzaZona = new()
+        {
+            new ChartSeries<double>
+            {
+                Name = "Cobrado",
+                Data = _datos.CobranzaPorZona.Select(z => (double)z.Monto).ToArray()
+            }
+        };
+
+        // Cobranza por día
+        _diasArray = _datos.CobranzaPorDia
+            .Select(d => d.Dia.EnZonaProyecto().DateTime.ToString("dd/MM"))
+            .ToArray();
+        _serieCobranzaDia = new()
+        {
+            new ChartSeries<double>
+            {
+                Name = "Cobrado",
+                Data = _datos.CobranzaPorDia.Select(d => (double)d.Monto).ToArray()
+            }
+        };
+
+        // Tabla resumen
+        _resumen = _datos.Resumen.Select(r => new FilaResumen(
+            r.Zona,
+            string.IsNullOrWhiteSpace(r.Vendedor) ? "—" : r.Vendedor!,
+            string.IsNullOrWhiteSpace(r.Cobrador) ? "—" : r.Cobrador!,
+            r.TotalVendido,
+            r.TotalCobrado,
+            r.SaldoPendiente,
+            r.PorcentajeRecuperacion)).ToList();
+    }
+
+    // ===================== Helpers =====================
+
+    // Convierte la fecha del date picker a un DateTimeOffset en la zona del proyecto.
+    private static DateTimeOffset? ADesde(DateTime? d) => d is { } v ? FechaProyecto.DesdeFechaLocal(v.Date) : null;
+    private static DateTimeOffset? AHasta(DateTime? d) => d is { } v ? FechaProyecto.DesdeFechaLocal(v.Date) : null;
+
+    private sealed record KpisVista(
+        decimal VentasTotales,
+        decimal TotalCobrado,
+        decimal SaldoPorCobrar,
+        decimal CobradoHoy,
+        int CuentasConSaldo,
+        int PagosHoy,
+        decimal PorcentajeRecuperacionGlobal)
+    {
+        public static readonly KpisVista Vacio = new(0, 0, 0, 0, 0, 0, 0);
     }
 }

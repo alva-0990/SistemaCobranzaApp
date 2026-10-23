@@ -1,35 +1,103 @@
-﻿@using SistemaCobranzaApp.Shared.Services
+@using Microsoft.AspNetCore.Components.Routing
+@using MudBlazor
+@using SistemaCobranzaApp.Shared.Services
+@using SistemaCobranzaApp.Shared.Theme
+@inject EstadoEmpresaGlobal EmpresaGlobal
 @inject ApiCliente Api
+@inject ServicioJornadaLocal Jornada
 @inject NavigationManager Navigation
 
-<Router AppAssembly="@typeof(Routes).Assembly">
-    <Found Context="routeData">
-        <RouteView RouteData="@routeData" DefaultLayout="@typeof(Layout.MainLayout)" />
-        <!-- CORREGIDO: Se agregó el parámetro obligatorio RouteData -->
-        <FocusOnNavigate RouteData="@routeData" Selector="h1" />
-    </Found>
-    <NotFound>
-        <LayoutView Layout="@typeof(Layout.MainLayout)">
-            <p role="alert">Lo sentimos, no hay nada en esta dirección.</p>
-        </LayoutView>
-    </NotFound>
-</Router>
+<CascadingValue Value="this">
+<MudThemeProvider Theme="AppTheme.Theme" @bind-IsDarkMode="_isDarkMode" />
+<MudPopoverProvider />
+<MudDialogProvider />
+<MudSnackbarProvider />
+
+<MudLayout>
+    @if (_inicializado)
+    {
+        <Router AppAssembly="@typeof(Routes).Assembly">
+            <Found Context="routeData">
+                <RouteView RouteData="@routeData" DefaultLayout="@typeof(Layout.MainLayout)" />
+                <FocusOnNavigate RouteData="@routeData" Selector="h1" />
+            </Found>
+            <NotFound>
+                <LayoutView Layout="@typeof(Layout.MainLayout)">
+                    <p role="alert">Lo sentimos, no hay nada en esta dirección.</p>
+                </LayoutView>
+            </NotFound>
+        </Router>
+    }
+    else
+    {
+        @* Usamos colores fijos/estándares temporales durante el milisegundo de carga para evitar dependencias de variables CSS no inicializadas *@
+        <div style="display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100vh; background-color: #f5f5f5; gap: 16px;">
+            <MudProgressCircular Color="Color.Primary" Indeterminate="true" Size="Size.Large" />
+            <span style="font-family: 'Roboto', sans-serif; font-size: 14px; color: #666666; font-weight: 500;">
+                Cargando sistema de cobranza...
+            </span>
+        </div>
+    }
+</MudLayout>
+</CascadingValue>
 
 @code {
     private bool _inicializado;
+    private bool _isDarkMode;
+
+    public bool IsDarkMode 
+    { 
+        get => _isDarkMode; 
+        set { _isDarkMode = value; StateHasChanged(); } 
+    }
 
     protected override async Task OnInitializedAsync()
     {
-        // 1. Intentamos cargar el token guardado (ya sea de Android o Web)
+        // 1. Cargamos el token de sesión seguro
         await Api.CargarSesionDesdeAlmacenamientoAsync();
+
+        // Opción A: solo reanudamos sin re-login si el token sigue vigente.
+        // Si hay una sesión guardada pero el JWT ya expiró, la cerramos: el servidor la
+        // rechazaría y no debemos dejar entrar con un token muerto. Los datos capturados
+        // offline NO dependen de la sesión (viven en SQLite por IdUsuario) y se conservan.
+        if (Api.Sesion is not null && !Api.SesionVigente)
+            await Api.CerrarSesionAsync();
+
+        // Recuperar identidad guardada para iniciar también sin conexión.
+        var identidad = await Api.CargarIdentidadEmpresaAsync();
+        if (identidad is not null) EmpresaGlobal.ActualizarIdentidad(identidad);
+        // Formato del comprobante de pago: primero el último valor persistido (vale sin internet).
+        EmpresaGlobal.ActualizarFormatoTicketPago(await Api.CargarFormatoTicketPagoAsync());
+        // La identidad pública se actualiza en Login, sin retrasar el arranque del router.
+        if (Api.SesionVigente)
+        {
+            // Oportunista: si hay señal, renovamos el token al arrancar para extender la
+            // ventana offline. Silencioso y sin bloquear el arranque si no hay conexión.
+            _ = Api.RefreshAsync();
+
+            using var limiteEmpresa = new CancellationTokenSource(TimeSpan.FromSeconds(4));
+            var (empresa, _) = await Api.ObtenerEmpresaOperativaAsync(limiteEmpresa.Token);
+            if (empresa is not null) EmpresaGlobal.Actualizar(empresa);
+
+            // Con sesión/red, refrescamos el formato desde la API y lo persistimos para próximos arranques.
+            EmpresaGlobal.ActualizarFormatoTicketPago(await Api.RefrescarFormatoTicketPagoAsync());
+        }
+
+        if (Jornada.Disponible && Jornada.EsUsuarioCampo)
+        {
+            Navigation.NavigateTo("/jornada");
+        }
+
 
         _inicializado = true;
 
-        // 2. Si no está autenticado y no está ya en la página de login, redirigir
-        var urlActual = Navigation.ToBaseRelativePath(Navigation.Uri);
-        if (!Api.Autenticado && !urlActual.StartsWith("login", StringComparison.OrdinalIgnoreCase))
+        // 2. CORREGIDO: Validación absoluta mediante la URI completa para asegurar compatibilidad con el WebView de Android
+        var uriAbsoluta = Navigation.Uri;
+        
+        if (!Api.SesionVigente && !uriAbsoluta.Contains("login", StringComparison.OrdinalIgnoreCase))
         {
-            Navigation.NavigateTo("/login");
+            // Forzamos la redirección limpia al Login de Blazor
+            Navigation.NavigateTo("login");
         }
     }
 }

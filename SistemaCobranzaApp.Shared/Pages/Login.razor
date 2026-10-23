@@ -1,97 +1,160 @@
+@using MudBlazor
 @page "/login"
+@implements IDisposable
 @layout SistemaCobranzaApp.Shared.Layout.LoginLayout
 @using SistemaCobranzaApp.Shared.Services
 @using SistemaCobranzaApp.Shared.Dtos
 @inject SistemaCobranzaApp.Shared.Services.ApiCliente ApiClienteService
+@inject SistemaCobranzaApp.Shared.Services.EstadoEmpresaGlobal EmpresaGlobal 
 @inject NavigationManager NavigationManagerService
+@inject ServicioJornadaLocal Jornada
+@inject IFormFactor FormFactor
+@using SistemaCobranzaApp.Shared.Theme
+@using SistemaCobranzaApp.Shared.Components
 
-<div style="display: flex; justify-content: center; align-items: center; min-height: 75vh; padding: 16px; font-family: -apple-system, system-ui, sans-serif;">
-    <div style="width: 100%; max-width: 400px; background: #ffffff; padding: 32px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08); display: flex; flex-direction: column; gap: 16px; text-align: center; border: 1px solid #e5e7eb;">
-        
-        <h2 style="margin: 0; color: #1e3a8a; font-size: 24px; font-weight: 700;">Sistema de Cobranza</h2>
-        <p style="margin: -8px 0 8px 0; color: #6b7280; font-size: 14px;">Inicia sesión para continuar</p>
-
-        <div style="display: flex; flex-direction: column; text-align: left; gap: 4px;">
-            <input type="text" 
-                   placeholder="Usuario" 
-                   @bind="_usuario" 
-                   disabled="@_ocupado" 
-                   style="width: 100%; padding: 12px; border: 1px solid #d1d5db; border-radius: 6px; box-sizing: border-box; font-size: 15px; color: #111827;" />
-        </div>
-
-        <div style="display: flex; flex-direction: column; text-align: left; gap: 4px;">
-            <input type="password" 
-                   placeholder="Contraseña" 
-                   @bind="_password" 
-                   disabled="@_ocupado" 
-                   style="width: 100%; padding: 12px; border: 1px solid #d1d5db; border-radius: 6px; box-sizing: border-box; font-size: 15px; color: #111827;" />
-        </div>
-
-        @if (!string.IsNullOrEmpty(_mensajeError))
-        {
-            <div style="color: #dc2626; background: #fef2f2; padding: 10px 12px; border-radius: 6px; font-size: 13px; text-align: left; border-left: 4px solid #dc2626; font-weight: 500;">
-                @_mensajeError
+<div class="login-page @(EsEntornoMovil ? "login-movil" : "")">
+    <main class="login-container">
+        <form class="login-card" @onsubmit="ManejarLogin" @onsubmit:preventDefault>
+            <div class="login-logo">
+                @if (!string.IsNullOrWhiteSpace(LogoEmpresa))
+                {
+                    <img src="@LogoEmpresa" alt="@AppTheme.ObtenerNombre(EmpresaGlobal.Identidad)" />
+                }
+                else
+                {
+                    <MudIcon Icon="@AppTheme.IconoLogin" Style="font-size: 48px;" />
+                }
             </div>
-        }
-
-        <button @onclick="ManejarLogin" 
-                disabled="@_ocupado" 
-                style="width: 100%; padding: 12px; background: #1e3a8a; color: #ffffff; border: none; border-radius: 6px; font-size: 16px; font-weight: 600; cursor: pointer; transition: background 0.2s;">
-            @if (_ocupado)
+            <h1>@AppTheme.ObtenerNombre(EmpresaGlobal.Identidad)</h1>
+            <p class="subtitle">Inicia sesión para continuar</p>
+            <div class="login-field">
+                <label for="login-usuario">Usuario</label>
+                <input id="login-usuario" type="text" autocomplete="username"
+                       @bind="_usuario" disabled="@_ocupado" />
+            </div>
+            <div class="login-field">
+                <label for="login-password">Contraseña</label>
+                <div class="password-field">
+                    <input id="login-password" type="@(_mostrarPassword ? "text" : "password")"
+                           autocomplete="current-password" @bind="_password" disabled="@_ocupado" />
+                    <button type="button" class="password-toggle" @onclick="() => _mostrarPassword = !_mostrarPassword"
+                            disabled="@_ocupado" aria-label="@(_mostrarPassword ? "Ocultar contraseña" : "Mostrar contraseña")"
+                            aria-pressed="@(_mostrarPassword ? "true" : "false")">
+                        <MudIcon Icon="@(_mostrarPassword ? Icons.Material.Filled.VisibilityOff : Icons.Material.Filled.Visibility)" />
+                    </button>
+                </div>
+            </div>
+            @if (!string.IsNullOrEmpty(_mensajeError))
             {
-                <span>Cargando...</span>
+                <div class="error-message" role="alert">@_mensajeError</div>
             }
-            else
-            {
-                <span>Entrar</span>
-            }
-        </button>
-    </div>
+            <button type="submit" class="btn-entrar" disabled="@_ocupado">
+                @(_ocupado ? "Verificando acceso..." : "Entrar")
+            </button>
+        </form>
+    </main>
+    <PieAplicacion Discreto="EsEntornoMovil" />
 </div>
 
 @code {
+    [CascadingParameter] public Routes? RoutesContainer { get; set; }
+    private string? LogoEmpresa => AppTheme.ObtenerLogo(EmpresaGlobal.Identidad, RoutesContainer?.IsDarkMode == true);
     private string _usuario = string.Empty;
     private string _password = string.Empty;
     private bool _ocupado;
+    private bool _mostrarPassword;
+    private bool EsEntornoMovil => FormFactor.GetFormFactor() is not ("Web" or "Desktop");
     private string? _mensajeError;
 
-    // Bloqueamos ejecuciones prematuras en el Prerender del servidor
-    protected override Task OnInitializedAsync()
+    private readonly CancellationTokenSource _cargaIdentidad = new(TimeSpan.FromSeconds(15));
+
+    protected override async Task OnInitializedAsync()
     {
-        return Task.CompletedTask;
+        EmpresaGlobal.OnCambio += ActualizarIdentidad;
+        var guardada = await ApiClienteService.CargarIdentidadEmpresaAsync();
+        if (EmpresaGlobal.Identidad is null && guardada is not null)
+            EmpresaGlobal.ActualizarIdentidad(guardada);
+
+        // Consultar al entrar al login, también al regresar de cerrar sesión.
+        // El túnel/dispositivo puede tardar más que la conexión local de la web.
+        var (identidad, _) = await ApiClienteService.ObtenerIdentidadEmpresaAsync(_cargaIdentidad.Token);
+        if (_cargaIdentidad.IsCancellationRequested) return;
+        if (identidad is not null)
+        {
+            EmpresaGlobal.ActualizarIdentidad(identidad);
+            await ApiClienteService.GuardarIdentidadEmpresaAsync(identidad);
+        }
+    }
+
+    private void ActualizarIdentidad() => _ = InvokeAsync(StateHasChanged);
+
+    public void Dispose()
+    {
+        EmpresaGlobal.OnCambio -= ActualizarIdentidad;
+        _cargaIdentidad.Cancel();
+        _cargaIdentidad.Dispose();
     }
 
     private async Task ManejarLogin()
     {
-        if (_ocupado) return;
+        if (_ocupado)
+            return;
+
         _mensajeError = null;
 
-        if (string.IsNullOrWhiteSpace(_usuario) || string.IsNullOrWhiteSpace(_password))
+        if (string.IsNullOrWhiteSpace(_usuario) ||
+            string.IsNullOrWhiteSpace(_password))
         {
             _mensajeError = "Ingresa usuario y contraseña.";
             return;
         }
 
         _ocupado = true;
-        StateHasChanged(); // Forzamos a mostrar el estado "Cargando..."
-        
+        StateHasChanged();
+
         try
         {
-            var (ok, error) = await ApiClienteService.LoginAsync(_usuario.Trim(), _password);
-            if (ok)
+            // 1. Validar las credenciales en el servidor.
+            var (ok, error) = await ApiClienteService.LoginAsync(
+                _usuario.Trim(),
+                _password);
+
+            if (!ok)
             {
-                _password = string.Empty; 
-                // Navegamos directo a zonas como definimos en tu estrategia de validación
-                NavigationManagerService.NavigateTo("/admin/zonas"); 
+                _mensajeError = error ?? "No fue posible iniciar sesión.";
+                return;
             }
-            else
+
+            _password = string.Empty;
+
+            // Guardar identidad también para cobradores/vendedores antes de ir a su jornada.
+            var (empresa, errorEmpresa) = await ApiClienteService.ObtenerEmpresaOperativaAsync();
+            if (empresa is not null) EmpresaGlobal.Actualizar(empresa);
+
+            if (Jornada.Disponible && Jornada.EsUsuarioCampo)
             {
-                _mensajeError = error;
+                await Jornada.CargarAsync();
+                NavigationManagerService.NavigateTo("/jornada");
+                return;
             }
+
+            // 3. Si la base de datos está vacía, redirige directamente a la configuración inicial.
+            if (empresa is null)
+            {
+                EmpresaGlobal.Limpiar(); // Limpia cualquier estado previo por seguridad.
+                NavigationManagerService.NavigateTo("/empresa");
+                return;
+            }
+
+            // 4. Si existe, poblar de inmediato el estado global para que layouts y menús lo utilicen.
+            EmpresaGlobal.Actualizar(empresa);
+
+            // 5. Redireccionar al panel principal de la cartera.
+            NavigationManagerService.NavigateTo("/");
         }
         catch (Exception ex)
         {
-            _mensajeError = "Error interno de ejecución: " + ex.Message;
+            _mensajeError = "Error al iniciar sesión: " + ex.Message;
         }
         finally
         {

@@ -1,0 +1,33 @@
+@using MudBlazor
+@using SistemaCobranzaApp.Shared.Dtos
+@using SistemaCobranzaApp.Shared.Services
+@inject ServicioJornadaLocal Local
+@inject ServicioImpresionTicket Impresion
+@inject IDialogService Dialogos
+@inject ISnackbar Snackbar
+
+@code {
+    private bool _imprimiendo;
+    public async Task ImprimirAsync(Guid uuid)
+    {
+        if (_imprimiendo) return;
+        _imprimiendo = true;
+        try
+        {
+            var operacion = Local.Estado.Operaciones.Single(o => o.Uuid == uuid);
+            if (operacion.Venta is null && operacion.Pago is null) return;
+            // El ticket se construye exclusivamente con el documento ya guardado en SQLite.
+            var venta = operacion.Venta is null ? null : Local.TicketVenta(uuid);
+            var pago = operacion.Pago is null ? null : Local.TicketPago(uuid);
+            var dialogo = await Dialogos.ShowAsync<ImpresoraBluetoothDialog>("Imprimir ticket",
+                new DialogOptions { FullScreen = true, CloseButton = true, FullWidth = true });
+            if (await dialogo.Result is not { Canceled: false, Data: ImpresoraBluetoothDto impresora }) return;
+            var ok = venta is not null ? await Impresion.ImprimirAsync(impresora, venta)
+                : await Impresion.ImprimirPagoAsync(impresora, pago!);
+            Snackbar.Add(ok ? "Ticket impreso." : "No se pudo imprimir. La operación está guardada y puedes reimprimirla.",
+                ok ? Severity.Success : Severity.Warning);
+        }
+        catch (Exception ex) { Snackbar.Add($"La operación sigue guardada. Error al imprimir: {ex.Message}", Severity.Warning); }
+        finally { _imprimiendo = false; }
+    }
+}

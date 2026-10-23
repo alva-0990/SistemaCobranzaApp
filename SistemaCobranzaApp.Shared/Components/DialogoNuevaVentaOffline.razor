@@ -1,0 +1,1281 @@
+@using MudBlazor
+@using SistemaCobranzaApp.Shared.Dtos
+@using SistemaCobranzaApp.Domain.Ventas
+@using SistemaCobranzaApp.Shared.Services
+
+@inject ISnackbar _snackbar
+@inject ApiCliente Api
+
+<MudDialog Class="dialogo-adaptativo">
+
+    <TitleContent>
+        <div class="encabezado-venta">
+            <MudIcon Icon="@Icons.Material.Filled.AddShoppingCart"
+                     Color="Color.Success"
+                     Size="Size.Medium" />
+
+            <MudText Typo="Typo.h6" Class="titulo-venta">
+                Nueva Venta a Crédito
+            </MudText>
+
+            <MudText Typo="Typo.caption"
+                     Color="Color.Secondary"
+                     Class="cliente-venta">
+                @Cliente.NombreCompleto
+            </MudText>
+        </div>
+    </TitleContent>
+
+    <DialogContent>
+        @if (ModoRenovacion)
+        {
+            <div class="alert alert-warning banner-renovacion" role="alert">
+                ⚠️ Modo Renovación: Liquidando cuenta <strong>@(CodigoVentaVieja ?? $"#{IdVentaVieja}")</strong>
+            </div>
+        }
+
+
+        <MudGrid Spacing="3" Class="contenido-dialogo-venta">
+
+            <!-- ========================================================= -->
+            <!-- SECCIÓN 1: ARTÍCULOS -->
+            <!-- ========================================================= -->
+
+            <MudItem xs="12" md="7">
+
+                <MudText Typo="Typo.subtitle2" Class="mb-3" Color="Color.Primary">
+                    <b>🛒 Artículos de la Venta</b>
+                </MudText>
+
+                <!-- CAPTURA DE ARTÍCULO -->
+                <div class="captura-articulo">
+
+                    <div class="campo-producto">
+                        <MudSelect T="ArticuloInventario"
+                                   Label="Seleccionar Artículo"
+                                   Value="_productoSeleccionado"
+                                   ValueChanged="OnProductoSeleccionado"
+                                   Variant="Variant.Outlined"
+                                   Dense="true"
+                                   FullWidth="true"
+                                   ToStringFunc="@(a => a is null ? "" : a.Descripcion)">
+                            @foreach (var art in _catalogoInventario)
+                            {
+                                <MudSelectItem Value="@art">
+                                    @art.Descripcion (@art.Categoria) — Disp.: @art.Disponible
+                                </MudSelectItem>
+                            }
+                        </MudSelect>
+                    </div>
+
+                    <div class="campo-cantidad">
+                        <MudNumericField T="int"
+                                         Label="Cant."
+                                         @bind-Value="_cantidadCaptura"
+                                         Min="1"
+                                         Max="@_maxCantidadCaptura"
+                                         Variant="Variant.Outlined"
+                                         Dense="true"
+                                         FullWidth="true" 
+                                         InputAttributes="@(new Dictionary<string, object>
+                                                          {
+                                                              ["onfocus"] = "this.select()"
+                                                          })"/>
+                    </div>
+
+                    <div class="campo-precio">
+                        <MudNumericField T="decimal"
+                                         Label="Precio"
+                                         @bind-Value="_precioCaptura"
+                                         Min="0"
+                                         Format="C2"
+                                         Variant="Variant.Outlined"
+                                         Dense="true"
+                                         FullWidth="true" 
+                                         InputAttributes="@(new Dictionary<string, object>
+                                                          {
+                                                              ["onfocus"] = "this.select()"
+                                                          })"/>
+                    </div>
+
+                    <div class="campo-agregar">
+                        <MudButton Variant="Variant.Filled"
+                                   Color="Color.Success"
+                                   StartIcon="@Icons.Material.Filled.Add"
+                                   OnClick="AgregarArticulo"
+                                   Class="boton-agregar-articulo">
+                            Agregar artículo
+                        </MudButton>
+                    </div>
+
+                </div>
+
+                <!-- INFORMACIÓN DEL PRODUCTO -->
+                @if (_productoSeleccionado is not null)
+                {
+                    <MudText Typo="Typo.caption" Color="Color.Secondary" Class="info-producto">
+                        Disponible en zona: <b>@_productoSeleccionado.Disponible</b>
+                        <span class="separador-info">·</span>
+                        Precio sugerido: <b>@_productoSeleccionado.PrecioSugerido.ToString("C2")</b>
+                    </MudText>
+                }
+                else if (!_catalogoInventario.Any())
+                {
+                    <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined" Dense="true" Class="mt-2">
+                        No hay productos con existencia en la zona del cliente.
+                    </MudAlert>
+                }
+
+                <!-- DETALLE ESCRITORIO -->
+                <div class="detalle-escritorio">
+                    <MudTable Items="_detallesCapturados" Dense="true" Hover="true"
+                              Elevation="0" Height="240px" FixedHeader="true">
+                        <HeaderContent>
+                            <MudTh>Artículo</MudTh>
+                            <MudTh Style="text-align:center; width:15%;">Cant.</MudTh>
+                            <MudTh Style="text-align:right; width:20%;">Precio</MudTh>
+                            <MudTh Style="text-align:right; width:25%;">Importe</MudTh>
+                            <MudTh Style="width:10%;"></MudTh>
+                        </HeaderContent>
+                        <RowTemplate>
+                            <MudTd>@context.NombreProducto</MudTd>
+                            <MudTd Style="text-align:center;">@context.Cantidad</MudTd>
+                            <MudTd Style="text-align:right;">@context.PrecioCobrado.ToString("C2")</MudTd>
+                            <MudTd Style="text-align:right;"><b>@((context.Cantidad * context.PrecioCobrado).ToString("C2"))</b></MudTd>
+                            <MudTd>
+                                <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                               Size="Size.Small"
+                                               Color="Color.Error"
+                                               OnClick="@(() => EliminarArticulo(context))" />
+                            </MudTd>
+                        </RowTemplate>
+                        <NoRecordsContent>
+                            <MudText Typo="Typo.caption" Color="Color.Secondary" Class="pa-3">
+                                Agrega al menos un artículo a la venta.
+                            </MudText>
+                        </NoRecordsContent>
+                    </MudTable>
+                </div>
+
+                <!-- DETALLE MÓVIL -->
+                <div class="detalle-movil">
+                    @if (_detallesCapturados.Any())
+                    {
+                        @foreach (var detalle in _detallesCapturados)
+                        {
+                            <MudPaper Elevation="1" Class="detalle-card">
+                                <div class="detalle-card-header">
+                                    <MudText Typo="Typo.subtitle2"><b>@detalle.NombreProducto</b></MudText>
+                                    <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                                   Size="Size.Small"
+                                                   Color="Color.Error"
+                                                   OnClick="@(() => EliminarArticulo(detalle))" />
+                                </div>
+                                <MudDivider Class="my-2" />
+                                <div class="detalle-card-datos">
+                                    <div>
+                                        <MudText Typo="Typo.caption" Color="Color.Secondary">Cantidad</MudText>
+                                        <MudText Typo="Typo.body2"><b>@detalle.Cantidad</b></MudText>
+                                    </div>
+                                    <div>
+                                        <MudText Typo="Typo.caption" Color="Color.Secondary">Precio</MudText>
+                                        <MudText Typo="Typo.body2"><b>@detalle.PrecioCobrado.ToString("C2")</b></MudText>
+                                    </div>
+                                    <div class="detalle-card-total">
+                                        <MudText Typo="Typo.caption" Color="Color.Secondary">Importe</MudText>
+                                        <MudText Typo="Typo.body1" Color="Color.Success">
+                                            <b>@((detalle.Cantidad * detalle.PrecioCobrado).ToString("C2"))</b>
+                                        </MudText>
+                                    </div>
+                                </div>
+                            </MudPaper>
+                        }
+                    }
+                    else
+                    {
+                        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="sin-articulos">
+                            Agrega al menos un artículo a la venta.
+                        </MudText>
+                    }
+                </div>
+
+                <!-- ========================================================= -->
+                <!-- SECCIÓN: PROMOCIÓN / CONDICIONES DE LIQUIDACIÓN -->
+                <!-- ========================================================= -->
+
+                <MudDivider Class="my-4" />
+
+                <MudText Typo="Typo.subtitle2" Color="Color.Primary">
+                    <b>🏷️ Promoción / Condiciones de liquidación</b>
+                </MudText>
+                <MudText Typo="Typo.caption" Color="Color.Secondary" Class="d-block mb-3">
+                    Condiciones negociadas con el cliente (opcional).
+                </MudText>
+
+                <!-- CAPTURA DE CONDICIÓN -->
+                <div class="captura-condicion">
+
+                    <div class="campo-plazo">
+                        <MudSelect T="MesDto"
+                                   Label="Plazo"
+                                   Value="_mesSeleccionado"
+                                   ValueChanged="@(m => _mesSeleccionado = m)"
+                                   Variant="Variant.Outlined"
+                                   Dense="true"
+                                   FullWidth="true"
+                                   ToStringFunc="@(m => m is null ? "" : $"{m.NumMeses}{m.Descripcion}")">
+                            @foreach (var mes in _catalogoMeses)
+                            {
+                                <MudSelectItem Value="@mes">
+                                    @mes.NumMeses@mes.Descripcion
+                                </MudSelectItem>
+                            }
+                        </MudSelect>
+                    </div>
+
+                    <div class="campo-liquidacion">
+                        <MudNumericField T="decimal"
+                                         Label="Monto de liquidación"
+                                         @bind-Value="_montoLiquidacionCaptura"
+                                         Min="0"
+                                         Format="C2"
+                                         Variant="Variant.Outlined"
+                                         Dense="true"
+                                         FullWidth="true" 
+                                         InputAttributes="@(new Dictionary<string, object>
+                                                          {
+                                                              ["onfocus"] = "this.select()"
+                                                          })"/>
+                    </div>
+
+                    <div class="campo-agregar-condicion">
+                        <MudButton Variant="Variant.Filled"
+                                   Color="Color.Success"
+                                   StartIcon="@Icons.Material.Filled.Add"
+                                   OnClick="AgregarCondicion"
+                                   FullWidth="true"
+                                   Class="boton-agregar-condicion">
+                            Agregar condición
+                        </MudButton>
+                    </div>
+
+                </div>
+
+                <MudText Typo="Typo.caption" Color="Color.Secondary" Class="d-block mb-3">
+                    Ejemplo: 1 mes → $1,200 · 2 meses → $1,500 · 3 meses → $1,800
+                </MudText>
+
+                @if (_planesCapturados.Any())
+                {
+                    <!-- CONDICIONES ESCRITORIO -->
+                    <div class="detalle-escritorio">
+                        <MudTable Items="_planesCapturados" Dense="true" Hover="true" Elevation="0">
+                            <HeaderContent>
+                                <MudTh>Plazo</MudTh>
+                                <MudTh Style="text-align:right; width:35%;">Monto de liquidación</MudTh>
+                                <MudTh Style="width:12%;"></MudTh>
+                            </HeaderContent>
+                            <RowTemplate>
+                                <MudTd>@context.NumeroMeses @(context.NumeroMeses == 1 ? "mes" : "meses")</MudTd>
+                                <MudTd Style="text-align:right;"><b>@context.MontoLiquidacion.ToString("C2")</b></MudTd>
+                                <MudTd Style="text-align:right;">
+                                    <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                                   Size="Size.Small"
+                                                   Color="Color.Error"
+                                                   OnClick="@(() => EliminarCondicion(context))" />
+                                </MudTd>
+                            </RowTemplate>
+                        </MudTable>
+                    </div>
+
+                    <!-- CONDICIONES MÓVIL -->
+                    <div class="detalle-movil">
+                        @foreach (var plan in _planesCapturados)
+                        {
+                            <MudPaper Elevation="1" Class="detalle-card">
+                                <div class="detalle-card-header">
+                                    <MudText Typo="Typo.subtitle2">
+                                        <b>@plan.NumeroMeses @(plan.NumeroMeses == 1 ? "mes" : "meses")</b>
+                                    </MudText>
+                                    <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                                   Size="Size.Small"
+                                                   Color="Color.Error"
+                                                   OnClick="@(() => EliminarCondicion(plan))" />
+                                </div>
+                                <div class="detalle-card-datos">
+                                    <div class="detalle-card-total">
+                                        <MudText Typo="Typo.caption" Color="Color.Secondary">Monto de liquidación</MudText>
+                                        <MudText Typo="Typo.body1" Color="Color.Success">
+                                            <b>@plan.MontoLiquidacion.ToString("C2")</b>
+                                        </MudText>
+                                    </div>
+                                </div>
+                            </MudPaper>
+                        }
+                    </div>
+                }
+
+            </MudItem>
+
+
+            <!-- ========================================================= -->
+            <!-- SECCIÓN 2: CRÉDITO -->
+            <!-- ========================================================= -->
+
+            <MudItem xs="12" md="5" Class="seccion-credito">
+
+                <MudText Typo="Typo.subtitle2" Class="mb-3" Color="Color.Primary">
+                    <b>💰 Resumen y Plan de Crédito</b>
+                </MudText>
+
+                <!-- Vendedor que realiza la venta -->
+                <MudSelect T="VendedorDto"
+                           Value="_vendedorSeleccionado"
+                           ValueChanged="OnVendedorSeleccionado"
+                           Label="Vendedor"
+                           Variant="Variant.Outlined"
+                           Margin="Margin.Dense"
+                           Class="mb-3"
+                           Adornment="Adornment.Start"
+                           AdornmentIcon="@Icons.Material.Filled.Person"
+                           ToStringFunc="@(v => v?.Nombre ?? "")">
+                    @foreach (var vend in _vendedores)
+                    {
+                        <MudSelectItem T="VendedorDto" Value="vend">@vend.Nombre</MudSelectItem>
+                    }
+                </MudSelect>
+
+                <!-- Tipo de venta (CRÉDITO / CONTADO) -->
+                <MudSelect T="CondicionCreditoDto"
+                           Value="_condicionSeleccionada"
+                           ValueChanged="OnCondicionSeleccionada"
+                           Label="Tipo de venta"
+                           Variant="Variant.Outlined"
+                           Margin="Margin.Dense"
+                           Class="mb-3"
+                           Adornment="Adornment.Start"
+                           AdornmentIcon="@Icons.Material.Filled.Sell"
+                           ToStringFunc="@(c => c?.Descripcion ?? "")">
+                    @foreach (var cond in _condiciones)
+                    {
+                        <MudSelectItem T="CondicionCreditoDto" Value="cond">@cond.Descripcion</MudSelectItem>
+                    }
+                </MudSelect>
+
+                <div class="fila-resumen">
+                    <MudText>Subtotal:</MudText>
+                    <MudText Typo="Typo.body1"><b>@_subtotal.ToString("C2")</b></MudText>
+                </div>
+
+                <MudNumericField T="decimal"
+                                 Label="Descuento Global"
+                                 @bind-Value="_descuentoGlobal"
+                                 Min="0"
+                                 Format="C2"
+                                 Variant="Variant.Outlined"
+                                 Dense="true"
+                                 Class="mb-3"
+                                 Immediate="true"
+                                 FullWidth="true" 
+                                 InputAttributes="@(new Dictionary<string, object>
+                                                  {
+                                                      ["onfocus"] = "this.select()"
+                                                  })"/>
+
+                @if (ModoRenovacion)
+                {
+                    <div class="fila-resumen">
+                        <MudText>Cargo por Liquidación:</MudText>
+                        <MudText><b>@CargoRenovacion.ToString("C2")</b></MudText>
+                    </div>
+                }
+                <div class="total-final">
+                    <MudText Typo="Typo.button">TOTAL FINAL:</MudText>
+                    <MudText Typo="Typo.h6"><b>@_totalFinal.ToString("C2")</b></MudText>
+                </div>
+
+                <MudNumericField T="decimal"
+                                 Label="Enganche (Pronto Pago)"
+                                 @bind-Value="_enganche"
+                                 Min="0"
+                                 Format="C2"
+                                 Variant="Variant.Outlined"
+                                 Dense="true"
+                                 Class="mt-3 mb-2"
+                                 Immediate="true"
+                                 FullWidth="true" 
+                                 InputAttributes="@(new Dictionary<string, object>
+                                                  {
+                                                      ["onfocus"] = "this.select()"
+                                                  })"/>
+
+                <div class="fila-resumen monto-financiado">
+                    <MudText>Monto Neto a Financiar:</MudText>
+                    <MudText><b>@_montoFinanciado.ToString("C2")</b></MudText>
+                </div>
+
+                <MudDivider Class="my-3" />
+
+                <MudSelect T="CatalogoFrecuenciaPagoDto"
+                           Label="📅 Frecuencia de Cobro"
+                           @bind-Value="_frecuenciaSeleccionada"
+                           Variant="Variant.Outlined"
+                           Dense="true"
+                           Class="mb-3"
+                           FullWidth="true">
+                    @foreach (var f in _catalogoFrecuencias)
+                    {
+                        <MudSelectItem Value="@f">@f.Descripcion (@f.DiasPeriodo días)</MudSelectItem>
+                    }
+                </MudSelect>
+
+                <MudNumericField T="decimal"
+                                 Label="@(ModoRenovacion ? "Cuota base para calcular plazo" : "Cuota Fija Exigida/Pactada")"
+                                 @bind-Value="_cuotaFijaExigida"
+                                 Min="1"
+                                 Format="C2"
+                                 Variant="Variant.Outlined"
+                                 Dense="true"
+                                 Class="mb-3"
+                                 Immediate="true"
+                                 FullWidth="true" 
+                                 InputAttributes="@(new Dictionary<string, object>
+                                                  {
+                                                      ["onfocus"] = "this.select()"
+                                                  })"/>
+
+                @if (_montoFinanciado > 0 && _cuotaFijaExigida > 0)
+                {
+                    <div class="proyeccion-cuotas">
+                        <MudText Typo="Typo.caption">Plazo Proyectado:</MudText>
+                        <MudText Typo="Typo.subtitle2"><b>@_cuotasProyectadas cuotas fijas</b></MudText>
+                    </div>
+                    @if (ModoRenovacion)
+                    {
+                        <MudText Typo="Typo.body2" Class="mt-1">Cuota con liquidación: @CuotaRenovada.ToString("C2")</MudText>
+                    }
+                    <MudText Typo="Typo.caption" Color="Color.Secondary" Class="d-block mt-1">
+                        La última cuota será de @_ultimaCuotaAjuste.ToString("C2").
+                    </MudText>
+                }
+
+            </MudItem>
+
+        </MudGrid>
+
+    </DialogContent>
+
+
+    <!-- ============================================================= -->
+    <!-- ACCIONES -->
+    <!-- ============================================================= -->
+
+    <DialogActions>
+        <div class="acciones-dialogo">
+        <MudButton OnClick="Cancelar" Variant="Variant.Text" Color="Color.Default">
+            Cancelar
+        </MudButton>
+        <MudButton Color="Color.Success"
+                   Variant="Variant.Filled"
+                   OnClick="ProcesarEstructuraVenta"
+                   Disabled="@(!_detallesCapturados.Any())"
+                   StartIcon="@Icons.Material.Filled.CheckCircle">
+            @(ModoRenovacion ? "Confirmar renovación" : "Confirmar Venta")
+        </MudButton>
+        </div>
+    </DialogActions>
+
+</MudDialog>
+
+
+<style>
+    .banner-renovacion { position: sticky; top: 0; z-index: 2; }
+
+
+    /* ================================================================ */
+    /* DIÁLOGO GENERAL */
+    /* ================================================================ */
+
+    .dialogo-adaptativo {
+        width: min(900px, 96vw);
+        max-width: 900px;
+    }
+
+    .contenido-dialogo-venta {
+        overflow-x: hidden;
+    }
+
+
+    /* ================================================================ */
+    /* ENCABEZADO */
+    /* ================================================================ */
+
+    .encabezado-venta {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        min-width: 0;
+    }
+
+    .titulo-venta {
+        white-space: nowrap;
+    }
+
+    .cliente-venta {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+
+    /* ================================================================ */
+    /* CAPTURA DE ARTÍCULOS */
+    /* ================================================================ */
+
+    .captura-articulo {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 90px 130px;
+        gap: 10px;
+        align-items: center;
+        width: 100%;
+    }
+
+    .campo-producto,
+    .campo-cantidad,
+    .campo-precio,
+    .campo-agregar {
+        min-width: 0;
+    }
+
+    .campo-agregar {
+        display: flex;
+        justify-content: flex-end;
+        align-items: center;
+        /* El botón ocupa su propia fila completa debajo de los campos (no comprime el selector). */
+        grid-column: 1 / -1;
+    }
+
+    .boton-agregar-articulo {
+        /* En escritorio el botón queda compacto a la derecha de su fila; en móvil (media query) va al 100%. */
+        width: auto;
+        margin-top: 4px;
+    }
+
+    .info-producto {
+        display: block;
+        margin-top: 8px;
+        margin-bottom: 12px;
+    }
+
+    .separador-info {
+        margin: 0 5px;
+    }
+
+
+    /* ================================================================ */
+    /* CAPTURA DE CONDICIÓN DE LIQUIDACIÓN */
+    /* ================================================================ */
+
+    .captura-condicion {
+        display: grid;
+        grid-template-columns: 120px minmax(0, 1fr) auto;
+        gap: 10px;
+        align-items: center;
+        width: 100%;
+        margin-bottom: 6px;
+    }
+
+    .campo-plazo,
+    .campo-liquidacion,
+    .campo-agregar-condicion {
+        min-width: 0;
+    }
+
+
+    /* ================================================================ */
+    /* DETALLE ESCRITORIO / MÓVIL */
+    /* ================================================================ */
+
+    .detalle-escritorio {
+        width: 100%;
+        margin-top: 12px;
+    }
+
+    .detalle-movil {
+        display: none;
+    }
+
+
+    /* ================================================================ */
+    /* RESUMEN */
+    /* ================================================================ */
+
+    .seccion-credito {
+        border-left: 1px solid var(--mud-palette-lines-inputs);
+        padding-left: 24px !important;
+    }
+
+    .fila-resumen {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        margin: 8px 0;
+    }
+
+    .monto-financiado {
+        color: var(--mud-palette-text-secondary);
+    }
+
+    .total-final {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        padding: 9px 12px;
+        margin: 8px 0;
+        border-radius: 6px;
+        background: var(--mud-palette-primary);
+        color: var(--mud-palette-primary-text);
+    }
+
+    .proyeccion-cuotas {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        padding: 9px 10px;
+        border-radius: 6px;
+        background: var(--mud-palette-info-hover);
+    }
+
+
+    /* ================================================================ */
+    /* ACCIONES */
+    /* ================================================================ */
+
+    .acciones-dialogo {
+        display: flex;
+        justify-content: flex-end;
+        gap: 8px;
+        padding: 4px 0;
+        width: 100%;
+    }
+
+
+    /* ================================================================ */
+    /* MÓVILES (tablet) */
+    /* ================================================================ */
+
+    @@media (max-width: 959px) {
+
+        .dialogo-adaptativo {
+            width: 98vw;
+            max-width: 98vw;
+        }
+
+        .seccion-credito {
+            border-left: none;
+            border-top: 1px solid var(--mud-palette-lines-inputs);
+            padding-left: 12px !important;
+            padding-top: 20px !important;
+        }
+
+    }
+
+
+    /* ================================================================ */
+    /* TELÉFONOS */
+    /* ================================================================ */
+
+    @@media (max-width: 600px) {
+
+        .dialogo-adaptativo {
+            /* 100vw desbordaba el área segura lateral del contenedor del diálogo
+               (.mud-dialog-container ya aplica el padding de safe-area). Usamos
+               el 100% del espacio disponible dentro de ese contenedor. */
+            width: 100%;
+            max-width: 100%;
+            margin: 0;
+        }
+
+        .encabezado-venta {
+            align-items: flex-start;
+            gap: 8px;
+        }
+
+        .titulo-venta {
+            white-space: normal;
+            font-size: 1rem;
+            line-height: 1.25;
+        }
+
+        .cliente-venta {
+            display: none;
+        }
+
+
+        /* CAPTURA ARTÍCULO */
+        .captura-articulo {
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        .campo-producto {
+            grid-column: 1 / -1;
+        }
+
+        .campo-cantidad {
+            grid-column: 1;
+        }
+
+        .campo-precio {
+            grid-column: 2;
+        }
+
+        .campo-agregar {
+            grid-column: 1 / -1;
+            justify-content: stretch;
+        }
+
+        .boton-agregar-articulo {
+            width: 100%;
+            margin-top: 0;
+        }
+
+
+        /* CAPTURA CONDICIÓN */
+        .captura-condicion {
+            grid-template-columns: 1fr 1fr;
+        }
+
+        .campo-plazo {
+            grid-column: 1;
+        }
+
+        .campo-liquidacion {
+            grid-column: 2;
+        }
+
+        .campo-agregar-condicion {
+            grid-column: 1 / -1;
+        }
+
+
+        /* OCULTAR TABLA / MOSTRAR TARJETAS */
+        .detalle-escritorio {
+            display: none;
+        }
+
+        .detalle-movil {
+            display: block;
+            margin-top: 14px;
+        }
+
+
+        /* TARJETA */
+        .detalle-card {
+            padding: 10px 12px;
+            margin-bottom: 10px;
+            border-radius: 8px;
+        }
+
+        .detalle-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .detalle-card-datos {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .detalle-card-total {
+            text-align: right;
+        }
+
+        .sin-articulos {
+            display: block;
+            text-align: center;
+            padding: 14px 4px;
+        }
+
+
+        /* RESUMEN */
+        .fila-resumen {
+            font-size: 0.95rem;
+        }
+
+        .total-final {
+            padding: 10px;
+        }
+
+        .proyeccion-cuotas {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 2px;
+        }
+
+
+        /* ACCIONES */
+        .acciones-dialogo {
+            flex-direction: column-reverse;
+            align-items: stretch;
+            gap: 8px;
+            padding: 4px 0;
+        }
+
+        .acciones-dialogo .mud-button {
+            width: 100%;
+            min-height: 42px;
+        }
+
+    }
+
+
+    /* ================================================================ */
+    /* TELÉFONOS MUY PEQUEÑOS */
+    /* ================================================================ */
+
+    @@media (max-width: 380px) {
+
+        .captura-articulo {
+            grid-template-columns: 1fr;
+        }
+
+        .campo-producto,
+        .campo-cantidad,
+        .campo-precio,
+        .campo-agregar {
+            grid-column: 1;
+        }
+
+        .captura-condicion {
+            grid-template-columns: 1fr;
+        }
+
+        .campo-plazo,
+        .campo-liquidacion,
+        .campo-agregar-condicion {
+            grid-column: 1;
+        }
+
+        .detalle-card-datos {
+            grid-template-columns: 1fr 1fr;
+        }
+
+        .detalle-card-total {
+            grid-column: 1 / -1;
+            text-align: left;
+        }
+
+    }
+
+</style>
+
+
+@code {
+
+    [CascadingParameter]
+    IMudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter]
+    public ClienteDto Cliente { get; set; } = default!;
+
+    [Parameter]
+    public string CodigoVenta { get; set; } = default!;
+
+    [Parameter]
+    public long IdVendedor { get; set; }
+
+    [Parameter]
+    public long IdZona { get; set; }
+
+    [Parameter] public long? IdVentaVieja { get; set; }
+    [Parameter] public string? CodigoVentaVieja { get; set; }
+    [Parameter] public decimal? SaldoArrastre { get; set; }
+    private bool ModoRenovacion => IdVentaVieja is > 0;
+    private decimal CargoRenovacion => ModoRenovacion ? Math.Max(0, SaldoArrastre ?? 0m) : 0m;
+
+    // Modo edición: cuando VentaExistente != null, el diálogo precarga sus datos
+    // y el resultado se marca como edición de esa venta.
+    [Parameter]
+    public VentaDto? VentaExistente { get; set; }
+
+
+    // ================================================================
+    // CATÁLOGOS
+    // ================================================================
+
+    [Parameter] public JornadaDescargaDto? CatalogosJornada { get; set; }
+
+    private List<ArticuloInventario> _catalogoInventario = new();
+    private List<CatalogoFrecuenciaPagoDto> _catalogoFrecuencias = new();
+    private List<MesDto> _catalogoMeses = new();
+    // Tipo de venta (CRÉDITO / CONTADO). Determina el IdCondicion que se envía.
+    private List<CondicionCreditoDto> _condiciones = new();
+    private CondicionCreditoDto? _condicionSeleccionada;
+
+    // Vendedor que realiza la venta (por defecto el asignado al cliente).
+    private List<VendedorDto> _vendedores = new();
+    private VendedorDto? _vendedorSeleccionado;
+
+
+    // ================================================================
+    // ESTADO DEL FORMULARIO (ARTÍCULOS)
+    // ================================================================
+
+    private List<DetalleVentaDto> _detallesCapturados = new();
+    private ArticuloInventario? _productoSeleccionado;
+    private int _cantidadCaptura = 1;
+    private decimal _precioCaptura;
+
+    // Tope de cantidad capturable según existencia disponible.
+    private int _maxCantidadCaptura => _productoSeleccionado?.Disponible ?? 1;
+
+
+    // ================================================================
+    // ESTADO DEL FORMULARIO (CONDICIONES DE LIQUIDACIÓN)
+    // ================================================================
+
+    private List<CrearVentaPlanRequest> _planesCapturados = new();
+    private MesDto? _mesSeleccionado;
+    private decimal _montoLiquidacionCaptura;
+
+
+    // ================================================================
+    // CAMPOS FINANCIEROS
+    // ================================================================
+
+    private decimal _descuentoGlobal;
+    private decimal _enganche;
+    private CatalogoFrecuenciaPagoDto? _frecuenciaSeleccionada;
+    private decimal _cuotaFijaExigida;
+
+
+    // ================================================================
+    // CÁLCULOS
+    // ================================================================
+
+    private decimal _subtotal =>
+        _detallesCapturados.Sum(d => d.Cantidad * d.PrecioCobrado);
+
+    private decimal TotalBase => Math.Max(0, _subtotal - _descuentoGlobal);
+    private decimal FinanciadoBase => Math.Max(0, TotalBase - _enganche);
+    private decimal _totalFinal => TotalBase + CargoRenovacion;
+    private decimal CuotaRenovada => _cuotasProyectadas > 0
+        ? Math.Round(_montoFinanciado / _cuotasProyectadas, 2, MidpointRounding.AwayFromZero) : 0;
+
+    private decimal _montoFinanciado =>
+        Math.Max(0, _totalFinal - _enganche);
+
+    private int _cuotasProyectadas =>
+        _cuotaFijaExigida > 0
+            ? (int)Math.Ceiling((ModoRenovacion ? FinanciadoBase : _montoFinanciado) / _cuotaFijaExigida)
+            : 0;
+
+    private decimal _ultimaCuotaAjuste =>
+        _cuotasProyectadas > 0
+            ? _montoFinanciado - ((ModoRenovacion ? CuotaRenovada : _cuotaFijaExigida) * (_cuotasProyectadas - 1))
+            : 0;
+
+
+    // ================================================================
+    // INICIALIZACIÓN
+    // ================================================================
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (CatalogosJornada is { } jornada)
+        {
+            var productos = jornada.Productos.ToDictionary(p => p.Id);
+            _catalogoInventario = jornada.Inventario.Where(e => e.Cantidad > 0 && productos.ContainsKey(e.IdProducto))
+                .Select(e => new ArticuloInventario(e.IdProducto, e.Descripcion, e.Categoria ?? "—",
+                    e.Cantidad, productos[e.IdProducto].PrecioSugerido)).OrderBy(a => a.Descripcion).ToList();
+            _catalogoFrecuencias = jornada.Frecuencias;
+            _frecuenciaSeleccionada = _catalogoFrecuencias.FirstOrDefault(f => f.Descripcion == "SEMANAL")
+                ?? _catalogoFrecuencias.FirstOrDefault();
+            _catalogoMeses = jornada.Meses.OrderBy(m => m.NumMeses).ToList();
+            _condiciones = jornada.Condiciones;
+            _condicionSeleccionada = _condiciones.FirstOrDefault(c => c.Descripcion.Contains("CRÉDITO", StringComparison.OrdinalIgnoreCase)
+                || c.Descripcion.Contains("CREDITO", StringComparison.OrdinalIgnoreCase)) ?? _condiciones.FirstOrDefault();
+            _vendedores = [new VendedorDto(IdVendedor, Api.Sesion?.NombreCompleto ?? "Vendedor", IdZona, null, null, null,true)];
+            _vendedorSeleccionado = _vendedores[0];
+            return;
+        }
+        throw new InvalidOperationException("Descarga los catálogos de la jornada antes de vender sin conexión.");
+    }
+
+    // Carga en el formulario los datos de una venta existente para editarla.
+    // El inventario de la zona ya tiene descontadas las unidades de esta venta; por eso
+    // sumamos de vuelta esas cantidades al "Disponible" de cada producto afectado,
+    // reflejando que al editar el servidor repone primero el stock original.
+    private void PrecargarVentaExistente(VentaDto v)
+    {
+        _descuentoGlobal = v.DescuentoGlobal;
+        _enganche = v.Enganche;
+        _cuotaFijaExigida = v.MontoCuotaFija;
+
+        // Tipo de venta de la venta existente.
+        _condicionSeleccionada = _condiciones.FirstOrDefault(c => c.IdCondicion == v.IdCondicion)
+                                 ?? _condicionSeleccionada;
+
+        if (v.IdFrecuenciaPago is { } idFrec)
+            _frecuenciaSeleccionada = _catalogoFrecuencias.FirstOrDefault(f => f.Id == idFrec)
+                                      ?? _frecuenciaSeleccionada;
+
+        var detalles = v.Detalles ?? new();
+
+        // Reponer al disponible las cantidades que esta venta ya tenía tomadas.
+        foreach (var grupo in detalles.GroupBy(d => d.IdProducto))
+        {
+            var tomado = grupo.Sum(x => x.Cantidad);
+            var idx = _catalogoInventario.FindIndex(a => a.IdProducto == grupo.Key);
+            if (idx >= 0)
+            {
+                var art = _catalogoInventario[idx];
+                _catalogoInventario[idx] = art with { Disponible = art.Disponible + tomado };
+            }
+            else
+            {
+                // El producto ya no está en el catálogo de la zona: lo agregamos con lo que tenía la venta.
+                var primero = grupo.First();
+                _catalogoInventario.Add(new ArticuloInventario(
+                    IdProducto: grupo.Key,
+                    Descripcion: primero.NombreProducto,
+                    Categoria: "—",
+                    Disponible: tomado,
+                    PrecioSugerido: primero.PrecioCobrado));
+            }
+        }
+
+        _catalogoInventario = _catalogoInventario.OrderBy(a => a.Descripcion).ToList();
+
+        // Capturar los renglones de la venta.
+        _detallesCapturados = detalles
+            .Select(d => new DetalleVentaDto(
+                d.IdDetalle, d.IdVenta, d.IdProducto, d.NombreProducto,
+                d.Cantidad, d.PrecioCobrado, d.Importe))
+            .ToList();
+
+        // Capturar los planes promocionales.
+        _planesCapturados = (v.PlanesPromocionales ?? new())
+            .Select(p => new CrearVentaPlanRequest(p.NumeroMeses, p.MontoLiquidacion))
+            .ToList();
+    }
+
+
+    // ================================================================
+    // ARTÍCULOS
+    // ================================================================
+
+    // Cambia el tipo de venta (CRÉDITO / CONTADO).
+    private void OnCondicionSeleccionada(CondicionCreditoDto? condicion)
+    {
+        _condicionSeleccionada = condicion;
+    }
+
+    private void OnVendedorSeleccionado(VendedorDto? vendedor)
+    {
+        _vendedorSeleccionado = vendedor;
+    }
+
+    private void OnProductoSeleccionado(ArticuloInventario? articulo)
+    {
+        _productoSeleccionado = articulo;
+        if (articulo is null) return;
+
+        _precioCaptura = articulo.PrecioSugerido;
+        if (_cantidadCaptura < 1) _cantidadCaptura = 1;
+        if (_cantidadCaptura > articulo.Disponible) _cantidadCaptura = articulo.Disponible;
+    }
+
+    private void AgregarArticulo()
+    {
+        if (_productoSeleccionado is null) return;
+
+        if (_precioCaptura <= 0)
+        {
+            _snackbar.Add("El precio cobrado debe ser mayor a cero.", Severity.Warning);
+            return;
+        }
+
+        if (_cantidadCaptura < 1)
+        {
+            _snackbar.Add("La cantidad debe ser al menos 1.", Severity.Warning);
+            return;
+        }
+
+        // Validar existencia acumulada contra lo disponible en la zona.
+        var yaCapturada = _detallesCapturados
+            .Where(d => d.IdProducto == _productoSeleccionado.IdProducto)
+            .Sum(d => d.Cantidad);
+
+        if (yaCapturada + _cantidadCaptura > _productoSeleccionado.Disponible)
+        {
+            _snackbar.Add(
+                $"No hay existencia suficiente en la zona. " +
+                $"Disponible: {_productoSeleccionado.Disponible}, ya en la venta: {yaCapturada}.",
+                Severity.Warning);
+            return;
+        }
+
+        _detallesCapturados.Add(new DetalleVentaDto(
+            IdDetalle: 0,
+            IdVenta: 0,
+            IdProducto: _productoSeleccionado.IdProducto,
+            NombreProducto: _productoSeleccionado.Descripcion,
+            Cantidad: _cantidadCaptura,
+            PrecioCobrado: _precioCaptura,
+            Importe: _cantidadCaptura * _precioCaptura));
+
+        // Limpiar captura.
+        _productoSeleccionado = null;
+        _cantidadCaptura = 1;
+        _precioCaptura = 0;
+    }
+
+    private void EliminarArticulo(DetalleVentaDto detalle)
+    {
+        _detallesCapturados.Remove(detalle);
+    }
+
+
+    // ================================================================
+    // CONDICIONES DE LIQUIDACIÓN (PLANES PROMOCIONALES)
+    // ================================================================
+
+    private void AgregarCondicion()
+    {
+        if (_mesSeleccionado is null)
+        {
+            _snackbar.Add("Seleccione un plazo del catálogo.", Severity.Warning);
+            return;
+        }
+
+        if (_montoLiquidacionCaptura <= 0)
+        {
+            _snackbar.Add("El monto de liquidación debe ser mayor a cero.", Severity.Warning);
+            return;
+        }
+
+        // No permitir dos condiciones con el mismo plazo.
+        if (_planesCapturados.Any(p => p.NumeroMeses == _mesSeleccionado.NumMeses))
+        {
+            _snackbar.Add($"Ya existe una condición para el plazo '{_mesSeleccionado.Descripcion}'.", Severity.Warning);
+            return;
+        }
+
+        _planesCapturados.Add(new CrearVentaPlanRequest(
+            NumeroMeses: _mesSeleccionado.NumMeses,
+            MontoLiquidacion: _montoLiquidacionCaptura));
+
+        _planesCapturados = _planesCapturados.OrderBy(p => p.NumeroMeses).ToList();
+
+        // Limpiar captura.
+        _mesSeleccionado = null;
+        _montoLiquidacionCaptura = 0;
+    }
+
+    private void EliminarCondicion(CrearVentaPlanRequest plan)
+    {
+        _planesCapturados.Remove(plan);
+    }
+
+
+    // ================================================================
+    // PROCESAR VENTA
+    // ================================================================
+
+    private void ProcesarEstructuraVenta()
+    {
+        if (!_detallesCapturados.Any()) return;
+        if (ModoRenovacion && (CargoRenovacion <= 0 || VentaExistente is not null))
+        {
+            _snackbar.Add("La renovación requiere una cuenta con saldo pendiente.", Severity.Warning);
+            return;
+        }
+        if (_descuentoGlobal < 0 || _descuentoGlobal > _subtotal || _enganche < 0 || _enganche > TotalBase)
+        {
+            _snackbar.Add("Revisa el descuento y el enganche de los productos nuevos.", Severity.Warning);
+            return;
+        }
+        if (ModoRenovacion && (FinanciadoBase <= 0 || _cuotaFijaExigida > FinanciadoBase))
+        {
+            _snackbar.Add("La renovación necesita financiar los productos nuevos; la cuota base no puede superar ese importe.", Severity.Warning);
+            return;
+        }
+
+
+        if (_montoFinanciado > 0 && _frecuenciaSeleccionada is null)
+        {
+            _snackbar.Add("Debe seleccionar una frecuencia de pago para ventas a crédito.", Severity.Warning);
+            return;
+        }
+
+        if (_montoFinanciado > 0 && _cuotaFijaExigida <= 0)
+        {
+            _snackbar.Add("Debe fijar la cuota que el cliente entregará periódicamente.", Severity.Warning);
+            return;
+        }
+
+        if (_vendedorSeleccionado is null)
+        {
+            _snackbar.Add("Debe seleccionar el vendedor que realiza la venta.", Severity.Warning);
+            return;
+        }
+
+        var request = new CrearVentaRequest(
+            IdCliente: Cliente.IdCliente,
+            IdVendedor: _vendedorSeleccionado.IdVendedor,
+            CodigoVenta: CodigoVenta,
+            // Tipo de venta elegido por el usuario (CRÉDITO / CONTADO). Fallback a crédito (1) si no hay selección.
+            IdCondicion: _condicionSeleccionada?.IdCondicion ?? 1,
+            Subtotal: _subtotal,
+            DescuentoGlobal: _descuentoGlobal,
+            // El procedimiento de renovación agrega el arrastre una sola vez en el servidor.
+            TotalFinal: TotalBase,
+            Enganche: _enganche,
+            IdFrecuenciaPago: _montoFinanciado > 0 ? _frecuenciaSeleccionada?.Id : null,
+            NumeroCuotas: _montoFinanciado > 0 ? _cuotasProyectadas : 1,
+            MontoCuotaFija: _montoFinanciado > 0 ? _cuotaFijaExigida : 0.00m,
+            TasaInteres: 0.00m,
+            FechaPrimerVence: _montoFinanciado > 0
+                ? DateTimeOffset.UtcNow.AddDays(_frecuenciaSeleccionada!.DiasPeriodo)
+                : null,
+            Observaciones: null,
+            Detalles: _detallesCapturados
+                .Select(d => new CrearDetalleVentaRequest(d.IdProducto, d.Cantidad, d.PrecioCobrado))
+                .ToList(),
+            // Condiciones de liquidación negociadas (null cuando no se capturó ninguna).
+            PlanesPromocionales: _planesCapturados.Any() ? _planesCapturados.ToList() : null);
+
+        var resultado = new ResultadoDialogoVenta(
+            Request: request,
+            EsEdicion: VentaExistente is not null,
+            IdVenta: VentaExistente?.IdVenta ?? 0);
+
+        MudDialog.Close(DialogResult.Ok(resultado));
+    }
+
+    private void Cancelar()
+    {
+        MudDialog.Cancel();
+    }
+
+
+    // ================================================================
+    // MODELO LOCAL
+    // ================================================================
+
+    private sealed record ArticuloInventario(
+        long IdProducto,
+        string Descripcion,
+        string Categoria,
+        int Disponible,
+        decimal PrecioSugerido);
+}

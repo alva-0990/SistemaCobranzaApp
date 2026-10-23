@@ -67,4 +67,10 @@ public record PagoSyncDto(
     int? ConsecutivoPago,
     long? IdCobrador,
     DateTimeOffset FechaPago,
-    DateTimeOffset FechaModificacion);
+    DateTimeOffset FechaModificacion)
+{
+    public long? IdMovimiento { get; init; }
+    public string? Movimiento { get; init; }
+    public string? Cobrador { get; init; }
+    public string? Observaciones { get; init; }
+}

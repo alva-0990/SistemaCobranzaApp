@@ -43,3 +43,12 @@ public class Zona
     public string Descripcion { get; set; } = string.Empty;
     public Estatus Estatus { get; set; } = Estatus.Activo;
 }
+
+public class CatalogoMes
+{
+    public long IdMes { get; set; }
+    public int NumMeses { get; set; }
+    public string Descripcion { get; set; } = string.Empty;
+    public Estatus Estatus { get; set; } = Estatus.Activo;
+}
+

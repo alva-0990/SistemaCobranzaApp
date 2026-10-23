@@ -1,0 +1,61 @@
+@using MudBlazor
+@using SistemaCobranzaApp.Shared.Dtos
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6" Style="font-weight:600;">
+            <MudIcon Icon="@Icons.Material.Filled.Label" Class="mr-2" Style="vertical-align:middle;" />
+            Actualizar estatus del cliente
+        </MudText>
+    </TitleContent>
+
+    <DialogContent>
+        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
+            @Cliente
+        </MudText>
+
+        <MudSelect T="long" Label="Clasificación" @bind-Value="_idClasificacion"
+                   Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-3">
+            @foreach (var c in Clasificaciones)
+            {
+                <MudSelectItem T="long" Value="@c.IdClasificaionCliente">@c.Descripcion</MudSelectItem>
+            }
+        </MudSelect>
+
+        <MudTextField T="string" Label="Observaciones" @bind-Value="_observaciones"
+                      Variant="Variant.Outlined" Lines="3" Margin="Margin.Dense"
+                      Placeholder="Notas del seguimiento (opcional)" />
+    </DialogContent>
+
+    <DialogActions>
+        <MudButton OnClick="Cancelar" Variant="Variant.Text">Cancelar</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Aceptar">Guardar</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    // Nombre del cliente (para el encabezado).
+    [Parameter] public string Cliente { get; set; } = "";
+    // Clasificación actual preseleccionada.
+    [Parameter] public long IdClasificacionActual { get; set; }
+    // Observaciones actuales (se precargan para edición).
+    [Parameter] public string? ObservacionesActuales { get; set; }
+    // Catálogo de clasificaciones disponibles.
+    [Parameter] public List<ClasificaionClienteDto> Clasificaciones { get; set; } = new();
+
+    private long _idClasificacion;
+    private string? _observaciones;
+
+    protected override void OnInitialized()
+    {
+        _idClasificacion = IdClasificacionActual;
+        _observaciones = ObservacionesActuales;
+    }
+
+    private void Aceptar()
+        => MudDialog.Close(DialogResult.Ok(new ResultadoClasificacionCliente(_idClasificacion, _observaciones)));
+
+    private void Cancelar() => MudDialog.Cancel();
+}

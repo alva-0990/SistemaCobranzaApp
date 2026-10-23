@@ -1,0 +1,93 @@
+@page "/parametros"
+
+@using MudBlazor
+@using SistemaCobranzaApp.Shared.Dtos
+
+<MudPaper Elevation="2" Rounded="true" Class="ma-2 pa-4">
+    <div class="barra-acciones">
+        <MudTextField T="string"
+                      @bind-Value="Busqueda"
+                      Immediate="true"
+                      Placeholder="Buscar parámetro por clave, descripción o valor..."
+                      Variant="Variant.Outlined"
+                      Adornment="Adornment.Start"
+                      AdornmentIcon="@Icons.Material.Filled.Search"
+                      AdornmentColor="Color.Primary"
+                      Clearable="true"
+                      Class="buscador-remarcado" />
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.Add"
+                   OnClick="AbrirNuevo"
+                   Class="boton-nuevo">
+            Nuevo parámetro
+        </MudButton>
+    </div>
+
+    @if (Cargando)
+    {
+        <div class="d-flex justify-center pa-8">
+            <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+        </div>
+    }
+    else
+    {
+        <MudTable Items="Filtrados" Hover="true" Dense="true" Breakpoint="Breakpoint.Sm"
+                  Elevation="0" RowsPerPage="15" T="ParametroSistemaDto">
+            <HeaderContent>
+                <MudTh>Clave</MudTh>
+                <MudTh>Descripción</MudTh>
+                <MudTh Style="width:14%; text-align:right;">Valor numérico</MudTh>
+                <MudTh Style="width:14%;">Valor texto</MudTh>
+                <MudTh Style="width:14%;">Modificado</MudTh>
+                <MudTh Style="width:12%; text-align:right;">Acciones</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="Clave"><b>@context.Clave</b></MudTd>
+                <MudTd DataLabel="Descripción">@context.Descripcion</MudTd>
+                <MudTd DataLabel="Valor numérico" Style="text-align:right;">
+                    @(context.ValorNumerico is null ? "—" : context.ValorNumerico.Value.ToString("0.####"))
+                </MudTd>
+                <MudTd DataLabel="Valor texto">
+                    @if (string.IsNullOrWhiteSpace(context.ValorTexto))
+                    {
+                        <text>—</text>
+                    }
+                    else
+                    {
+                        <MudChip T="string" Size="Size.Small" Variant="Variant.Text" Color="Color.Secondary">@context.ValorTexto</MudChip>
+                    }
+                </MudTd>
+                <MudTd DataLabel="Modificado">@context.FechaModificacion.EnZonaProyecto().DateTime.ToString("dd/MM/yyyy HH:mm")</MudTd>
+                <MudTd DataLabel="Acciones" Style="text-align:right;">
+                    <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" Color="Color.Info"
+                                   Title="Editar" OnClick="@(() => AbrirEditar(context))" />
+                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error"
+                                   Title="Eliminar" OnClick="@(() => Eliminar(context))" />
+                </MudTd>
+            </RowTemplate>
+            <NoRecordsContent>
+                <div class="pa-8 text-center">
+                    <MudIcon Icon="@Icons.Material.Filled.Tune" Size="Size.Large" Color="Color.Secondary" />
+                    <MudText Color="Color.Secondary" Class="mt-2">No hay parámetros que coincidan.</MudText>
+                </div>
+            </NoRecordsContent>
+            <PagerContent>
+                <MudTablePager InfoFormat="{first_item}-{last_item} de {all_items}" RowsPerPageString="Filas:" />
+            </PagerContent>
+        </MudTable>
+    }
+</MudPaper>
+
+<style>
+    .barra-acciones {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 16px;
+    }
+
+    .barra-acciones .buscador-remarcado { flex: 1 1 auto; min-width: 0; }
+    .boton-nuevo { white-space: nowrap; flex: 0 0 auto; }
+    .buscador-remarcado .mud-input-outlined-border { border-width: 2px; }
+</style>

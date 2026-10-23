@@ -1,5 +1,5 @@
 ﻿<!DOCTYPE html>
-<html lang="en">
+<html lang="es">
 
 <head>
     <meta charset="utf-8"/>
@@ -7,17 +7,32 @@
     <base href="/"/>
     <ResourcePreloader/>
     <link rel="stylesheet" href="_content/SistemaCobranzaApp.Shared/lib/bootstrap/dist/css/bootstrap.min.css"/>
+
+    <!-- Fuentes oficiales de Google y estilos core de MudBlazor.
+         IMPORTANTE: MudBlazor debe cargar ANTES que app.css y el bundle de
+         estilos scoped, para que nuestras reglas (p. ej. el ítem activo del
+         menú lateral) puedan sobreescribir las de MudBlazor por orden de
+         cascada. Si MudBlazor carga al final, gana su color y el texto del
+         ítem seleccionado "desaparece". -->
+    <link href="https://googleapis.com" rel="stylesheet" />
+    <link href="_content/MudBlazor/MudBlazor.min.css" rel="stylesheet" />
+
     <link rel="stylesheet" href="_content/SistemaCobranzaApp.Shared/app.css"/>
     <link rel="stylesheet" href="SistemaCobranzaApp.Web.styles.css"/>
     <ImportMap/>
     <link rel="icon" type="image/png" href="_content/SistemaCobranzaApp.Shared/favicon.png"/>
-    <HeadOutlet @rendermode="InteractiveServer"/>
+
+    <HeadOutlet @rendermode="@(new InteractiveServerRenderMode(prerender: false))"/>
 </head>
 
 <body>
-<Routes @rendermode="InteractiveServer"/>
+<!-- La directiva global rendermode aquí propaga la interactividad de forma correcta -->
+<Routes @rendermode="@(new InteractiveServerRenderMode(prerender: false))"/>
 <ReconnectModal/>
+
+<!-- Carga secuencial de JavaScript -->
 <script src="@Assets["_framework/blazor.web.js"]"></script>
+<script src="_content/MudBlazor/MudBlazor.min.js"></script>
 </body>
 
 </html>

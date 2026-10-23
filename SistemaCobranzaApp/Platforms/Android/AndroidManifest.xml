@@ -1,12 +1,28 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <application
-            android:allowBackup="true"
-            android:icon="@mipmap/appicon"
-            android:roundIcon="@mipmap/appicon_round"
-            android:supportsRtl="true"
-            android:usesCleartextTraffic="true"> <!-- 👈 Agregamos esta propiedad aquí -->
-    </application>
-    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
-    <uses-permission android:name="android.permission.INTERNET" />
+
+<!-- Permisos de Red y Conectividad -->
+<uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+<uses-permission android:name="android.permission.INTERNET" />
+
+<!-- Permisos de Bluetooth para Compatibilidad con Android Antiguo (11 o menor) -->
+<uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
+<uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />
+
+<!-- Permisos de Bluetooth para Android Moderno (12, 13, 14+) -->
+<uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+<uses-permission android:name="android.permission.BLUETOOTH_SCAN" android:usesPermissionFlags="neverForLocation" />
+
+<!-- Permiso de cámara para el escaneo de códigos QR (lectura del folio de la venta) -->
+<uses-permission android:name="android.permission.CAMERA" />
+<uses-feature android:name="android.hardware.camera" android:required="false" />
+
+<application
+        android:allowBackup="true"
+        android:icon="@mipmap/appicon"
+        android:roundIcon="@mipmap/appicon_round"
+        android:supportsRtl="true"
+        android:usesCleartextTraffic="true">
+</application>
+
 </manifest>

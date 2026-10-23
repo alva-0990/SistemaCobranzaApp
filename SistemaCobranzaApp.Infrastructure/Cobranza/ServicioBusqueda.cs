@@ -6,9 +6,8 @@ using SistemaCobranzaApp.Shared.Dtos;
 namespace SistemaCobranzaApp.Infrastructure.Cobranza;
 
 /// <summary>
-/// Búsquedas del módulo de cobro: clientes por nombre/apellidos, venta por
-/// id o código, e historial de pagos de una venta.
-/// Portado de VistaPagoAgregar (app WPF).
+/// Búsquedas del módulo de cobro: venta por id o código e historial de pagos de una venta.
+/// Optimizadas bajo el nuevo estándar financiero unificado de cuotas y abonos en cascada.
 /// </summary>
 public class ServicioBusqueda
 {
@@ -20,43 +19,8 @@ public class ServicioBusqueda
     }
 
     /// <summary>
-    /// Busca clientes activos por nombre/apPaterno/apMaterno (LIKE, ci).
-    /// Replica EjecutarBusquedaCliente (sin LIMIT: puede haber homónimos).
-    /// </summary>
-    public async Task<List<ClienteDto>> BuscarClientesAsync(ClienteBusquedaFiltro f, CancellationToken ct = default)
-    {
-        if (string.IsNullOrWhiteSpace(f.Nombre)
-            && string.IsNullOrWhiteSpace(f.ApPaterno)
-            && string.IsNullOrWhiteSpace(f.ApMaterno))
-            return new List<ClienteDto>();
-
-        var nombre = BusquedaHelper.ParaLike(f.Nombre);
-        var paterno = BusquedaHelper.ParaLike(f.ApPaterno);
-        var materno = BusquedaHelper.ParaLike(f.ApMaterno);
-
-        var q = from c in _db.Clientes.AsNoTracking()
-                join r in _db.Rutas.AsNoTracking() on c.IdRuta equals r.IdRuta into rj
-                from r in rj.DefaultIfEmpty()
-                where c.Estatus == Domain.Enums.Estatus.Activo
-                      && EF.Functions.ILike(c.Nombre, nombre)
-                      && EF.Functions.ILike(c.ApPaterno ?? "", paterno)
-                      && EF.Functions.ILike(c.ApMaterno ?? "", materno)
-                orderby c.Nombre, c.ApPaterno, c.ApMaterno, c.IdCliente
-                select new { c, r };
-
-        var filas = await q.ToListAsync(ct);
-
-        return filas.Select(x => new ClienteDto(
-            x.c.IdCliente, x.c.Nombre, x.c.ApPaterno, x.c.ApMaterno,
-            BusquedaHelper.NombreCompleto(x.c.Nombre, x.c.ApPaterno, x.c.ApMaterno),
-            x.c.IdRuta, x.r?.Descripcion, x.r?.IdZona,
-            x.c.IdVendedor, x.c.IdClasificacion, x.c.Observaciones)).ToList();
-    }
-
-    /// <summary>
-    /// Resuelve una venta por texto: IdVenta (dígitos) o CodigoVenta (V#######).
+    /// Resuelve una venta por texto: IdVenta (dígitos) o CodigoVenta (Vendedor-Timestamp-Hash).
     /// Devuelve null si el texto es inválido o la venta no existe.
-    /// Replica EjecutarBusquedaVenta.
     /// </summary>
     public async Task<VentaDetalleDto?> BuscarVentaAsync(string texto, CancellationToken ct = default)
     {
@@ -66,7 +30,7 @@ public class ServicioBusqueda
         switch (tipo)
         {
             case BusquedaHelper.TipoBusquedaVenta.PorCodigo:
-                var codigo = BusquedaHelper.NormalizarCodigoVenta(texto);
+                var codigo = texto.Trim().ToUpper(); // El código unificado puede contener guiones, se busca directo
                 idQuery = _db.Ventas.AsNoTracking()
                     .Where(v => v.CodigoVenta != null && v.CodigoVenta.ToUpper() == codigo)
                     .Select(v => v.IdVenta);
@@ -95,16 +59,31 @@ public class ServicioBusqueda
         if (fila is null)
             return null;
 
+        // 🎯 CORREGIDO: Se sustituyó 'TotalAbonos' por 'TotalAbonado' para calcular correctamente el saldo vivo
         var saldo = CalculoCobranza.CalcularSaldoAnterior(
-            fila.v.TotalFinal, fila.v.Enganche, fila.v.TotalAbonos);
+            fila.v.TotalFinal, fila.v.Enganche, fila.v.TotalAbonado);
 
+        // Agrega dirección, teléfono y geolocalización al DTO de ventas
         return new VentaDetalleDto(
-            fila.v.IdVenta, fila.v.IdCliente,
+            fila.v.IdVenta, 
+            fila.v.IdCliente,
             BusquedaHelper.NombreCompleto(fila.c.Nombre, fila.c.ApPaterno, fila.c.ApMaterno),
-            fila.r?.Descripcion, fila.r?.IdZona, fila.v.CodigoVenta,
-            fila.v.TotalFinal, fila.v.Enganche, fila.v.TotalAbonos, saldo,
-            fila.v.PagoRequerido, fila.v.IdEstatusVenta, fila.ev?.Descripcion,
-            fila.v.FechaCompra, fila.v.FechaUltimoPago);
+            fila.r?.Descripcion, 
+            fila.r?.IdZona, 
+            fila.v.CodigoVenta,
+            fila.v.TotalFinal, 
+            fila.v.Enganche, 
+            fila.v.TotalAbonado, // 🎯 CORREGIDO: Alineado a tu columna real
+            saldo,
+            fila.v.MontoCuotaFija, // 🎯 CORREGIDO: Cambiado de PagoRequerido a MontoCuotaFija (tu cuota exigida)
+            fila.v.IdEstatusVenta, 
+            fila.ev?.Descripcion,
+            fila.v.FechaCompra, 
+            fila.v.FechaUltimoPago,
+            fila.c.TelefonoPrincipal, 
+            fila.c.Direccion, 
+            fila.c.Latitud, 
+            fila.c.Longitud);
     }
 
     /// <summary>
@@ -116,16 +95,29 @@ public class ServicioBusqueda
                 where p.IdVenta == idVenta
                 join cob in _db.Cobradores.AsNoTracking() on p.IdCobrador equals cob.IdCobrador into cobj
                 from cob in cobj.DefaultIfEmpty()
-                join mov in _db.Movimientos.AsNoTracking() on p.IdMovimiento equals mov.IdMovimiento into movj
+                join mov in _db.Movimientos.AsNoTracking() on p.IdMovimiento equals mov.IdMovimiento into movj // 🎯 CORREGIDO: Alineado a CatalogoMovimientos
                 from mov in movj.DefaultIfEmpty()
                 orderby p.IdPago descending
-                select new PagoHistoricoDto(
-                    p.IdPago, p.FolioPago, p.ConsecutivoPago, p.MontoAbona,
-                    p.SaldoAnterior, p.SaldoActual, p.IdCobrador,
-                    cob != null ? cob.Nombre : null,
-                    mov != null ? mov.Descripcion : null,
-                    p.Observaciones, p.FechaPago);
+                select new { p, cob, mov };
 
-        return await q.ToListAsync(ct);
+        var filas = await q.ToListAsync(ct);
+
+        // Satisface los parámetros de auditoría GPS opcional en el historial
+        return filas.Select(x => new PagoHistoricoDto(
+            x.p.IdPago, 
+            x.p.FolioPago, 
+            x.p.ConsecutivoPago ?? 0, 
+            x.p.MontoAbona,
+            x.p.SaldoAnterior, 
+            x.p.SaldoActual, 
+            x.p.IdCobrador,
+            x.cob != null ? x.cob.Nombre : null,
+            x.p.IdMovimiento ?? 0,
+            x.mov != null ? x.mov.Descripcion : null,
+            x.p.Observaciones, 
+            x.p.FechaPago,
+            null, // Espacio para latitud de auditoría si la implementas en la entidad Pago
+            null  // Espacio para longitud de auditoría si la implementas en la entidad Pago
+        )).ToList();
     }
 }

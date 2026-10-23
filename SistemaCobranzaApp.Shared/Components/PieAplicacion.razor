@@ -1,0 +1,16 @@
+@using SistemaCobranzaApp.Shared.Theme
+@using SistemaCobranzaApp.Shared.Services
+@implements IDisposable
+@inject EstadoEmpresaGlobal EmpresaGlobal
+
+<footer class="pie-aplicacion @(Discreto ? "pie-discreto" : "")">
+    <span>@AppTheme.ObtenerNombre(EmpresaGlobal.Identidad)</span>
+    <span>Versión @AppTheme.Version</span>
+</footer>
+
+@code {
+    protected override void OnInitialized() => EmpresaGlobal.OnCambio += Actualizar;
+    private void Actualizar() => _ = InvokeAsync(StateHasChanged);
+    public void Dispose() => EmpresaGlobal.OnCambio -= Actualizar;
+    [Parameter] public bool Discreto { get; set; }
+}
