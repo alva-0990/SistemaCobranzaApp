@@ -1,0 +1,28 @@
+# =====================================================================
+# Cloudflare Tunnel — configuración de ejemplo para cobragil.com
+# Copia este archivo al servidor como /etc/cloudflared/config.yml y
+# reemplaza <TUNNEL_ID> y la ruta de credenciales por los reales.
+#
+# Pasos previos (en el servidor):
+#   cloudflared tunnel login
+#   cloudflared tunnel create cobragil
+#   cloudflared tunnel route dns cobragil api.cobragil.com
+#   cloudflared tunnel route dns cobragil app.cobragil.com
+#   sudo cloudflared service install
+#   sudo systemctl enable --now cloudflared
+# =====================================================================
+
+tunnel: <TUNNEL_ID>
+credentials-file: /home/USUARIO/.cloudflared/<TUNNEL_ID>.json
+
+ingress:
+  # API .NET (Kestrel escuchando en 127.0.0.1:8081)
+  - hostname: api.cobragil.com
+    service: http://127.0.0.1:8081
+
+  # Web Blazor (Kestrel escuchando en 127.0.0.1:8080)
+  - hostname: app.cobragil.com
+    service: http://127.0.0.1:8080
+
+  # Regla final obligatoria
+  - service: http_status:404

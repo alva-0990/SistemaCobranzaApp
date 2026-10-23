@@ -1,0 +1,18 @@
+# Copiar a /etc/systemd/system/cobranza-api.service en el servidor.
+# Los secretos viven en /etc/cobranza/api.env (ver deploy/cobranza-api.env.example).
+# Luego: sudo systemctl daemon-reload && sudo systemctl enable --now cobranza-api
+[Unit]
+Description=API Sistema Cobranza (.NET 10)
+After=network.target docker.service
+
+[Service]
+WorkingDirectory=/opt/cobranza/api
+ExecStart=/usr/bin/dotnet /opt/cobranza/api/SistemaCobranzaApp.Api.dll
+Restart=always
+RestartSec=10
+User=www-data
+# Los secretos y la configuración se cargan desde este archivo (editable, fuera del repo).
+EnvironmentFile=/etc/cobranza/api.env
+
+[Install]
+WantedBy=multi-user.target

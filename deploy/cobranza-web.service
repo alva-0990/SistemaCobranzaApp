@@ -1,0 +1,18 @@
+# Copiar a /etc/systemd/system/cobranza-web.service en el servidor.
+# La configuración vive en /etc/cobranza/web.env (ver deploy/cobranza-web.env.example).
+# Luego: sudo systemctl daemon-reload && sudo systemctl enable --now cobranza-web
+[Unit]
+Description=Web Sistema Cobranza (Blazor Server, .NET 10)
+After=network.target cobranza-api.service
+
+[Service]
+WorkingDirectory=/opt/cobranza/web
+ExecStart=/usr/bin/dotnet /opt/cobranza/web/SistemaCobranzaApp.Web.dll
+Restart=always
+RestartSec=10
+User=www-data
+# La configuración se carga desde este archivo (editable, fuera del repo).
+EnvironmentFile=/etc/cobranza/web.env
+
+[Install]
+WantedBy=multi-user.target

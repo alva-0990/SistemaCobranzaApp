@@ -1,0 +1,26 @@
+# Acelera el build de Docker excluyendo lo que no se necesita en el contexto.
+
+# Compilación .NET
+**/bin/
+**/obj/
+publish-api/
+publish-web/
+publish/
+
+# Proyecto MAUI (no se compila en Docker; requiere workloads de Android/iOS)
+SistemaCobranzaApp/
+tests/
+
+# Datos locales de Postgres (volumen)
+cobranza_pgdata/
+
+# IDE / sistema
+.idea/
+.vs/
+.git/
+**/.DS_Store
+
+# Secretos (nunca en la imagen)
+**/.env
+deploy/*.env
+!deploy/*.env.example

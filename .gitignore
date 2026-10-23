@@ -1,0 +1,29 @@
+# ===== Secretos de despliegue (NUNCA subir con valores reales) =====
+# Los archivos .env reales viven solo en el servidor (/etc/cobranza/*.env).
+# En el repo solo se versionan las plantillas *.env.example.
+deploy/*.env
+!deploy/*.env.example
+*.env
+!*.env.example
+# .env de Docker Compose (en la raíz). La plantilla .env.docker.example SÍ se versiona.
+.env
+!.env.docker.example
+
+# appsettings con secretos reales (por si se crean localmente con valores)
+**/appsettings.Production.local.json
+**/appsettings.*.Secrets.json
+
+# ===== Paquetes de publicación =====
+publish-api/
+publish-web/
+publish/
+
+# ===== Datos locales de PostgreSQL (volumen Docker) =====
+cobranza_pgdata/
+
+# ===== Compilación .NET =====
+bin/
+obj/
+
+# ===== Sistema =====
+.DS_Store
