@@ -163,7 +163,7 @@ VALUES
 INSERT INTO ParametrosSistema (Clave, Descripcion, ValorTexto)
 VALUES
     ('TICKET_PAGO_COMPACTO', 'Formato del comprobante de pago: SI = compacto, NO = detallado', 'NO')
-    ('PROMO_PAGOS_CONSECUTIVOS_ACTIVA', 'Indica si la promoción de pagos consecutivos está encendida (SI/NO)', 'SI'),
+    ('PROMO_PAGOS_CONSECUTIVOS_ACTIVA', 'Indica si la promoción de pagos consecutivos está encendida (SI/NO)', 'SI')
 ON CONFLICT (Clave) DO NOTHING;
 -- =====================================================================
 -- REALINEACIÓN DE SECUENCIAS

@@ -4,6 +4,7 @@
         <TargetFramework>net10.0</TargetFramework>
         <Nullable>enable</Nullable>
         <ImplicitUsings>enable</ImplicitUsings>
+        <RequiresAspNetWebAssets>true</RequiresAspNetWebAssets>
     </PropertyGroup>
 
     <ItemGroup>
@@ -11,7 +12,7 @@
     </ItemGroup>
 
     <ItemGroup>
-      <PackageReference Include="MudBlazor" Version="9.10.0" />
+        <PackageReference Include="MudBlazor" Version="9.10.0" />
     </ItemGroup>
 
 </Project>
