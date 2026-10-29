@@ -35,18 +35,25 @@
                 @if (!EsPerfil)
                 {
                     <MudItem xs="12">
-                        <MudSelect T="long?"
-                                   Label="Rol"
-                                   @bind-Value="Modelo.IdRol"
-                                   Variant="Variant.Outlined"
-                                   Margin="Margin.Dense"
-                                   Clearable="true"
-                                  >
-                            @foreach (var r in Roles)
-                            {
-                                <MudSelectItem T="long?" Value="@r.IdRol">@r.Descripcion</MudSelectItem>
-                            }
-                        </MudSelect>
+                        <MudAutocomplete T="RolDto"
+                                         Label="Rol"
+                                         Value="_rolSeleccionado"
+                                         ValueChanged="OnRolSeleccionado"
+                                         SearchFunc="BuscarRoles"
+                                         ToStringFunc="@(r => r?.Descripcion ?? string.Empty)"
+                                         Variant="Variant.Outlined"
+                                         Margin="Margin.Dense"
+                                         Clearable="true"
+                                         ResetValueOnEmptyText="true"
+                                         CoerceText="true"
+                                         Placeholder="Busca y selecciona un rol...">
+                            <ItemTemplate Context="rol">
+                                @rol.Descripcion
+                            </ItemTemplate>
+                            <NoItemsTemplate>
+                                <MudText Align="Align.Center" Class="px-4 py-1">No hay roles que coincidan.</MudText>
+                            </NoItemsTemplate>
+                        </MudAutocomplete>
                     </MudItem>
 
                     <MudItem xs="12">
@@ -102,6 +109,30 @@
     private bool _guardando;
     private MudForm _form = null!;
     private bool _formValido;
+
+    // Rol actualmente seleccionado en el autocomplete; se sincroniza con Modelo.IdRol.
+    private RolDto? _rolSeleccionado;
+
+    protected override void OnParametersSet()
+    {
+        // Mantiene el rol mostrado alineado con el Id del modelo (al abrir en modo edición).
+        _rolSeleccionado = Modelo.IdRol is { } id ? Roles.FirstOrDefault(r => r.IdRol == id) : null;
+    }
+
+    // Filtra los roles por descripción (búsqueda sin distinción de mayúsculas/acentos básicos).
+    private Task<IEnumerable<RolDto>> BuscarRoles(string? valor, CancellationToken ct)
+    {
+        IEnumerable<RolDto> resultado = string.IsNullOrWhiteSpace(valor)
+            ? Roles
+            : Roles.Where(r => (r.Descripcion ?? string.Empty).Contains(valor, StringComparison.OrdinalIgnoreCase));
+        return Task.FromResult(resultado);
+    }
+
+    private void OnRolSeleccionado(RolDto? rol)
+    {
+        _rolSeleccionado = rol;
+        Modelo.IdRol = rol?.IdRol;
+    }
 
     private void Cancelar() => MudDialog.Cancel();
 

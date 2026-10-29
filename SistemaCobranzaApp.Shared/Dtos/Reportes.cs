@@ -151,7 +151,9 @@ public record ReporteSeguimientoFila(
     string? Clasificacion,
     DateTimeOffset FechaAlta,
     string? Zona,
-    string? Observaciones = null);
+    string? Observaciones = null,
+    int DiasPeriodo = 0,
+    string? FrecuenciaPago = null);
 
 public record ReporteSeguimientoResponse(
     IReadOnlyList<ReporteSeguimientoFila> Filas,

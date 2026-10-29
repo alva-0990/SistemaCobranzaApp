@@ -113,14 +113,14 @@
 
                 <!-- Cobrador -->
                 <MudItem xs="12" sm="6">
-                    <MudSelect T="long?" @bind-Value="_idCobrador"
-                               Label="Cobrador" Clearable="@(!SoloAbono)" Disabled="@SoloAbono"
-                               Variant="Variant.Outlined" Margin="Margin.Dense">
-                        @foreach (var cob in Cobradores)
-                        {
-                            <MudSelectItem T="long?" Value="@((long?)cob.IdCobrador)">@cob.Nombre</MudSelectItem>
-                        }
-                    </MudSelect>
+                    <AutocompletarCatalogo TItem="CobradorDto" Label="Cobrador"
+                                           Placeholder="Busca un cobrador..."
+                                           Margin="Margin.Dense"
+                                           Clearable="@(!SoloAbono)" Disabled="@SoloAbono"
+                                           @bind-Value="_idCobrador"
+                                           Items="Cobradores"
+                                           ObtenerId="@(c => c.IdCobrador)"
+                                           ObtenerTexto="@(c => c.Nombre)" />
                 </MudItem>
 
                 <!-- Observaciones -->

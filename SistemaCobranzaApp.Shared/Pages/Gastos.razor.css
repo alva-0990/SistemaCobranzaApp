@@ -11,9 +11,8 @@
 }
 
 .filtros-gastos .f-item {
-    flex: 1 1 180px;
-    min-width: 160px;
-    max-width: 240px;
+    flex: 1 1 0;
+    min-width: 120px;
 }
 
 .barra-gastos .b-item {

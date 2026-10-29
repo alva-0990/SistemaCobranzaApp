@@ -155,7 +155,9 @@ VALUES
     ('PROMO_PAGOS_CONSECUTIVOS_META', 'Pagos consecutivos requeridos para bonificación', 5.00),
     ('CLIENTE_DIAS_REGULAR','Días sin pago para clasificar al cliente como REGULAR',15),
     ('CLIENTE_DIAS_MALO','Días sin pago para clasificar al cliente como MALO', 31),
-    ('CLIENTE_DIAS_MOROSO','Días sin pago para clasificar al cliente como MOROSO',61)
+    ('CLIENTE_DIAS_MOROSO','Días sin pago para clasificar al cliente como MOROSO',61),
+    ('SEGUIMIENTO_DIAS_GRACIA_ALERTA','Días sin pago para clasificar al cliente como ATRASADO',15),
+    ('SEGUIMIENTO_DIAS_GRACIA_CRITICO','Días sin pago para clasificar al cliente como ATRASADO',31)
     ON CONFLICT (Clave) DO NOTHING;
 
 -- Formato del comprobante de PAGO: 'SI' = ticket compacto; 'NO'/ausente = ticket detallado.

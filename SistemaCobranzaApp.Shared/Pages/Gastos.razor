@@ -37,13 +37,12 @@
                             <MudText Typo="Typo.subtitle1"><b>Nuevo gasto</b></MudText>
                         </div>
 
-                        <MudSelect T="long?" Label="Categoría" @bind-Value="_nvCategoria"
-                                   Variant="Variant.Outlined" Dense="true" Class="mb-3">
-                            @foreach (var c in _categoriasActivas)
-                            {
-                                <MudSelectItem T="long?" Value="@c.IdCategoriaGasto">@c.Nombre</MudSelectItem>
-                            }
-                        </MudSelect>
+                        <AutocompletarCatalogo TItem="CatalogoCategoriaGastoDto" Label="Categoría" Class="mb-3"
+                                               Placeholder="Busca una categoría..."
+                                               @bind-Value="_nvCategoria"
+                                               Items="_categoriasActivas"
+                                               ObtenerId="@(c => c.IdCategoriaGasto)"
+                                               ObtenerTexto="@(c => c.Nombre)" />
 
                         <MudDatePicker Label="Fecha del gasto" @bind-Date="_nvFecha"
                                        Variant="Variant.Outlined" Class="mb-3" />
@@ -58,39 +57,37 @@
                         <MudTextField T="string" @bind-Value="_nvProveedor" Label="Proveedor (opcional)"
                                       Variant="Variant.Outlined" Dense="true" Class="mb-3" MaxLength="200" />
 
-                        <MudSelect T="long?" Label="Zona (vacío = central)" @bind-Value="_nvZona"
-                                   Variant="Variant.Outlined" Dense="true" Clearable="true" Class="mb-3">
-                            @foreach (var z in _zonas)
-                            {
-                                <MudSelectItem T="long?" Value="@z.IdZona">@z.Descripcion</MudSelectItem>
-                            }
-                        </MudSelect>
+                        <AutocompletarCatalogo TItem="ZonaDto" Label="Zona (vacío = central)" Class="mb-3"
+                                               Placeholder="Busca una zona..."
+                                               @bind-Value="_nvZona"
+                                               Items="_zonas"
+                                               ObtenerId="@(z => z.IdZona)"
+                                               ObtenerTexto="@(z => z.Descripcion)" />
 
-                        <MudSelect T="long?" Label="Cobrador (opcional)" @bind-Value="_nvCobrador"
-                                   Variant="Variant.Outlined" Dense="true" Clearable="true" Class="mb-3">
-                            @foreach (var p in _cobradores)
-                            {
-                                <MudSelectItem T="long?" Value="@p.IdCobrador">@p.Nombre</MudSelectItem>
-                            }
-                        </MudSelect>
+                        <AutocompletarCatalogo TItem="CobradorDto" Label="Cobrador (opcional)" Class="mb-3"
+                                               Placeholder="Busca un cobrador..."
+                                               @bind-Value="_nvCobrador"
+                                               Items="_cobradores"
+                                               ObtenerId="@(p => p.IdCobrador)"
+                                               ObtenerTexto="@(p => p.Nombre)" />
 
-                        <MudSelect T="long?" Label="Vendedor (opcional)" @bind-Value="_nvVendedor"
-                                   Variant="Variant.Outlined" Dense="true" Clearable="true" Class="mb-3">
-                            @foreach (var p in _vendedores)
-                            {
-                                <MudSelectItem T="long?" Value="@p.IdVendedor">@p.Nombre</MudSelectItem>
-                            }
-                        </MudSelect>
+                        <AutocompletarCatalogo TItem="VendedorDto" Label="Vendedor (opcional)" Class="mb-3"
+                                               Placeholder="Busca un vendedor..."
+                                               @bind-Value="_nvVendedor"
+                                               Items="_vendedores"
+                                               ObtenerId="@(p => p.IdVendedor)"
+                                               ObtenerTexto="@(p => p.Nombre)" />
 
-                        <MudSelect T="long?" Label="Cuenta prevista (de dónde saldrá)" @bind-Value="_nvCuenta"
-                                   Variant="Variant.Outlined" Dense="true" Clearable="true" Class="mb-3">
-                            @foreach (var c in _cuentas.Where(c => c.Activo))
-                            {
-                                <MudSelectItem T="long?" Value="@c.IdCuentaGasto">
-                                    @c.Nombre (@c.SaldoActual.ToString("C2"))
-                                </MudSelectItem>
-                            }
-                        </MudSelect>
+                        <MudAutocomplete T="long?" Label="Cuenta prevista (de dónde saldrá)" @bind-Value="_nvCuenta"
+                                         SearchFunc="BuscarCuentas" ToStringFunc="TextoCuenta"
+                                         Variant="Variant.Outlined" Dense="true" Clearable="true" Class="mb-3"
+                                         ResetValueOnEmptyText="true" CoerceText="true"
+                                         Placeholder="Busca una cuenta...">
+                            <ItemTemplate Context="id">@TextoCuenta(id)</ItemTemplate>
+                            <NoItemsTemplate>
+                                <MudText Align="Align.Center" Class="px-4 py-1">Sin coincidencias.</MudText>
+                            </NoItemsTemplate>
+                        </MudAutocomplete>
 
                         @if (CuentaPrevistaInsuficiente())
                         {
@@ -120,20 +117,17 @@
                                       Placeholder="Folio..." Label="Folio" Variant="Variant.Outlined"
                                       Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
                                       Clearable="true" Class="f-item" />
-                        <MudSelect T="string" Value="_fEstatus" ValueChanged="OnEstatusChanged" Label="Estatus"
-                                   Variant="Variant.Outlined" Clearable="true" Class="f-item">
-                            @foreach (var e in _estatusGasto)
-                            {
-                                <MudSelectItem T="string" Value="@e">@e</MudSelectItem>
-                            }
-                        </MudSelect>
-                        <MudSelect T="long?" Value="_fZona" ValueChanged="OnZonaChanged" Label="Zona"
-                                   Variant="Variant.Outlined" Clearable="true" Class="f-item">
-                            @foreach (var z in _zonas)
-                            {
-                                <MudSelectItem T="long?" Value="@z.IdZona">@z.Descripcion</MudSelectItem>
-                            }
-                        </MudSelect>
+                        <MudAutocomplete T="string" Value="_fEstatus" ValueChanged="OnEstatusChanged" Label="Estatus"
+                                         SearchFunc="BuscarEstatusGasto"
+                                         Variant="Variant.Outlined" Clearable="true" Class="f-item"
+                                         ResetValueOnEmptyText="true" CoerceText="true" Placeholder="Todos">
+                            <ItemTemplate Context="e">@e</ItemTemplate>
+                        </MudAutocomplete>
+                        <AutocompletarCatalogo TItem="ZonaDto" Label="Zona" Placeholder="Todas" Class="f-item"
+                                               Value="_fZona" ValueChanged="OnZonaChanged"
+                                               Items="_zonas"
+                                               ObtenerId="@(z => z.IdZona)"
+                                               ObtenerTexto="@(z => z.Descripcion)" />
                         <MudDatePicker Date="_fDesde" DateChanged="OnDesdeChanged" Label="Desde"
                                        Variant="Variant.Outlined" Clearable="true" Class="f-item" />
                         <MudDatePicker Date="_fHasta" DateChanged="OnHastaChanged" Label="Hasta"
@@ -864,6 +858,31 @@
     }
 
     // ===================== Helpers de diálogo =====================
+
+    // ---- Búsqueda para los campos editables (estatus y cuenta prevista) ----
+    private Task<IEnumerable<string>> BuscarEstatusGasto(string? valor, CancellationToken ct)
+    {
+        IEnumerable<string> origen = _estatusGasto;
+        if (!string.IsNullOrWhiteSpace(valor))
+            origen = origen.Where(e => e.Contains(valor, StringComparison.OrdinalIgnoreCase));
+        return Task.FromResult(origen);
+    }
+
+    // Texto visible de una cuenta (nombre + saldo). Solo cuentas activas.
+    private string TextoCuenta(long? id)
+    {
+        if (id is null) return string.Empty;
+        var cuenta = _cuentas.FirstOrDefault(c => c.IdCuentaGasto == id.Value);
+        return cuenta is null ? string.Empty : $"{cuenta.Nombre} ({cuenta.SaldoActual:C2})";
+    }
+
+    private Task<IEnumerable<long?>> BuscarCuentas(string? valor, CancellationToken ct)
+    {
+        IEnumerable<CuentaGastoDto> activas = _cuentas.Where(c => c.Activo);
+        if (!string.IsNullOrWhiteSpace(valor))
+            activas = activas.Where(c => (c.Nombre ?? string.Empty).Contains(valor, StringComparison.OrdinalIgnoreCase));
+        return Task.FromResult<IEnumerable<long?>>(activas.Select(c => (long?)c.IdCuentaGasto).ToList());
+    }
 
     private async Task<bool> ConfirmarDialogo(string titulo, string mensaje, string textoAceptar, Color color)
     {

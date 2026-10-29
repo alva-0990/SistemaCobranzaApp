@@ -25,18 +25,13 @@
                 @if (MostrarZona)
                 {
                     <MudItem xs="12">
-                        <MudSelect T="long?"
-                                   Label="Zona asignada"
-                                   @bind-Value="Modelo.IdZona"
-                                   Variant="Variant.Outlined"
-                                   Margin="Margin.Dense"
-                                   Clearable="true"
-                                  >
-                            @foreach (var z in Zonas)
-                            {
-                                <MudSelectItem T="long?" Value="@z.IdZona">@z.Descripcion</MudSelectItem>
-                            }
-                        </MudSelect>
+                        <AutocompletarCatalogo TItem="ZonaDto" Label="Zona asignada"
+                                               Placeholder="Busca y selecciona una zona..."
+                                               Margin="Margin.Dense"
+                                               @bind-Value="Modelo.IdZona"
+                                               Items="Zonas"
+                                               ObtenerId="@(z => z.IdZona)"
+                                               ObtenerTexto="@(z => z.Descripcion)" />
                     </MudItem>
                 }
 

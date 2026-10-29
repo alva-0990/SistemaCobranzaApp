@@ -15,6 +15,9 @@ h1 { margin: 0; font-size: 1.6rem; font-weight: 700; color: var(--mud-palette-pr
 .error-message { color: var(--mud-palette-error); border-left: 4px solid currentColor; padding: 12px; font-size: .875rem; text-align: left; }
 .btn-entrar { width: 100%; padding: 14px; background: var(--mud-palette-primary); color: var(--mud-palette-primary-text); border: 0; border-radius: 8px; font-size: 1rem; font-weight: 600; cursor: pointer; }
 .btn-entrar:hover { background: var(--mud-palette-primary-darken); }
+.login-ayuda { margin: -8px 0 0; font-size: .875rem; text-align: center; }
+.login-ayuda a { color: var(--mud-palette-primary); font-weight: 500; text-decoration: none; }
+.login-ayuda a:hover { text-decoration: underline; }
 button:disabled { opacity: .6; cursor: wait; }
 .login-movil .login-container { padding: max(24px, env(safe-area-inset-top)) 24px 16px; }
 .login-movil .login-card { background: transparent; border: 0; box-shadow: none; padding: 16px 0; }

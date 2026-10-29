@@ -21,34 +21,25 @@
             </div>
             <MudGrid Spacing="2" Class="align-end">
                 <MudItem xs="12" sm="4">
-                    <MudSelect T="long?" Label="Zona" @bind-Value="_cartZona" Dense="true" Clearable="true"
-                               Variant="Variant.Outlined">
-                        <MudSelectItem T="long?" Value="@((long?)null)">Todas</MudSelectItem>
-                        @foreach (var z in _zonas)
-                        {
-                            <MudSelectItem T="long?" Value="@((long?)z.IdZona)">@z.Descripcion</MudSelectItem>
-                        }
-                    </MudSelect>
+                    <AutocompletarCatalogo TItem="ZonaDto" Label="Zona" Placeholder="Todas"
+                                           @bind-Value="_cartZona"
+                                           Items="_zonas"
+                                           ObtenerId="@(z => z.IdZona)"
+                                           ObtenerTexto="@(z => z.Descripcion)" />
                 </MudItem>
                 <MudItem xs="12" sm="4">
-                    <MudSelect T="long?" Label="Ruta" @bind-Value="_cartRuta" Dense="true" Clearable="true"
-                               Variant="Variant.Outlined">
-                        <MudSelectItem T="long?" Value="@((long?)null)">Todas</MudSelectItem>
-                        @foreach (var r in _rutas)
-                        {
-                            <MudSelectItem T="long?" Value="@((long?)r.IdRuta)">@r.Descripcion</MudSelectItem>
-                        }
-                    </MudSelect>
+                    <AutocompletarCatalogo TItem="RutaAdminDto" Label="Ruta" Placeholder="Todas"
+                                           @bind-Value="_cartRuta"
+                                           Items="_rutas"
+                                           ObtenerId="@(r => r.IdRuta)"
+                                           ObtenerTexto="@(r => r.Descripcion)" />
                 </MudItem>
                 <MudItem xs="12" sm="4">
-                    <MudSelect T="long?" Label="Estatus de venta" @bind-Value="_cartEstatus" Dense="true" Clearable="true"
-                               Variant="Variant.Outlined">
-                        <MudSelectItem T="long?" Value="@((long?)null)">Todos</MudSelectItem>
-                        @foreach (var e in _estatusVenta)
-                        {
-                            <MudSelectItem T="long?" Value="@((long?)e.Id)">@e.Descripcion</MudSelectItem>
-                        }
-                    </MudSelect>
+                    <AutocompletarCatalogo TItem="EstatusVentaDto" Label="Estatus de venta" Placeholder="Todos"
+                                           @bind-Value="_cartEstatus"
+                                           Items="_estatusVenta"
+                                           ObtenerId="@(e => e.Id)"
+                                           ObtenerTexto="@(e => e.Descripcion)" />
                 </MudItem>
             </MudGrid>
 
@@ -134,44 +125,32 @@
                     <MudDatePicker Label="Hasta" @bind-Date="_pagHasta" Variant="Variant.Outlined" Clearable="true" />
                 </MudItem>
                 <MudItem xs="12" sm="6" md="2">
-                    <MudSelect T="long?" Label="Cobrador" @bind-Value="_pagCobrador" Dense="true" Clearable="true"
-                               Variant="Variant.Outlined">
-                        <MudSelectItem T="long?" Value="@((long?)null)">Todos</MudSelectItem>
-                        @foreach (var c in _cobradores)
-                        {
-                            <MudSelectItem T="long?" Value="@((long?)c.IdCobrador)">@c.Nombre</MudSelectItem>
-                        }
-                    </MudSelect>
+                    <AutocompletarCatalogo TItem="CobradorDto" Label="Cobrador" Placeholder="Todos"
+                                           @bind-Value="_pagCobrador"
+                                           Items="_cobradores"
+                                           ObtenerId="@(c => c.IdCobrador)"
+                                           ObtenerTexto="@(c => c.Nombre)" />
                 </MudItem>
                 <MudItem xs="12" sm="6" md="2">
-                    <MudSelect T="long?" Label="Zona" @bind-Value="_pagZona" Dense="true" Clearable="true"
-                               Variant="Variant.Outlined">
-                        <MudSelectItem T="long?" Value="@((long?)null)">Todas</MudSelectItem>
-                        @foreach (var z in _zonas)
-                        {
-                            <MudSelectItem T="long?" Value="@((long?)z.IdZona)">@z.Descripcion</MudSelectItem>
-                        }
-                    </MudSelect>
+                    <AutocompletarCatalogo TItem="ZonaDto" Label="Zona" Placeholder="Todas"
+                                           @bind-Value="_pagZona"
+                                           Items="_zonas"
+                                           ObtenerId="@(z => z.IdZona)"
+                                           ObtenerTexto="@(z => z.Descripcion)" />
                 </MudItem>
                 <MudItem xs="12" sm="6" md="2">
-                    <MudSelect T="long?" Label="Ruta" @bind-Value="_pagRuta" Dense="true" Clearable="true"
-                               Variant="Variant.Outlined">
-                        <MudSelectItem T="long?" Value="@((long?)null)">Todas</MudSelectItem>
-                        @foreach (var r in _rutas)
-                        {
-                            <MudSelectItem T="long?" Value="@((long?)r.IdRuta)">@r.Descripcion</MudSelectItem>
-                        }
-                    </MudSelect>
+                    <AutocompletarCatalogo TItem="RutaAdminDto" Label="Ruta" Placeholder="Todas"
+                                           @bind-Value="_pagRuta"
+                                           Items="_rutas"
+                                           ObtenerId="@(r => r.IdRuta)"
+                                           ObtenerTexto="@(r => r.Descripcion)" />
                 </MudItem>
                 <MudItem xs="12" sm="6" md="2">
-                    <MudSelect T="long?" Label="Movimiento" @bind-Value="_pagMovimiento" Dense="true" Clearable="true"
-                               Variant="Variant.Outlined">
-                        <MudSelectItem T="long?" Value="@((long?)null)">Todos</MudSelectItem>
-                        @foreach (var m in _movimientos)
-                        {
-                            <MudSelectItem T="long?" Value="@((long?)m.Id)">@m.Descripcion</MudSelectItem>
-                        }
-                    </MudSelect>
+                    <AutocompletarCatalogo TItem="MovimientoDto" Label="Movimiento" Placeholder="Todos"
+                                           @bind-Value="_pagMovimiento"
+                                           Items="_movimientos"
+                                           ObtenerId="@(m => m.Id)"
+                                           ObtenerTexto="@(m => m.Descripcion)" />
                 </MudItem>
             </MudGrid>
 
@@ -254,41 +233,32 @@
                 Filtros de ventas
             </div>
             <MudGrid Spacing="2" Class="align-end">
-                <MudItem xs="12" sm="4">
+                <MudItem xs="12" sm="6" md="2">
                     <MudDatePicker Label="Desde" @bind-Date="_venDesde" Variant="Variant.Outlined" Clearable="true" />
                 </MudItem>
-                <MudItem xs="12" sm="4">
+                <MudItem xs="12" sm="6" md="2">
                     <MudDatePicker Label="Hasta" @bind-Date="_venHasta" Variant="Variant.Outlined" Clearable="true" />
                 </MudItem>
-                <MudItem xs="12" sm="4">
-                    <MudSelect T="long?" Label="Vendedor" @bind-Value="_venVendedor" Dense="true" Clearable="true"
-                               Variant="Variant.Outlined">
-                        <MudSelectItem T="long?" Value="@((long?)null)">Todos</MudSelectItem>
-                        @foreach (var v in _vendedores)
-                        {
-                            <MudSelectItem T="long?" Value="@((long?)v.IdVendedor)">@v.Nombre</MudSelectItem>
-                        }
-                    </MudSelect>
+                <MudItem xs="12" sm="6" md="2">
+                    <AutocompletarCatalogo TItem="VendedorDto" Label="Vendedor" Placeholder="Todos"
+                                           @bind-Value="_venVendedor"
+                                           Items="_vendedores"
+                                           ObtenerId="@(v => v.IdVendedor)"
+                                           ObtenerTexto="@(v => v.Nombre)" />
                 </MudItem>
-                <MudItem xs="12" sm="6">
-                    <MudSelect T="long?" Label="Zona" @bind-Value="_venZona" Dense="true" Clearable="true"
-                               Variant="Variant.Outlined">
-                        <MudSelectItem T="long?" Value="@((long?)null)">Todas</MudSelectItem>
-                        @foreach (var z in _zonas)
-                        {
-                            <MudSelectItem T="long?" Value="@((long?)z.IdZona)">@z.Descripcion</MudSelectItem>
-                        }
-                    </MudSelect>
+                <MudItem xs="12" sm="6" md="3">
+                    <AutocompletarCatalogo TItem="ZonaDto" Label="Zona" Placeholder="Todas"
+                                           @bind-Value="_venZona"
+                                           Items="_zonas"
+                                           ObtenerId="@(z => z.IdZona)"
+                                           ObtenerTexto="@(z => z.Descripcion)" />
                 </MudItem>
-                <MudItem xs="12" sm="6">
-                    <MudSelect T="long?" Label="Ruta" @bind-Value="_venRuta" Dense="true" Clearable="true"
-                               Variant="Variant.Outlined">
-                        <MudSelectItem T="long?" Value="@((long?)null)">Todas</MudSelectItem>
-                        @foreach (var r in _rutas)
-                        {
-                            <MudSelectItem T="long?" Value="@((long?)r.IdRuta)">@r.Descripcion</MudSelectItem>
-                        }
-                    </MudSelect>
+                <MudItem xs="12" sm="6" md="3">
+                    <AutocompletarCatalogo TItem="RutaAdminDto" Label="Ruta" Placeholder="Todas"
+                                           @bind-Value="_venRuta"
+                                           Items="_rutas"
+                                           ObtenerId="@(r => r.IdRuta)"
+                                           ObtenerTexto="@(r => r.Descripcion)" />
                 </MudItem>
             </MudGrid>
 
@@ -365,31 +335,25 @@
                 Filtros de recuperación
             </div>
             <MudGrid Spacing="2" Class="align-end">
-                <MudItem xs="12" sm="6">
+                <MudItem xs="12" sm="6" md="3">
                     <MudDatePicker Label="Desde" @bind-Date="_recDesde" Variant="Variant.Outlined" Clearable="true" />
                 </MudItem>
-                <MudItem xs="12" sm="6">
+                <MudItem xs="12" sm="6" md="3">
                     <MudDatePicker Label="Hasta" @bind-Date="_recHasta" Variant="Variant.Outlined" Clearable="true" />
                 </MudItem>
-                <MudItem xs="12" sm="6">
-                    <MudSelect T="long?" Label="Zona" @bind-Value="_recZona" Dense="true" Clearable="true"
-                               Variant="Variant.Outlined">
-                        <MudSelectItem T="long?" Value="@((long?)null)">Todas</MudSelectItem>
-                        @foreach (var z in _zonas)
-                        {
-                            <MudSelectItem T="long?" Value="@((long?)z.IdZona)">@z.Descripcion</MudSelectItem>
-                        }
-                    </MudSelect>
+                <MudItem xs="12" sm="6" md="3">
+                    <AutocompletarCatalogo TItem="ZonaDto" Label="Zona" Placeholder="Todas"
+                                           @bind-Value="_recZona"
+                                           Items="_zonas"
+                                           ObtenerId="@(z => z.IdZona)"
+                                           ObtenerTexto="@(z => z.Descripcion)" />
                 </MudItem>
-                <MudItem xs="12" sm="6">
-                    <MudSelect T="long?" Label="Ruta" @bind-Value="_recRuta" Dense="true" Clearable="true"
-                               Variant="Variant.Outlined">
-                        <MudSelectItem T="long?" Value="@((long?)null)">Todas</MudSelectItem>
-                        @foreach (var r in _rutas)
-                        {
-                            <MudSelectItem T="long?" Value="@((long?)r.IdRuta)">@r.Descripcion</MudSelectItem>
-                        }
-                    </MudSelect>
+                <MudItem xs="12" sm="6" md="3">
+                    <AutocompletarCatalogo TItem="RutaAdminDto" Label="Ruta" Placeholder="Todas"
+                                           @bind-Value="_recRuta"
+                                           Items="_rutas"
+                                           ObtenerId="@(r => r.IdRuta)"
+                                           ObtenerTexto="@(r => r.Descripcion)" />
                 </MudItem>
             </MudGrid>
 
@@ -453,34 +417,25 @@
             </div>
             <MudGrid Spacing="2" Class="align-end">
                 <MudItem xs="12" sm="4">
-                    <MudSelect T="long?" Label="Zona" @bind-Value="_cliZona" Dense="true" Clearable="true"
-                               Variant="Variant.Outlined">
-                        <MudSelectItem T="long?" Value="@((long?)null)">Todas</MudSelectItem>
-                        @foreach (var z in _zonas)
-                        {
-                            <MudSelectItem T="long?" Value="@((long?)z.IdZona)">@z.Descripcion</MudSelectItem>
-                        }
-                    </MudSelect>
+                    <AutocompletarCatalogo TItem="ZonaDto" Label="Zona" Placeholder="Todas"
+                                           @bind-Value="_cliZona"
+                                           Items="_zonas"
+                                           ObtenerId="@(z => z.IdZona)"
+                                           ObtenerTexto="@(z => z.Descripcion)" />
                 </MudItem>
                 <MudItem xs="12" sm="4">
-                    <MudSelect T="long?" Label="Ruta" @bind-Value="_cliRuta" Dense="true" Clearable="true"
-                               Variant="Variant.Outlined">
-                        <MudSelectItem T="long?" Value="@((long?)null)">Todas</MudSelectItem>
-                        @foreach (var r in _rutas)
-                        {
-                            <MudSelectItem T="long?" Value="@((long?)r.IdRuta)">@r.Descripcion</MudSelectItem>
-                        }
-                    </MudSelect>
+                    <AutocompletarCatalogo TItem="RutaAdminDto" Label="Ruta" Placeholder="Todas"
+                                           @bind-Value="_cliRuta"
+                                           Items="_rutas"
+                                           ObtenerId="@(r => r.IdRuta)"
+                                           ObtenerTexto="@(r => r.Descripcion)" />
                 </MudItem>
                 <MudItem xs="12" sm="4">
-                    <MudSelect T="long?" Label="Clasificación" @bind-Value="_cliClasificacion" Dense="true" Clearable="true"
-                               Variant="Variant.Outlined">
-                        <MudSelectItem T="long?" Value="@((long?)null)">Todas</MudSelectItem>
-                        @foreach (var c in _clasificaciones)
-                        {
-                            <MudSelectItem T="long?" Value="@((long?)c.IdClasificaionCliente)">@c.Descripcion</MudSelectItem>
-                        }
-                    </MudSelect>
+                    <AutocompletarCatalogo TItem="ClasificaionClienteDto" Label="Clasificación" Placeholder="Todas"
+                                           @bind-Value="_cliClasificacion"
+                                           Items="_clasificaciones"
+                                           ObtenerId="@(c => c.IdClasificaionCliente)"
+                                           ObtenerTexto="@(c => c.Descripcion)" />
                 </MudItem>
                 <MudItem xs="12" sm="12" Class="d-flex align-center">
                     <MudSwitch T="bool" @bind-Value="_cliIncluirInactivos" Color="Color.Primary" Label="Incluir inactivos" />
@@ -557,14 +512,11 @@
             </div>
             <MudGrid Spacing="2" Class="align-end">
                 <MudItem xs="12" sm="4">
-                    <MudSelect T="long?" Label="Zona" @bind-Value="_segZona" Dense="true" Clearable="true"
-                               Variant="Variant.Outlined">
-                        <MudSelectItem T="long?" Value="@((long?)null)">Todas</MudSelectItem>
-                        @foreach (var z in _zonas)
-                        {
-                            <MudSelectItem T="long?" Value="@((long?)z.IdZona)">@z.Descripcion</MudSelectItem>
-                        }
-                    </MudSelect>
+                    <AutocompletarCatalogo TItem="ZonaDto" Label="Zona" Placeholder="Todas"
+                                           @bind-Value="_segZona"
+                                           Items="_zonas"
+                                           ObtenerId="@(z => z.IdZona)"
+                                           ObtenerTexto="@(z => z.Descripcion)" />
                 </MudItem>
                 <MudItem xs="12" sm="4">
                     <MudDatePicker Label="Alta desde" @bind-Date="_segAltaDesde" Variant="Variant.Outlined" Clearable="true" />
@@ -622,6 +574,7 @@
                         <MudTh><MudTableSortLabel SortBy="new Func<ReporteSeguimientoFila, object>(x => x.FechaVenta)">F. venta</MudTableSortLabel></MudTh>
                         <MudTh><MudTableSortLabel SortBy="new Func<ReporteSeguimientoFila, object>(x => (object?)x.FechaUltimoPago ?? DateTimeOffset.MinValue)">Último pago</MudTableSortLabel></MudTh>
                         <MudTh Style="text-align:right;"><MudTableSortLabel InitialDirection="SortDirection.Descending" SortBy="new Func<ReporteSeguimientoFila, object>(x => x.DiasTranscurridos)">Días</MudTableSortLabel></MudTh>
+                        <MudTh><MudTableSortLabel SortBy="new Func<ReporteSeguimientoFila, object>(x => x.FrecuenciaPago ?? string.Empty)">Frecuencia</MudTableSortLabel></MudTh>
                         <MudTh><MudTableSortLabel SortBy="new Func<ReporteSeguimientoFila, object>(x => x.Clasificacion ?? string.Empty)">Clasificación</MudTableSortLabel></MudTh>
                         <MudTh Style="text-align:center;">Acción</MudTh>
                     </HeaderContent>
@@ -636,10 +589,11 @@
                         <MudTd DataLabel="F. venta">@FechaCorta(context.FechaVenta)</MudTd>
                         <MudTd DataLabel="Último pago">@FechaCorta(context.FechaUltimoPago)</MudTd>
                         <MudTd DataLabel="Días" Style="text-align:right;">
-                            <MudChip T="string" Size="Size.Small" Variant="Variant.Filled" Color="@ColorDias(context.DiasTranscurridos)">
+                            <MudChip T="string" Size="Size.Small" Variant="Variant.Filled" Color="@ColorDias(context.DiasTranscurridos, context.DiasPeriodo)">
                                 @context.DiasTranscurridos
                             </MudChip>
                         </MudTd>
+                        <MudTd DataLabel="Frecuencia">@Mostrar(context.FrecuenciaPago)</MudTd>
                         <MudTd DataLabel="Clasificación">@Mostrar(context.Clasificacion)</MudTd>
                         <MudTd DataLabel="Acción" Style="text-align:center;">
                             <MudButton Size="Size.Small" Variant="Variant.Text" Color="Color.Primary"
@@ -726,6 +680,16 @@
     private ReporteSeguimientoResponse? _seguimiento;
     private string? _segBusqueda;
 
+    // Días de gracia para el semáforo del reporte de seguimiento (configurables en Parámetros del Sistema).
+    // El color depende de los días transcurridos frente al período de pago de cada venta:
+    //   verde  : dentro del período
+    //   amarillo: hasta período + gracia de alerta
+    //   rojo   : más allá
+    private const string ClaveGraciaAlerta = "SEGUIMIENTO_DIAS_GRACIA_ALERTA";
+    private const string ClaveGraciaCritico = "SEGUIMIENTO_DIAS_GRACIA_CRITICO";
+    private int _diasGraciaAlerta = 3;
+    private int _diasGraciaCritico = 7;
+
     protected override async Task OnInitializedAsync()
     {
         await Api.CargarSesionDesdeAlmacenamientoAsync();
@@ -759,6 +723,31 @@
         _vendedores = (await tVendedores).datos ?? new();
         _clasificaciones = (await tClasificaciones).datos ?? new();
         _movimientos = (await tMovimientos).datos ?? new();
+
+        await CargarDiasGraciaSeguimientoAsync();
+    }
+
+    // Lee los días de gracia del semáforo de seguimiento desde Parámetros del Sistema.
+    // Si un parámetro no existe o no es un entero válido, conserva el valor por defecto.
+    private async Task CargarDiasGraciaSeguimientoAsync()
+    {
+        var (lista, error) = await Api.ListarParametrosAsync();
+        if (error is not null || lista is null) return;
+
+        _diasGraciaAlerta = LeerDiasGracia(lista, ClaveGraciaAlerta, _diasGraciaAlerta);
+        _diasGraciaCritico = LeerDiasGracia(lista, ClaveGraciaCritico, _diasGraciaCritico);
+
+        // El umbral crítico nunca debe quedar por debajo del de alerta.
+        if (_diasGraciaCritico < _diasGraciaAlerta) _diasGraciaCritico = _diasGraciaAlerta;
+    }
+
+    private static int LeerDiasGracia(IEnumerable<ParametroSistemaDto> parametros, string clave, int porDefecto)
+    {
+        var p = parametros.FirstOrDefault(x => string.Equals(x.Clave, clave, StringComparison.OrdinalIgnoreCase));
+        if (p is null) return porDefecto;
+        if (p.ValorNumerico is { } n) return (int)Math.Max(0, Math.Round(n));
+        if (int.TryParse(p.ValorTexto?.Trim(), out var v)) return Math.Max(0, v);
+        return porDefecto;
     }
 
     // ===================== Generadores de cada reporte =====================
@@ -882,13 +871,27 @@
         Snackbar.Add($"Estatus de '{fila.Cliente}' actualizado a {datos.ClasificacionNombre}.", Severity.Success);
     }
 
-    // Color del chip de días: verde reciente, amarillo en alerta, rojo crítico.
-    private static Color ColorDias(int dias) => dias switch
+    // Color del chip de días según el período de pago de la venta y los días de gracia configurados:
+    //   verde  : dentro del período de pago
+    //   amarillo: hasta período + gracia de alerta
+    //   rojo   : más allá (crítico)
+    // Si la venta no tiene frecuencia (período 0), usa los umbrales fijos históricos (7 / 15).
+    private Color ColorDias(int dias, int diasPeriodo)
     {
-        <= 7 => Color.Success,
-        <= 15 => Color.Warning,
-        _ => Color.Error
-    };
+        if (diasPeriodo <= 0)
+        {
+            return dias switch
+            {
+                <= 7 => Color.Success,
+                <= 15 => Color.Warning,
+                _ => Color.Error
+            };
+        }
+
+        if (dias <= diasPeriodo) return Color.Success;
+        if (dias <= diasPeriodo + _diasGraciaAlerta) return Color.Warning;
+        return Color.Error;
+    }
 
     private async Task ExportarAsync(string nombre, string[] columnas, IEnumerable<object?[]> filas)
     {
@@ -929,10 +932,10 @@
 
     private Task ExportarSeguimiento() => _seguimiento is null ? Task.CompletedTask : ExportarAsync("Seguimiento",
         ["ID cliente", "Cliente", "Folio venta", "Producto", "Total venta", "Total cobrado", "Total pendiente",
-         "Fecha venta", "Último pago", "Días transcurridos", "Clasificación", "Zona", "Fecha alta"],
+         "Fecha venta", "Último pago", "Días transcurridos", "Frecuencia", "Clasificación", "Zona", "Fecha alta"],
         _seguimiento.Filas.Select(f => new object?[] { f.IdCliente, f.Cliente, f.FolioVenta, f.Productos,
             f.TotalVenta, f.TotalCobrado, f.TotalPendiente, FechaCorta(f.FechaVenta), FechaCorta(f.FechaUltimoPago),
-            f.DiasTranscurridos, f.Clasificacion, f.Zona, FechaCorta(f.FechaAlta) }));
+            f.DiasTranscurridos, f.FrecuenciaPago, f.Clasificacion, f.Zona, FechaCorta(f.FechaAlta) }));
 
     // ===================== Helpers =====================
 

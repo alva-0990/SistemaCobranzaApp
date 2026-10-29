@@ -7,7 +7,7 @@ public static class AppTheme
 {
     public static string NombreAplicacion { get; } = "Nombre comercial";
     public static string TextoEmpresa { get; } = "Nombre comercial";
-    public static string Version { get; } = "1.0.0";
+    public static string Version { get; } = "1.0.1";
     public static string IconoLogin { get; } = Icons.Material.Filled.AccountBalanceWallet;
     // Imagen fija de respaldo cuando no existe logo en la base; null utiliza IconoLogin.
     public static string? LogoLoginUrl { get; } = null;

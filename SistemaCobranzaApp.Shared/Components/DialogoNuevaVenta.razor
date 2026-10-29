@@ -51,21 +51,26 @@
                 <div class="captura-articulo">
 
                     <div class="campo-producto">
-                        <MudSelect T="ArticuloInventario"
-                                   Label="Seleccionar Artículo"
-                                   Value="_productoSeleccionado"
-                                   ValueChanged="OnProductoSeleccionado"
-                                   Variant="Variant.Outlined"
-                                   Dense="true"
-                                   FullWidth="true"
-                                   ToStringFunc="@(a => a is null ? "" : a.Descripcion)">
-                            @foreach (var art in _catalogoInventario)
-                            {
-                                <MudSelectItem Value="@art">
-                                    @art.Descripcion (@art.Categoria) — Disp.: @art.Disponible
-                                </MudSelectItem>
-                            }
-                        </MudSelect>
+                        <MudAutocomplete T="ArticuloInventario"
+                                         Label="Seleccionar Artículo"
+                                         Value="_productoSeleccionado"
+                                         ValueChanged="OnProductoSeleccionado"
+                                         SearchFunc="BuscarArticulos"
+                                         Variant="Variant.Outlined"
+                                         Dense="true"
+                                         FullWidth="true"
+                                         Clearable="true"
+                                         ResetValueOnEmptyText="true"
+                                         CoerceText="true"
+                                         Placeholder="Busca por nombre o categoría..."
+                                         ToStringFunc="@(a => a is null ? "" : a.Descripcion)">
+                            <ItemTemplate Context="art">
+                                @art.Descripcion (@art.Categoria) — Disp.: @art.Disponible
+                            </ItemTemplate>
+                            <NoItemsTemplate>
+                                <MudText Align="Align.Center" Class="px-4 py-1">Sin coincidencias.</MudText>
+                            </NoItemsTemplate>
+                        </MudAutocomplete>
                     </div>
 
                     <div class="campo-cantidad">
@@ -216,21 +221,26 @@
                 <div class="captura-condicion">
 
                     <div class="campo-plazo">
-                        <MudSelect T="MesDto"
-                                   Label="Plazo"
-                                   Value="_mesSeleccionado"
-                                   ValueChanged="@(m => _mesSeleccionado = m)"
-                                   Variant="Variant.Outlined"
-                                   Dense="true"
-                                   FullWidth="true"
-                                   ToStringFunc="@(m => m is null ? "" : $"{m.NumMeses}{m.Descripcion}")">
-                            @foreach (var mes in _catalogoMeses)
-                            {
-                                <MudSelectItem Value="@mes">
-                                    @mes.NumMeses@mes.Descripcion
-                                </MudSelectItem>
-                            }
-                        </MudSelect>
+                        <MudAutocomplete T="MesDto"
+                                         Label="Plazo"
+                                         Value="_mesSeleccionado"
+                                         ValueChanged="@(m => _mesSeleccionado = m)"
+                                         SearchFunc="BuscarPlazos"
+                                         Variant="Variant.Outlined"
+                                         Dense="true"
+                                         FullWidth="true"
+                                         Clearable="true"
+                                         ResetValueOnEmptyText="true"
+                                         CoerceText="true"
+                                         Placeholder="Busca un plazo..."
+                                         ToStringFunc="@(m => m is null ? "" : $"{m.NumMeses}{m.Descripcion}")">
+                            <ItemTemplate Context="mes">
+                                @mes.NumMeses@mes.Descripcion
+                            </ItemTemplate>
+                            <NoItemsTemplate>
+                                <MudText Align="Align.Center" Class="px-4 py-1">Sin coincidencias.</MudText>
+                            </NoItemsTemplate>
+                        </MudAutocomplete>
                     </div>
 
                     <div class="campo-liquidacion">
@@ -329,21 +339,26 @@
                 </MudText>
 
                 <!-- Vendedor que realiza la venta -->
-                <MudSelect T="VendedorDto"
-                           Value="_vendedorSeleccionado"
-                           ValueChanged="OnVendedorSeleccionado"
-                           Label="Vendedor"
-                           Variant="Variant.Outlined"
-                           Margin="Margin.Dense"
-                           Class="mb-3"
-                           Adornment="Adornment.Start"
-                           AdornmentIcon="@Icons.Material.Filled.Person"
-                           ToStringFunc="@(v => v?.Nombre ?? "")">
-                    @foreach (var vend in _vendedores)
-                    {
-                        <MudSelectItem T="VendedorDto" Value="vend">@vend.Nombre</MudSelectItem>
-                    }
-                </MudSelect>
+                <MudAutocomplete T="VendedorDto"
+                                 Value="_vendedorSeleccionado"
+                                 ValueChanged="OnVendedorSeleccionado"
+                                 SearchFunc="BuscarVendedores"
+                                 Label="Vendedor"
+                                 Variant="Variant.Outlined"
+                                 Margin="Margin.Dense"
+                                 Class="mb-3"
+                                 Clearable="true"
+                                 ResetValueOnEmptyText="true"
+                                 CoerceText="true"
+                                 Placeholder="Busca un vendedor..."
+                                 Adornment="Adornment.Start"
+                                 AdornmentIcon="@Icons.Material.Filled.Person"
+                                 ToStringFunc="@(v => v?.Nombre ?? "")">
+                    <ItemTemplate Context="vend">@vend.Nombre</ItemTemplate>
+                    <NoItemsTemplate>
+                        <MudText Align="Align.Center" Class="px-4 py-1">Sin coincidencias.</MudText>
+                    </NoItemsTemplate>
+                </MudAutocomplete>
 
                 <!-- Tipo de venta (CRÉDITO / CONTADO) -->
                 <MudSelect T="CondicionCreditoDto"
@@ -1110,6 +1125,35 @@
     private void OnVendedorSeleccionado(VendedorDto? vendedor)
     {
         _vendedorSeleccionado = vendedor;
+    }
+
+    // ---- Búsqueda para los autocompletados (artículo, plazo, vendedor) ----
+    private Task<IEnumerable<ArticuloInventario>> BuscarArticulos(string? valor, CancellationToken ct)
+    {
+        IEnumerable<ArticuloInventario> origen = _catalogoInventario;
+        if (!string.IsNullOrWhiteSpace(valor))
+            origen = origen.Where(a =>
+                a.Descripcion.Contains(valor, StringComparison.OrdinalIgnoreCase)
+                || (a.Categoria ?? string.Empty).Contains(valor, StringComparison.OrdinalIgnoreCase));
+        return Task.FromResult(origen);
+    }
+
+    private Task<IEnumerable<MesDto>> BuscarPlazos(string? valor, CancellationToken ct)
+    {
+        IEnumerable<MesDto> origen = _catalogoMeses;
+        if (!string.IsNullOrWhiteSpace(valor))
+            origen = origen.Where(m =>
+                $"{m.NumMeses}{m.Descripcion}".Contains(valor, StringComparison.OrdinalIgnoreCase)
+                || (m.Descripcion ?? string.Empty).Contains(valor, StringComparison.OrdinalIgnoreCase));
+        return Task.FromResult(origen);
+    }
+
+    private Task<IEnumerable<VendedorDto>> BuscarVendedores(string? valor, CancellationToken ct)
+    {
+        IEnumerable<VendedorDto> origen = _vendedores;
+        if (!string.IsNullOrWhiteSpace(valor))
+            origen = origen.Where(v => (v.Nombre ?? string.Empty).Contains(valor, StringComparison.OrdinalIgnoreCase));
+        return Task.FromResult(origen);
     }
 
     private void OnProductoSeleccionado(ArticuloInventario? articulo)

@@ -33,80 +33,63 @@
                 </MudItem>
 
                 <MudItem xs="12" sm="6">
-                    <MudSelect T="long?"
-                               Label="Categoría"
-                               @bind-Value="Modelo.IdCategoria"
-                               Required="true"
-                               RequiredError="La categoría es obligatoria."
-                               Variant="Variant.Outlined"
-                               Margin="Margin.Dense"
-                              >
-                        @foreach (var c in Categorias)
-                        {
-                            <MudSelectItem T="long?" Value="@c.Id">@c.Descripcion</MudSelectItem>
-                        }
-                    </MudSelect>
+                    <AutocompletarCatalogo TItem="CategoriaDto" Label="Categoría"
+                                           Placeholder="Busca una categoría..."
+                                           Margin="Margin.Dense"
+                                           Required="true" RequiredError="La categoría es obligatoria."
+                                           @bind-Value="Modelo.IdCategoria"
+                                           Items="Categorias"
+                                           ObtenerId="@(c => c.Id)"
+                                           ObtenerTexto="@(c => c.Descripcion)" />
                 </MudItem>
 
                 <MudItem xs="12" sm="6">
-                    <MudSelect T="long?"
-                               Label="Marca"
-                               @bind-Value="Modelo.IdMarca"
-                               Required="true"
-                               RequiredError="La marca es obligatoria."
-                               Variant="Variant.Outlined"
-                               Margin="Margin.Dense"
-                              >
-                        @foreach (var m in Marcas)
-                        {
-                            <MudSelectItem T="long?" Value="@m.Id">@m.Descripcion</MudSelectItem>
-                        }
-                    </MudSelect>
+                    <AutocompletarCatalogo TItem="MarcaDto" Label="Marca"
+                                           Placeholder="Busca una marca..."
+                                           Margin="Margin.Dense"
+                                           Required="true" RequiredError="La marca es obligatoria."
+                                           @bind-Value="Modelo.IdMarca"
+                                           Items="Marcas"
+                                           ObtenerId="@(m => m.Id)"
+                                           ObtenerTexto="@(m => m.Descripcion)" />
                 </MudItem>
 
                 <MudItem xs="12" sm="6">
-                    <MudSelect T="long?"
-                               Label="Color (opcional)"
-                               @bind-Value="Modelo.IdColor"
-                               Variant="Variant.Outlined"
-                               Margin="Margin.Dense"
-                               Clearable="true"
-                              >
-                        @foreach (var c in Colores)
-                        {
-                            <MudSelectItem T="long?" Value="@c.Id">@c.Descripcion</MudSelectItem>
-                        }
-                    </MudSelect>
+                    <AutocompletarCatalogo TItem="ColorDto" Label="Color (opcional)"
+                                           Placeholder="Busca un color..."
+                                           Margin="Margin.Dense"
+                                           @bind-Value="Modelo.IdColor"
+                                           Items="Colores"
+                                           ObtenerId="@(c => c.Id)"
+                                           ObtenerTexto="@(c => c.Descripcion)" />
                 </MudItem>
 
                 <MudItem xs="12" sm="6">
-                    <MudSelect T="long?"
-                               Label="Talla (opcional)"
-                               @bind-Value="Modelo.IdTalla"
-                               Variant="Variant.Outlined"
-                               Margin="Margin.Dense"
-                               Clearable="true"
-                              >
-                        @foreach (var t in Tallas)
-                        {
-                            <MudSelectItem T="long?" Value="@t.Id">@t.Descripcion (@t.Tipo)</MudSelectItem>
-                        }
-                    </MudSelect>
+                    <AutocompletarCatalogo TItem="TallaDto" Label="Talla (opcional)"
+                                           Placeholder="Busca una talla..."
+                                           Margin="Margin.Dense"
+                                           @bind-Value="Modelo.IdTalla"
+                                           Items="Tallas"
+                                           ObtenerId="@(t => t.Id)"
+                                           ObtenerTexto="@(t => $"{t.Descripcion} ({t.Tipo})")" />
                 </MudItem>
 
                 <MudItem xs="12">
-                    <MudSelect T="long?" Label="Esquema de comisión" @bind-Value="Modelo.IdCatalogoComision"
-                               Required="true" RequiredError="Selecciona un esquema de comisión."
-                               Variant="Variant.Outlined" Margin="Margin.Dense">
-                        @if (!EsNuevo && Modelo.IdCatalogoComision is long idActual && !Comisiones.Any(c => c.Id == idActual))
-                        {
-                            <MudSelectItem T="long?" Value="@idActual" Disabled="true">@Modelo.NombreComisionActual (inactivo)</MudSelectItem>
-                        }
-                        @foreach (var comision in Comisiones)
-                        {
-                            <MudSelectItem T="long?" Value="@comision.Id">@comision.NombreEsquema</MudSelectItem>
-                        }
-                    </MudSelect>
+                    <MudAutocomplete T="long?" Label="Esquema de comisión"
+                                     @bind-Value="Modelo.IdCatalogoComision"
+                                     SearchFunc="BuscarComisiones"
+                                     ToStringFunc="TextoComision"
+                                     Required="true" RequiredError="Selecciona un esquema de comisión."
+                                     Variant="Variant.Outlined" Margin="Margin.Dense"
+                                     ResetValueOnEmptyText="true" CoerceText="true"
+                                     Placeholder="Busca un esquema de comisión...">
+                        <ItemTemplate Context="id">
+                            @TextoComision(id)
+                        </ItemTemplate>
+                        <NoItemsTemplate>
+                            <MudText Align="Align.Center" Class="px-4 py-1">Sin coincidencias.</MudText>
+                        </NoItemsTemplate>
+                    </MudAutocomplete>
                     @if (Comisiones.FirstOrDefault(c => c.Id == Modelo.IdCatalogoComision) is { } seleccionada)
                     {
                         <MudText Typo="Typo.caption" Color="Color.Secondary">
@@ -200,6 +183,40 @@
 
     private static string FormatearComision(decimal valor, string tipoCalculo)
         => tipoCalculo == "PORCENTAJE" ? $"{valor:N2} %" : valor.ToString("C2");
+
+    // Texto visible de un esquema de comisión. Incluye el esquema actual aunque esté inactivo
+    // (cuando se edita un producto cuyo esquema ya no está en el catálogo activo).
+    private string TextoComision(long? id)
+    {
+        if (id is null) return string.Empty;
+        var comision = Comisiones.FirstOrDefault(c => c.Id == id.Value);
+        if (comision is not null) return comision.NombreEsquema;
+        if (id.Value == Modelo.IdCatalogoComision && !string.IsNullOrWhiteSpace(Modelo.NombreComisionActual))
+            return $"{Modelo.NombreComisionActual} (inactivo)";
+        return string.Empty;
+    }
+
+    // Candidatos (ids) filtrados por el texto. Mantiene visible el esquema inactivo ya asignado.
+    private Task<IEnumerable<long?>> BuscarComisiones(string? valor, CancellationToken ct)
+    {
+        IEnumerable<CatalogoComisionDto> activos = Comisiones;
+        if (!string.IsNullOrWhiteSpace(valor))
+            activos = activos.Where(c => (c.NombreEsquema ?? string.Empty)
+                .Contains(valor, StringComparison.OrdinalIgnoreCase));
+
+        var ids = activos.Select(c => (long?)c.Id).ToList();
+
+        // Al editar: si el esquema actual está inactivo (fuera del catálogo), lo incluimos para no perderlo.
+        if (!EsNuevo && Modelo.IdCatalogoComision is long idActual && Comisiones.All(c => c.Id != idActual))
+        {
+            var texto = Modelo.NombreComisionActual ?? string.Empty;
+            var coincide = string.IsNullOrWhiteSpace(valor)
+                || texto.Contains(valor, StringComparison.OrdinalIgnoreCase);
+            if (coincide && !ids.Contains(idActual)) ids.Insert(0, idActual);
+        }
+
+        return Task.FromResult<IEnumerable<long?>>(ids);
+    }
 
     private MudForm _form = null!;
     private bool _formValido;

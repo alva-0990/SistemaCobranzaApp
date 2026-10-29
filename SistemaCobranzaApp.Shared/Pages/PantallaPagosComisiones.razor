@@ -52,19 +52,17 @@
             </div>
 
             <div class="barra-filtros-responsiva mb-3">
-                <MudSelect T="long?" Label="Zona" @bind-Value="_fZonaLib" Variant="Variant.Outlined" Clearable="true" Class="f-item-compacto">
-                    @foreach (var z in _zonas)
-                    {
-                        <MudSelectItem T="long?" Value="@z.IdZona">@z.Descripcion</MudSelectItem>
-                    }
-                </MudSelect>
+                <AutocompletarCatalogo TItem="ZonaDto" Label="Zona" Placeholder="Todas" Class="f-item-compacto"
+                                       @bind-Value="_fZonaLib"
+                                       Items="_zonas"
+                                       ObtenerId="@(z => z.IdZona)"
+                                       ObtenerTexto="@(z => z.Descripcion)" />
 
-                <MudSelect T="long?" Label="Vendedor" @bind-Value="_fVendedorLib" Variant="Variant.Outlined" Clearable="true" Class="f-item-compacto">
-                    @foreach (var v in _vendedoresFiltradosLib)
-                    {
-                        <MudSelectItem T="long?" Value="@v.IdVendedor">@v.Nombre</MudSelectItem>
-                    }
-                </MudSelect>
+                <AutocompletarCatalogo TItem="VendedorDto" Label="Vendedor" Placeholder="Todos" Class="f-item-compacto"
+                                       @bind-Value="_fVendedorLib"
+                                       Items="_vendedoresFiltradosLib"
+                                       ObtenerId="@(v => v.IdVendedor)"
+                                       ObtenerTexto="@(v => v.Nombre)" />
 
                 <MudDatePicker Label="Desde" @bind-Date="_fDesdeLib" Variant="Variant.Outlined" Clearable="true" Class="f-item-compacto" />
                 <MudDatePicker Label="Hasta" @bind-Date="_fHastaLib" Variant="Variant.Outlined" Clearable="true" Class="f-item-compacto" />
@@ -139,19 +137,17 @@
             </div>
 
             <div class="barra-filtros-responsiva mb-3">
-                <MudSelect T="long?" Label="Zona" @bind-Value="_fZona" Variant="Variant.Outlined" Clearable="true" Class="f-item-compacto">
-                    @foreach (var z in _zonas)
-                    {
-                        <MudSelectItem T="long?" Value="@z.IdZona">@z.Descripcion</MudSelectItem>
-                    }
-                </MudSelect>
+                <AutocompletarCatalogo TItem="ZonaDto" Label="Zona" Placeholder="Todas" Class="f-item-compacto"
+                                       @bind-Value="_fZona"
+                                       Items="_zonas"
+                                       ObtenerId="@(z => z.IdZona)"
+                                       ObtenerTexto="@(z => z.Descripcion)" />
 
-                <MudSelect T="long?" Label="Vendedor" @bind-Value="_fVendedor" Variant="Variant.Outlined" Clearable="true" Class="f-item-compacto">
-                    @foreach (var v in _vendedoresFiltrados)
-                    {
-                        <MudSelectItem T="long?" Value="@v.IdVendedor">@v.Nombre</MudSelectItem>
-                    }
-                </MudSelect>
+                <AutocompletarCatalogo TItem="VendedorDto" Label="Vendedor" Placeholder="Todos" Class="f-item-compacto"
+                                       @bind-Value="_fVendedor"
+                                       Items="_vendedoresFiltrados"
+                                       ObtenerId="@(v => v.IdVendedor)"
+                                       ObtenerTexto="@(v => v.Nombre)" />
 
                 <MudDatePicker Label="Desde" @bind-Date="_fDesde" Variant="Variant.Outlined" Clearable="true" Class="f-item-compacto" />
                 <MudDatePicker Label="Hasta" @bind-Date="_fHasta" Variant="Variant.Outlined" Clearable="true" Class="f-item-compacto" />
@@ -226,19 +222,17 @@
             </div>
 
             <div class="barra-filtros-responsiva mb-3">
-                <MudSelect T="long?" Label="Zona" @bind-Value="_fZonaHist" Variant="Variant.Outlined" Clearable="true" Class="f-item-compacto">
-                    @foreach (var z in _zonas) 
-                    { 
-                        <MudSelectItem T="long?" Value="@z.IdZona">@z.Descripcion</MudSelectItem> 
-                    }
-                </MudSelect>
+                <AutocompletarCatalogo TItem="ZonaDto" Label="Zona" Placeholder="Todas" Class="f-item-compacto"
+                                       @bind-Value="_fZonaHist"
+                                       Items="_zonas"
+                                       ObtenerId="@(z => z.IdZona)"
+                                       ObtenerTexto="@(z => z.Descripcion)" />
 
-                <MudSelect T="long?" Label="Vendedor" @bind-Value="_fVendedorHist" Variant="Variant.Outlined" Clearable="true" Class="f-item-compacto">
-                    @foreach (var v in _vendedoresFiltradosHist) 
-                    { 
-                        <MudSelectItem T="long?" Value="@v.IdVendedor">@v.Nombre</MudSelectItem> 
-                    }
-                </MudSelect>
+                <AutocompletarCatalogo TItem="VendedorDto" Label="Vendedor" Placeholder="Todos" Class="f-item-compacto"
+                                       @bind-Value="_fVendedorHist"
+                                       Items="_vendedoresFiltradosHist"
+                                       ObtenerId="@(v => v.IdVendedor)"
+                                       ObtenerTexto="@(v => v.Nombre)" />
 
                 <MudDatePicker Label="Desde" @bind-Date="_fDesdeHist" Variant="Variant.Outlined" Clearable="true" Class="f-item-compacto" />
                 <MudDatePicker Label="Hasta" @bind-Date="_fHastaHist" Variant="Variant.Outlined" Clearable="true" Class="f-item-compacto" />

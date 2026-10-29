@@ -7,6 +7,7 @@
 @inject ApiCliente Api
 @inject IDialogService _dialogo
 @inject ISnackbar _snackbar
+@inject IDescargaArchivo _descarga
 
 <MudTabs Elevation="2" Rounded="true" Color="Color.Primary" ApplyEffectsToContainer="true"
          PanelClass="pa-0 pt-4" SliderColor="Color.Warning" Class="ma-2 tabs-remarcados">
@@ -103,10 +104,11 @@
                                       AdornmentColor="Color.Primary"
                                       Clearable="true"
                                       Class="buscador-remarcado" />
-                        <MudButton Variant="Variant.Filled" Color="Color.Primary"
-                                   StartIcon="@Icons.Material.Filled.Refresh"
-                                   OnClick="CargarCentral" Class="boton-nuevo">
-                            Refrescar
+                        <MudButton Variant="Variant.Filled" Color="Color.Success"
+                                   StartIcon="@Icons.Material.Filled.FileDownload"
+                                   OnClick="ExportarCentral" Class="boton-nuevo"
+                                   Disabled="@(_exportando || CentralFiltrado.Any() == false)">
+                            Exportar a Excel
                         </MudButton>
                     </div>
 
@@ -182,15 +184,13 @@
                             <MudText Typo="Typo.subtitle1"><b>Ajuste de existencia en zona</b></MudText>
                         </div>
 
-                        <MudSelect T="long?" Label="Zona" Value="_zonaSeleccionada"
-                                   ValueChanged="OnZonaSeleccionadaChanged"
-                                   Variant="Variant.Outlined" Dense="true" Class="mb-3"
-                                   Placeholder="Seleccione una zona">
-                            @foreach (var z in _zonas)
-                            {
-                                <MudSelectItem T="long?" Value="@z.IdZona">@z.Descripcion</MudSelectItem>
-                            }
-                        </MudSelect>
+                        <AutocompletarCatalogo TItem="ZonaDto" Label="Zona" Class="mb-3"
+                                               Placeholder="Busque y seleccione una zona"
+                                               Value="_zonaSeleccionada"
+                                               ValueChanged="OnZonaSeleccionadaChanged"
+                                               Items="_zonas"
+                                               ObtenerId="@(z => z.IdZona)"
+                                               ObtenerTexto="@(z => z.Descripcion)" />
 
                         <MudText Typo="Typo.caption" Color="Color.Secondary">Producto seleccionado:</MudText>
                         @if (_zonaSeleccion is null)
@@ -252,11 +252,11 @@
                                       AdornmentColor="Color.Primary"
                                       Clearable="true"
                                       Class="buscador-remarcado" />
-                        <MudButton Variant="Variant.Filled" Color="Color.Primary"
-                                   StartIcon="@Icons.Material.Filled.Refresh"
-                                   OnClick="CargarExistenciasZona" Class="boton-nuevo"
-                                   Disabled="@(_zonaSeleccionada is null)">
-                            Refrescar
+                        <MudButton Variant="Variant.Filled" Color="Color.Success"
+                                   StartIcon="@Icons.Material.Filled.FileDownload"
+                                   OnClick="ExportarZona" Class="boton-nuevo"
+                                   Disabled="@(_exportando || _zonaSeleccionada is null || ZonaFiltrado.Any() == false)">
+                            Exportar a Excel
                         </MudButton>
                     </div>
 
@@ -337,14 +337,12 @@
                                     <MudText Typo="Typo.subtitle1"><b>Datos de la propuesta</b></MudText>
                                 </div>
 
-                                <MudSelect T="long?" Label="Zona destino" @bind-Value="_propZonaDestino"
-                                           Variant="Variant.Outlined" Dense="true" Class="mb-3"
-                                           Placeholder="Seleccione una zona">
-                                    @foreach (var z in _zonas)
-                                    {
-                                        <MudSelectItem T="long?" Value="@z.IdZona">@z.Descripcion</MudSelectItem>
-                                    }
-                                </MudSelect>
+                                <AutocompletarCatalogo TItem="ZonaDto" Label="Zona destino" Class="mb-3"
+                                                       Placeholder="Busque y seleccione una zona"
+                                                       @bind-Value="_propZonaDestino"
+                                                       Items="_zonas"
+                                                       ObtenerId="@(z => z.IdZona)"
+                                                       ObtenerTexto="@(z => z.Descripcion)" />
 
                                 <MudTextField T="string" @bind-Value="_propObservaciones"
                                               Label="Observaciones (opcional)" Variant="Variant.Outlined"
@@ -439,19 +437,33 @@
 
                         <!-- Propuestas existentes: tabla + panel de detalle lateral -->
                         <MudTabPanel Text="Propuestas" Icon="@Icons.Material.Filled.Inventory2">
-                            <div class="barra-acciones">
-                                <MudSelect T="string" Value="_filtroEstatus" Label="Filtrar estatus"
-                                           Variant="Variant.Outlined" Dense="true" Clearable="true"
-                                           Class="buscador-remarcado"
-                                           ValueChanged="@(async v => { _filtroEstatus = v; await CargarPropuestas(); })">
-                                    <MudSelectItem T="string" Value="@("PENDIENTE")">Pendiente</MudSelectItem>
-                                    <MudSelectItem T="string" Value="@("CONFIRMADA")">Confirmada</MudSelectItem>
-                                    <MudSelectItem T="string" Value="@("RECHAZADA")">Rechazada</MudSelectItem>
-                                </MudSelect>
-                                <MudButton Variant="Variant.Filled" Color="Color.Primary"
-                                           StartIcon="@Icons.Material.Filled.Refresh"
-                                           OnClick="CargarPropuestas" Class="boton-nuevo">
+                            <div class="barra-filtros-prop">
+                                <MudAutocomplete T="string" @bind-Value="_filtroEstatus" Label="Estatus"
+                                                 SearchFunc="BuscarEstatusPropuesta"
+                                                 Variant="Variant.Outlined" Dense="true" Margin="Margin.Dense"
+                                                 Clearable="true" ResetValueOnEmptyText="true" CoerceText="true"
+                                                 Class="filtro-prop" Placeholder="Todos">
+                                    <ItemTemplate Context="e">@EtiquetaEstatus(e)</ItemTemplate>
+                                </MudAutocomplete>
+                                <AutocompletarCatalogo TItem="ZonaDto" Label="Zona" Placeholder="Todas"
+                                                       Margin="Margin.Dense" Class="filtro-prop"
+                                                       @bind-Value="_propFiltroZona"
+                                                       Items="_zonas"
+                                                       ObtenerId="@(z => z.IdZona)"
+                                                       ObtenerTexto="@(z => z.Descripcion)" />
+                                <MudDatePicker Label="Desde" @bind-Date="_propFiltroDesde" Variant="Variant.Outlined"
+                                               Margin="Margin.Dense" Clearable="true" Class="filtro-prop filtro-prop-fecha" />
+                                <MudDatePicker Label="Hasta" @bind-Date="_propFiltroHasta" Variant="Variant.Outlined"
+                                               Margin="Margin.Dense" Clearable="true" Class="filtro-prop filtro-prop-fecha" />
+                                <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small"
+                                           StartIcon="@Icons.Material.Filled.Search"
+                                           OnClick="CargarPropuestas" Class="boton-prop">
                                     Actualizar
+                                </MudButton>
+                                <MudButton Variant="Variant.Outlined" Color="Color.Default" Size="Size.Small"
+                                           StartIcon="@Icons.Material.Filled.FilterAltOff"
+                                           OnClick="LimpiarFiltrosPropuestas" Class="boton-prop">
+                                    Limpiar
                                 </MudButton>
                             </div>
 
@@ -466,7 +478,7 @@
                                     }
                                     else
                                     {
-                                        <MudTable Items="_propuestas" Hover="true" Dense="true"
+                                        <MudTable Items="PropuestasFiltradas" Hover="true" Dense="true"
                                                   Breakpoint="Breakpoint.Sm" Elevation="0" RowsPerPage="15"
                                                   T="PropuestaDto" Height="56vh" FixedHeader="true"
                                                   OnRowClick="@((TableRowClickEventArgs<PropuestaDto> e) => SeleccionarPropuesta(e.Item))"
@@ -551,6 +563,13 @@
                                                     </NoRecordsContent>
                                                 </MudTable>
 
+                                                <MudButton Variant="Variant.Outlined" Color="Color.Success" FullWidth="true"
+                                                           StartIcon="@Icons.Material.Filled.FileDownload" Class="mt-2"
+                                                           OnClick="ExportarDetallePropuesta"
+                                                           Disabled="@(_exportando || _propuestaDetalle.Detalles.Count == 0)">
+                                                    Exportar a Excel
+                                                </MudButton>
+
                                                 @if (!string.IsNullOrWhiteSpace(_propuestaDetalle.Observaciones))
                                                 {
                                                     <MudAlert Severity="Severity.Info" Dense="true" Class="mt-2" Variant="Variant.Outlined">
@@ -594,22 +613,20 @@
                         <!-- Historial de inventario: vista global con filtros -->
                         <MudTabPanel Text="Historial de inventario" Icon="@Icons.Material.Filled.History">
                             <div class="barra-filtros-hist">
-                                <MudSelect T="string" @bind-Value="_histTipo" Label="Tipo"
-                                           Variant="Variant.Outlined" Dense="true" Margin="Margin.Dense"
-                                           Clearable="true" Class="filtro-hist">
-                                    @foreach (var t in _tiposMovimiento)
-                                    {
-                                        <MudSelectItem T="string" Value="@t.Key">@t.Value</MudSelectItem>
-                                    }
-                                </MudSelect>
-                                <MudSelect T="long?" @bind-Value="_histZona" Label="Zona"
-                                           Variant="Variant.Outlined" Dense="true" Margin="Margin.Dense"
-                                           Clearable="true" Class="filtro-hist">
-                                    @foreach (var z in _zonas)
-                                    {
-                                        <MudSelectItem T="long?" Value="@z.IdZona">@z.Descripcion</MudSelectItem>
-                                    }
-                                </MudSelect>
+                                <MudAutocomplete T="string" @bind-Value="_histTipo" Label="Tipo"
+                                                 SearchFunc="BuscarTipoMovimiento"
+                                                 ToStringFunc="EtiquetaTipoMovimiento"
+                                                 Variant="Variant.Outlined" Dense="true" Margin="Margin.Dense"
+                                                 Clearable="true" ResetValueOnEmptyText="true" CoerceText="true"
+                                                 Class="filtro-hist" Placeholder="Todos">
+                                    <ItemTemplate Context="t">@EtiquetaTipoMovimiento(t)</ItemTemplate>
+                                </MudAutocomplete>
+                                <AutocompletarCatalogo TItem="ZonaDto" Label="Zona" Placeholder="Todas"
+                                                       Margin="Margin.Dense" Class="filtro-hist"
+                                                       @bind-Value="_histZona"
+                                                       Items="_zonas"
+                                                       ObtenerId="@(z => z.IdZona)"
+                                                       ObtenerTexto="@(z => z.Descripcion)" />
                                 <MudDatePicker Label="Desde" @bind-Date="_histDesde" Variant="Variant.Outlined"
                                                Margin="Margin.Dense" Clearable="true" Class="filtro-hist filtro-hist-fecha" />
                                 <MudDatePicker Label="Hasta" @bind-Date="_histHasta" Variant="Variant.Outlined"
@@ -764,6 +781,27 @@
     /* Botones sin que el texto se parta y sin crecer. */
     .barra-filtros-hist .boton-hist { white-space: nowrap; flex: 0 0 auto; }
 
+    /* ===== Filtros de propuestas: todos en una sola fila; se apilan en pantallas pequeñas ===== */
+    .barra-filtros-prop {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 16px;
+        flex-wrap: wrap;
+    }
+
+    .barra-filtros-prop .filtro-prop { flex: 1 1 140px; min-width: 120px; max-width: 220px; }
+    .barra-filtros-prop .filtro-prop-fecha { flex: 0 1 150px; min-width: 120px; max-width: 170px; }
+    .barra-filtros-prop .boton-prop { white-space: nowrap; flex: 0 0 auto; }
+
+    /* En pantallas pequeñas cada filtro/botón ocupa su propia fila (uno debajo del otro). */
+    @@media (max-width: 600px) {
+        .barra-filtros-prop { flex-direction: column; align-items: stretch; }
+        .barra-filtros-prop .filtro-prop,
+        .barra-filtros-prop .filtro-prop-fecha,
+        .barra-filtros-prop .boton-prop { max-width: none; width: 100%; }
+    }
+
     .encabezado-seccion { display: flex; align-items: center; gap: 12px; }
     .titulo-seccion { font-weight: 800; }
 
@@ -833,9 +871,31 @@
     private List<PropuestaDto> _propuestas = new();
     private bool _cargandoPropuestas;
     private string? _filtroEstatus;
+    private long? _propFiltroZona;
+    private DateTime? _propFiltroDesde;
+    private DateTime? _propFiltroHasta;
     private PropuestaDto? _propuestaDetalle;
     private bool _cargandoDetalle;
     private bool _resolviendoPropuesta;
+
+    // Indicador compartido mientras se genera/descarga un archivo de Excel.
+    private bool _exportando;
+
+    // Propuestas filtradas en memoria por zona y rango de fechas (el estatus se filtra en el servidor).
+    private IEnumerable<PropuestaDto> PropuestasFiltradas
+    {
+        get
+        {
+            IEnumerable<PropuestaDto> q = _propuestas;
+            if (_propFiltroZona is { } zona)
+                q = q.Where(p => p.IdZonaDestino == zona);
+            if (_propFiltroDesde is { } desde)
+                q = q.Where(p => p.FechaCreacion.EnZonaProyecto().Date >= desde.Date);
+            if (_propFiltroHasta is { } hasta)
+                q = q.Where(p => p.FechaCreacion.EnZonaProyecto().Date <= hasta.Date);
+            return q;
+        }
+    }
 
     // Historial de inventario (vista global con filtros).
     private List<MovimientoHistorialDto> _historial = new();
@@ -931,6 +991,15 @@
         if (error is not null) _snackbar.Add(error, Severity.Error);
         _propuestas = datos ?? new();
         _cargandoPropuestas = false;
+    }
+
+    private async Task LimpiarFiltrosPropuestas()
+    {
+        _filtroEstatus = null;
+        _propFiltroZona = null;
+        _propFiltroDesde = null;
+        _propFiltroHasta = null;
+        await CargarPropuestas();
     }
 
     private async Task CargarHistorial()
@@ -1204,5 +1273,114 @@
         var dialogo = await _dialogo.ShowAsync<DialogoConfirmacion>(titulo, parametros, opciones);
         var resultado = await dialogo.Result;
         return resultado is { Canceled: false, Data: true };
+    }
+
+    // ===================== Exportación a Excel =====================
+
+    // Genera el libro XLSX y dispara la descarga. 'titulo' es el nombre de la hoja de Excel.
+    // 'titulos' (opcional) son líneas de encabezado que se escriben arriba de la tabla.
+    private async Task ExportarAsync(string titulo, string[] columnas, IEnumerable<object?[]> filas,
+        IEnumerable<string>? titulos = null)
+    {
+        if (_exportando) return;
+        _exportando = true;
+        try
+        {
+            var archivo = ExportadorExcel.Crear(columnas, filas, titulo, titulos);
+            await _descarga.GuardarAsync($"{titulo}-{FechaProyecto.Ahora:yyyyMMdd-HHmmssfff}.xlsx", archivo);
+        }
+        catch (Exception ex)
+        {
+            _snackbar.Add($"No se pudo exportar: {ex.Message}", Severity.Error);
+        }
+        finally { _exportando = false; }
+    }
+
+    private Task ExportarCentral() => ExportarAsync(
+        "Inventario Central",
+        ["ID", "Clave", "Descripción", "Marca", "Categoría", "Color", "Talla", "Existencia", "Stock mínimo"],
+        CentralFiltrado.Select(x => new object?[]
+        {
+            x.IdProducto, x.CodigoClave, x.Descripcion, x.Marca, x.Categoria, x.Color, x.Talla, x.Cantidad, x.StockMini
+        }));
+
+    private Task ExportarZona()
+    {
+        if (_zonaSeleccionada is null) return Task.CompletedTask;
+        var nombreZona = _zonas.FirstOrDefault(z => z.IdZona == _zonaSeleccionada.Value)?.Descripcion
+                         ?? $"Zona {_zonaSeleccionada.Value}";
+        return ExportarAsync(
+            nombreZona,
+            ["ID", "Clave", "Descripción", "Marca", "Categoría", "Color", "Talla", "Existencia"],
+            ZonaFiltrado.Select(x => new object?[]
+            {
+                x.IdProducto, x.CodigoClave, x.Descripcion, x.Marca, x.Categoria, x.Color, x.Talla, x.Cantidad
+            }));
+    }
+
+    // Exporta el detalle (artículos) de la propuesta seleccionada en el panel lateral.
+    // El título de la hoja es la zona destino de la propuesta.
+    private Task ExportarDetallePropuesta()
+    {
+        if (_propuestaDetalle is null) return Task.CompletedTask;
+        var p = _propuestaDetalle;
+        var zona = string.IsNullOrWhiteSpace(p.ZonaDestino) ? $"Zona #{p.IdZonaDestino}" : p.ZonaDestino!;
+        // Bloque de títulos arriba de la tabla (zona, estatus y fechas de cabecera).
+        // La fecha de confirmación solo aparece si la propuesta está confirmada.
+        var titulos = new List<string>
+        {
+            $"Zona: {zona}",
+            $"Estatus: {p.Estatus}",
+            $"Fecha de la propuesta: {p.FechaCreacion.EnZonaProyecto().DateTime:dd/MM/yyyy HH:mm}"
+        };
+        if (EsConfirmada(p.Estatus) && p.FechaResolucion is { } fr)
+            titulos.Add($"Fecha de confirmación: {fr.EnZonaProyecto().DateTime:dd/MM/yyyy HH:mm}");
+
+        return ExportarAsync(
+            zona,
+            ["Clave", "Producto", "Marca", "Categoría", "Cantidad"],
+            p.Detalles.Select(d => new object?[]
+            {
+                d.CodigoClave,
+                d.Producto ?? $"Producto #{d.IdProducto}",
+                d.Marca,
+                d.Categoria,
+                d.Cantidad
+            }),
+            titulos);
+    }
+
+    // ===================== Búsqueda en filtros de selección =====================
+
+    // Estatus de propuesta: valores fijos. El valor almacenado es la clave en mayúsculas.
+    private static readonly string[] _estatusPropuesta = { "PENDIENTE", "CONFIRMADA", "RECHAZADA" };
+
+    private static string EtiquetaEstatus(string? estatus) => estatus?.ToUpperInvariant() switch
+    {
+        "PENDIENTE" => "Pendiente",
+        "CONFIRMADA" => "Confirmada",
+        "RECHAZADA" => "Rechazada",
+        _ => estatus ?? string.Empty
+    };
+
+    private Task<IEnumerable<string>> BuscarEstatusPropuesta(string? valor, CancellationToken ct)
+    {
+        IEnumerable<string> origen = _estatusPropuesta;
+        if (!string.IsNullOrWhiteSpace(valor))
+            origen = origen.Where(e => EtiquetaEstatus(e).Contains(valor, StringComparison.OrdinalIgnoreCase));
+        return Task.FromResult(origen);
+    }
+
+    // Tipo de movimiento del historial: la clave backend se guarda; se muestra su etiqueta.
+    private string EtiquetaTipoMovimiento(string? clave)
+        => clave is not null && _tiposMovimiento.TryGetValue(clave, out var etiqueta) ? etiqueta : (clave ?? string.Empty);
+
+    private Task<IEnumerable<string>> BuscarTipoMovimiento(string? valor, CancellationToken ct)
+    {
+        IEnumerable<string> claves = _tiposMovimiento.Keys;
+        if (!string.IsNullOrWhiteSpace(valor))
+            claves = claves.Where(k => _tiposMovimiento[k].Contains(valor, StringComparison.OrdinalIgnoreCase));
+        return Task.FromResult(claves);
+    }
     }
 }

@@ -230,7 +230,9 @@ public class ServicioReportes
                 from z in zj.DefaultIfEmpty()
                 join cl in _db.Clasificaciones.AsNoTracking() on c.IdClasificacion equals cl.IdClasificacion into clj
                 from cl in clj.DefaultIfEmpty()
-                select new { v, c, r, z, cl };
+                join fp in _db.CatalogoFrecuenciasPago.AsNoTracking() on v.IdFrecuenciaPago equals fp.IdFrecuenciaPago into fpj
+                from fp in fpj.DefaultIfEmpty()
+                select new { v, c, r, z, cl, fp };
 
         if (f.IdZona is { } zona) q = q.Where(x => x.r != null && x.r.IdZona == zona);
         if (f.AltaDesde is { } desde) q = q.Where(x => x.c.FechaAlta >= desde);
@@ -265,7 +267,9 @@ public class ServicioReportes
                 x.cl?.Descripcion,
                 x.c.FechaAlta,
                 x.z?.Descripcion,
-                x.c.Observaciones);
+                x.c.Observaciones,
+                x.fp?.DiasPeriodo ?? 0,
+                x.fp?.Descripcion);
         })
         .Where(x => x.TotalPendiente > 0)
         .OrderByDescending(x => x.DiasTranscurridos)
