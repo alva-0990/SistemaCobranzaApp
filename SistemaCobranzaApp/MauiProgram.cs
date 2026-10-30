@@ -32,7 +32,8 @@ public static class MauiProgram
 
         // Add device-specific services used by the SistemaCobranzaApp.Shared project
         builder.Services.AddSingleton<IFormFactor, FormFactor>();
-
+        builder.Services.AddSingleton<IEnlaceExterno, EnlaceExternoMaui>();
+        
         builder.Services.AddMauiBlazorWebView();
 
         // MudBlazor

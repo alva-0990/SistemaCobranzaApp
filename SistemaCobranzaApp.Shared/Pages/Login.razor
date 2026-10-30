@@ -11,6 +11,7 @@
 @inject IFormFactor FormFactor
 @using SistemaCobranzaApp.Shared.Theme
 @using SistemaCobranzaApp.Shared.Components
+@inject IEnlaceExterno EnlaceExterno
 
 <div class="login-page @(EsEntornoMovil ? "login-movil" : "")">
     <main class="login-container">
@@ -52,7 +53,9 @@
                 @(_ocupado ? "Verificando acceso..." : "Entrar")
             </button>
             <p class="login-ayuda">
-                <a href="https://alva-0990.github.io/alva-0990.github.oi/" target="_blank" rel="noopener noreferrer">
+                <a href="https://alva-0990.github.io/alva-0990.github.oi/"
+                   @onclick="AbrirAyuda"
+                   @onclick:preventDefault="true">
                     ¿Cómo funciona Cobragil?
                 </a>
             </p>
@@ -166,5 +169,11 @@
             _ocupado = false;
             StateHasChanged();
         }
+    }
+    
+    private async Task AbrirAyuda()
+    {
+        await EnlaceExterno.AbrirAsync(
+            "https://alva-0990.github.io/alva-0990.github.oi/");
     }
 }
