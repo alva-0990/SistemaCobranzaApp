@@ -351,6 +351,11 @@ private static byte[] ConstruirTicketPagoCompacto(TicketPagoDto ticket)
     bytes.AddRange(new byte[] { 0x1B, 0x45, 0x01 });
     AgregarImporte(bytes, ticket.MontoAnterior is null ? "PAGO REC:" : "MONTO NVO:", ticket.MontoPagado, ancho);
     bytes.AddRange(new byte[] { 0x1B, 0x45, 0x00 });
+    // Liquidación por acuerdo: bonificación automática y saldo perdonado (solo si aplican).
+    if (ticket.MontoBonificado > 0)
+        AgregarImporte(bytes, "BONIFIC:", ticket.MontoBonificado, ancho);
+    if (ticket.MontoCondonado > 0)
+        AgregarImporte(bytes, "CONDONADO:", ticket.MontoCondonado, ancho);
     AgregarLinea(bytes, Separador(ancho));
     bytes.AddRange(new byte[] { 0x1B, 0x45, 0x01 });
     AgregarImporte(bytes, "SALDO ACT:", ticket.SaldoActual, ancho);
@@ -450,6 +455,11 @@ private static byte[] ConstruirTicketPago(TicketPagoDto ticket)
     bytes.AddRange(new byte[] { 0x1B, 0x45, 0x01 });
     AgregarImporte(bytes, ticket.MontoAnterior is null ? "PAGO RECIBIDO:" : "MONTO NUEVO:", ticket.MontoPagado, ancho);
     bytes.AddRange(new byte[] { 0x1B, 0x45, 0x00 });
+    // Liquidación por acuerdo: bonificación automática y saldo perdonado (solo si aplican).
+    if (ticket.MontoBonificado > 0)
+        AgregarImporte(bytes, "BONIFICACION:", ticket.MontoBonificado, ancho);
+    if (ticket.MontoCondonado > 0)
+        AgregarImporte(bytes, "SALDO CONDONADO:", ticket.MontoCondonado, ancho);
     AgregarLinea(bytes, Separador(ancho));
     bytes.AddRange(new byte[] { 0x1B, 0x45, 0x01 });
     AgregarImporte(bytes, "SALDO ACTUAL:", ticket.SaldoActual, ancho);

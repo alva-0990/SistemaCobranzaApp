@@ -77,13 +77,13 @@
             <MudGrid Class="my-3">
                 <MudItem xs="12" sm="4"><MudPaper Outlined="true" Class="pa-3"><MudText>Clientes disponibles</MudText><MudText Typo="Typo.h5">@Local.ClientesDisponibles().Count</MudText></MudPaper></MudItem>
                 <MudItem xs="12" sm="4"><MudPaper Outlined="true" Class="pa-3"><MudText>Ventas capturadas</MudText><MudText Typo="Typo.h5">@Local.Estado.Operaciones.Where(o => o.Venta is not null).Sum(o => o.Venta!.TotalFinal).ToString("C2")</MudText></MudPaper></MudItem>
-                <MudItem xs="12" sm="4"><MudPaper Outlined="true" Class="pa-3"><MudText>Abonos recibidos</MudText><MudText Typo="Typo.h5">@Local.Estado.Operaciones.Where(o => o.Pago is not null).Sum(o => o.Pago!.MontoAbona).ToString("C2")</MudText></MudPaper></MudItem>
+                <MudItem xs="12" sm="4"><MudPaper Outlined="true" Class="pa-3"><MudText>Abonos recibidos</MudText><MudText Typo="Typo.h5">@Local.Estado.Operaciones.Where(o => o.Pago is not null && !ServicioJornadaLocal.EsCondonacion(o)).Sum(o => o.Pago!.MontoAbona).ToString("C2")</MudText></MudPaper></MudItem>
             </MudGrid>
             <MudText>Confirmadas: @Local.Estado.Operaciones.Count(o => o.Aplicada) · Pendientes: @Local.Pendientes · Con error: @Local.Estado.Operaciones.Count(o => !o.Aplicada && o.Error is not null)</MudText>
 
 
             <MudText Typo="Typo.h6" Class="mt-4">Operaciones de la jornada</MudText>
-            <MudTable Items="Local.Estado.Operaciones.OrderByDescending(o => o.FechaCaptura)" Dense="true" Breakpoint="Breakpoint.Sm">
+            <MudTable Items="Local.Estado.Operaciones.Where(o => !ServicioJornadaLocal.EsCondonacion(o)).OrderByDescending(o => o.FechaCaptura)" Dense="true" Breakpoint="Breakpoint.Sm">
                 <HeaderContent><MudTh>Referencia</MudTh><MudTh>Operación</MudTh><MudTh>Monto</MudTh><MudTh>Estado</MudTh></HeaderContent>
                 <RowTemplate>
                     <MudTd DataLabel="Referencia">@Referencia(context)</MudTd>

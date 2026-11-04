@@ -225,6 +225,8 @@ CREATE TABLE Clientes
     -- TIMESTAMPTZ conserva el instante; la zona horaria se aplica al consultar o mostrar.
     FechaAlta           TIMESTAMPTZ  NOT NULL DEFAULT now(),
     Estatus             SMALLINT     NOT NULL DEFAULT 1 CHECK (Estatus IN (0, 1)),
+    NotificarWhatsApp   SMALLINT     NOT NULL DEFAULT 1 CHECK (NotificarWhatsApp IN (0, 1)),
+    ClienteUuid         UUID,                  -- Identificador del cliente capturado offline (jornada)
     Observaciones       VARCHAR(500),
     IdUsuarioRegistro   BIGINT       NOT NULL,
     -- TIMESTAMPTZ conserva el instante; la zona horaria se aplica al consultar o mostrar.
@@ -847,6 +849,25 @@ CREATE TABLE VentaUnificaciones (
     CONSTRAINT fk_unif_venta_nueva FOREIGN KEY (IdVentaNueva) REFERENCES Venta (IdVenta) ON DELETE RESTRICT,
     CONSTRAINT fk_unif_venta_vieja FOREIGN KEY (IdVentaVieja) REFERENCES Venta (IdVenta) ON DELETE RESTRICT,
     CONSTRAINT fk_unif_usuario FOREIGN KEY (IdUsuarioRegistro) REFERENCES Usuarios (IdUsuario) ON DELETE RESTRICT
+);
+
+CREATE TABLE ColaMensajesWhatsapp (
+    id             BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    telefono       VARCHAR(20)  NOT NULL,                       -- Número con código de país (ej: '521234567890')
+    mensaje        TEXT         NOT NULL,                       -- El texto dinámico (sea Pago o Venta)
+    estado         VARCHAR(20)  NOT NULL DEFAULT 'Pendiente',   -- 'Pendiente', 'Procesando', 'Enviado', 'Fallido'
+    intentos       INT          NOT NULL DEFAULT 0,             -- Contador para reintentos automáticos (máximo 3)
+    tipo_origen    VARCHAR(20),                                 -- 'VENTA' | 'PAGO' (trazabilidad; informativo)
+    id_venta       BIGINT,                                      -- Referencia informativa (sin FK dura: tabla de paso)
+    id_pago        BIGINT,                                      -- Referencia informativa (sin FK dura: tabla de paso)
+    error_log      TEXT,                                        -- Detalle técnico del último fallo de envío
+    fecha_creacion TIMESTAMPTZ  NOT NULL DEFAULT now(),         -- Entrada al servidor central
+    fecha_envio    TIMESTAMPTZ,                                 -- Entrega exitosa a Evolution API
+    CONSTRAINT chk_estado_whatsapp
+        CHECK (estado IN ('Pendiente', 'Procesando', 'Enviado', 'Fallido')),
+
+    CONSTRAINT chk_tipo_origen_whatsapp
+        CHECK (tipo_origen IS NULL OR tipo_origen IN ('VENTA', 'PAGO'))
 );
 
 

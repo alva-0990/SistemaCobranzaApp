@@ -28,6 +28,28 @@ public static class MovimientoIds
 }
 
 /// <summary>
+/// Marcas en Pagos.Observaciones que activan un tratamiento especial del abono.
+/// </summary>
+public static class MarcasPago
+{
+    /// <summary>La detecta el trigger fn_procesar_abono_cascada para condonar por plan vigente.</summary>
+    public const string ProntoPago = "LIQUIDACION PRONTO PAGO";
+
+    /// <summary>
+    /// La detecta ServicioCobranza: tras aplicar el abono (y las bonificaciones automáticas del
+    /// trigger) registra en la misma transacción un AJUSTE que condona el saldo restante.
+    /// </summary>
+    public const string LiquidacionAcuerdo = "LIQUIDACION POR ACUERDO";
+
+    public static bool EsLiquidacionAcuerdo(string? observaciones)
+        => observaciones?.Contains(LiquidacionAcuerdo, StringComparison.OrdinalIgnoreCase) == true;
+
+    /// <summary>Antepone la marca a las observaciones capturadas por el usuario.</summary>
+    public static string ConMarca(string marca, string? observaciones)
+        => string.IsNullOrWhiteSpace(observaciones) ? marca : $"{marca} — {observaciones.Trim()}";
+}
+
+/// <summary>
 /// IDs fijos del catálogo de clasificación de clientes.
 /// </summary>
 public static class ClasificacionClienteIds

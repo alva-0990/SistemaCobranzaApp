@@ -3,6 +3,7 @@ using SistemaCobranzaApp.Domain.Cobranza;
 using SistemaCobranzaApp.Domain.Constantes;
 using SistemaCobranzaApp.Domain.Entidades;
 using SistemaCobranzaApp.Infrastructure.Persistencia;
+using SistemaCobranzaApp.Infrastructure.Whatsapp;
 using SistemaCobranzaApp.Shared.Dtos;
 
 namespace SistemaCobranzaApp.Infrastructure.Cobranza;
@@ -24,10 +25,12 @@ public class ResultadoPago
 public class ServicioCobranza
 {
     private readonly CobranzaDbContext _db;
+    private readonly ServicioColaWhatsApp _colaWhatsApp;
 
-    public ServicioCobranza(CobranzaDbContext db)
+    public ServicioCobranza(CobranzaDbContext db, ServicioColaWhatsApp colaWhatsApp)
     {
         _db = db;
+        _colaWhatsApp = colaWhatsApp;
     }
 
     public async Task<ResultadoPago> RegistrarPagoAsync(RegistrarPagoRequest req, CancellationToken ct = default)
@@ -41,11 +44,7 @@ public class ServicioCobranza
             
         if (existente is not null)
         {
-            return ResultadoPago.Ok(new RegistrarPagoResponse(
-                existente.IdPago, existente.PagoUuid, existente.IdVenta,
-                existente.FolioPago ?? string.Empty, existente.ConsecutivoPago ?? 0,
-                existente.SaldoAnterior, existente.SaldoActual, existente.MontoAbona,
-                existente.SaldoActual <= 0));
+            return ResultadoPago.Ok(await ConstruirRespuestaAsync(existente, ct));
         }
 
         var idMovimiento = req.IdMovimiento ?? MovimientoIds.Abono;
@@ -63,15 +62,17 @@ public class ServicioCobranza
             // Otra solicitud pudo confirmar el mismo UUID mientras esperábamos el bloqueo.
             var repetido = await _db.Pagos.AsNoTracking().FirstOrDefaultAsync(p => p.PagoUuid == req.PagoUuid, ct);
             if (repetido is not null)
-                return ResultadoPago.Ok(new RegistrarPagoResponse(repetido.IdPago, repetido.PagoUuid, repetido.IdVenta,
-                    repetido.FolioPago ?? "", repetido.ConsecutivoPago ?? 0, repetido.SaldoAnterior,
-                    repetido.SaldoActual, repetido.MontoAbona, repetido.SaldoActual <= 0));
+                return ResultadoPago.Ok(await ConstruirRespuestaAsync(repetido, ct));
             if (venta.IdEstatusVenta == EstatusVentaIds.Cancelada)
                 return ResultadoPago.Fallo("La venta está cancelada.");
 
             // 🎯 CORREGIDO: Se sustituyó 'TotalAbonos' por 'TotalAbonado' proveniente de tu base de datos real
-            var saldoAnterior = CalculoCobranza.CalcularSaldoAnterior(
-                venta.TotalFinal, venta.Enganche, venta.TotalAbonado);
+            // El saldo autoritativo es el SaldoPendiente que mantiene el trigger: además de los abonos
+            // descuenta las bonificaciones automáticas (racha de pagos, pronto pago), que NO suman a
+            // TotalAbonado. Se toma el menor para no aceptar un monto que el trigger rechazaría.
+            var saldoAnterior = Math.Min(
+                CalculoCobranza.CalcularSaldoAnterior(venta.TotalFinal, venta.Enganche, venta.TotalAbonado),
+                venta.SaldoPendiente);
 
             var validacion = CalculoCobranza.ValidarAbono(req.MontoAbona, saldoAnterior);
             switch (validacion)
@@ -125,23 +126,89 @@ public class ServicioCobranza
             await _db.Entry(pago).ReloadAsync(ct);
             await _db.Entry(venta).ReloadAsync(ct);
 
+            // 6. Liquidación por acuerdo: el cliente paga el monto convenido y se condona el resto.
+            // El saldo a condonar se toma DESPUÉS del abono, cuando el trigger ya aplicó la cascada y
+            // cualquier bonificación automática (racha / pronto pago). El AJUSTE usa el consecutivo
+            // siguiente, que es el que limpia el trigger de reversión si se revierte el abono.
+            if (idMovimiento == MovimientoIds.Abono && MarcasPago.EsLiquidacionAcuerdo(pago.Observaciones)
+                && venta.SaldoPendiente > 0)
+            {
+                var condonar = venta.SaldoPendiente;
+                _db.Pagos.Add(new Pago
+                {
+                    PagoUuid = Guid.NewGuid(),
+                    IdVenta = venta.IdVenta,
+                    IdCliente = venta.IdCliente,
+                    MontoAbona = condonar,
+                    IdCobrador = req.IdCobrador,
+                    FechaPago = fechaPago,
+                    IdMovimiento = MovimientoIds.Ajuste,
+                    Observaciones = $"CONDONACIÓN POR ACUERDO DE LIQUIDACIÓN (folio {folio}). Saldo perdonado de {condonar:C2}.",
+                    IdUsuarioRegistro = req.IdUsuarioRegistro,
+                    FolioPago = CalculoCobranza.FormatearFolio(MovimientoIds.Ajuste, consecutivo + 1),
+                    ConsecutivoPago = consecutivo + 1,
+                    FechaModificacion = ahora
+                });
+                await _db.SaveChangesAsync(ct);
+                await _db.Entry(venta).ReloadAsync(ct);
+            }
+
+            // Encola la notificación de WhatsApp dentro de la misma transacción, usando ya el saldo
+            // real inyectado por el trigger (disponible tras ReloadAsync). Solo Add + un SaveChanges
+            // adicional; si algo falla, el rollback revierte también el mensaje encolado.
+            // La respuesta ya trae el estado final (con condonación si fue liquidación por acuerdo),
+            // así el cliente recibe UN solo mensaje con todo el detalle.
+            var respuesta = await ConstruirRespuestaAsync(pago, ct);
+            var encolado = await _colaWhatsApp.EncolarPagoAsync(respuesta, ct);
+            if (encolado) await _db.SaveChangesAsync(ct);
+
             await tx.CommitAsync(ct);
 
-            return ResultadoPago.Ok(new RegistrarPagoResponse(
-                pago.IdPago, 
-                pago.PagoUuid, 
-                venta.IdVenta, 
-                folio, 
-                consecutivo,
-                pago.SaldoAnterior, // Datos inyectados de forma segura por el Trigger
-                pago.SaldoActual,   // Datos inyectados de forma segura por el Trigger
-                pago.MontoAbona, 
-                pago.SaldoActual <= 0));
+            // Despierta al worker solo después de confirmar la transacción.
+            if (encolado) _colaWhatsApp.Senal.Avisar();
+
+            return ResultadoPago.Ok(respuesta);
+        }
+        catch (DbUpdateException ex) when (ex.InnerException is Npgsql.PostgresException { SqlState: "P0001" } pg)
+        {
+            // Regla de negocio rechazada por el trigger (RAISE EXCEPTION): se devuelve como error
+            // controlado para que el cliente lo muestre, en lugar de un 500.
+            await tx.RollbackAsync(ct);
+            return ResultadoPago.Fallo(pg.MessageText);
         }
         catch
         {
             await tx.RollbackAsync(ct);
             throw;
         }
+    }
+
+    /// <summary>
+    /// Respuesta del pago. En una liquidación por acuerdo refleja el estado FINAL de la operación:
+    /// incluye la bonificación automática del mismo consecutivo y el AJUSTE de condonación del
+    /// consecutivo siguiente, por lo que el saldo actual queda en 0 y la cuenta como liquidada.
+    /// </summary>
+    private async Task<RegistrarPagoResponse> ConstruirRespuestaAsync(Pago p, CancellationToken ct)
+    {
+        decimal bonificado = 0m, condonado = 0m;
+        if (p.IdMovimiento == MovimientoIds.Abono && MarcasPago.EsLiquidacionAcuerdo(p.Observaciones)
+            && p.ConsecutivoPago is { } c)
+        {
+            var asociados = await _db.Pagos.AsNoTracking()
+                .Where(x => x.IdVenta == p.IdVenta && x.IdPago != p.IdPago
+                            && ((x.ConsecutivoPago == c && (x.IdMovimiento == MovimientoIds.BonificacionProntoPago
+                                                             || x.IdMovimiento == MovimientoIds.BonificacionPromocion))
+                                || (x.ConsecutivoPago == c + 1 && x.IdMovimiento == MovimientoIds.Ajuste)))
+                .Select(x => new { x.IdMovimiento, x.MontoAbona })
+                .ToListAsync(ct);
+            bonificado = asociados.Where(x => x.IdMovimiento != MovimientoIds.Ajuste).Sum(x => x.MontoAbona);
+            condonado = asociados.Where(x => x.IdMovimiento == MovimientoIds.Ajuste).Sum(x => x.MontoAbona);
+        }
+
+        var saldoFinal = Math.Max(0m, p.SaldoActual - bonificado - condonado);
+        return new RegistrarPagoResponse(
+            p.IdPago, p.PagoUuid, p.IdVenta, p.FolioPago ?? string.Empty, p.ConsecutivoPago ?? 0,
+            p.SaldoAnterior, saldoFinal, p.MontoAbona, saldoFinal <= 0,
+            MontoCondonado: condonado, MontoBonificado: bonificado);
     }
 }

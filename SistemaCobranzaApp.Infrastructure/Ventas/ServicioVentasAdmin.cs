@@ -6,6 +6,7 @@ using SistemaCobranzaApp.Domain.Enums;
 using SistemaCobranzaApp.Domain.Ventas;
 using SistemaCobranzaApp.Infrastructure.Inventario;
 using SistemaCobranzaApp.Infrastructure.Persistencia;
+using SistemaCobranzaApp.Infrastructure.Whatsapp;
 using SistemaCobranzaApp.Shared.Dtos;
 
 namespace SistemaCobranzaApp.Infrastructure.Ventas;
@@ -24,11 +25,13 @@ public class ServicioVentasAdmin
 {
     private readonly CobranzaDbContext _db;
     private readonly ServicioInventario _inventario;
+    private readonly ServicioColaWhatsApp _colaWhatsApp;
 
-    public ServicioVentasAdmin(CobranzaDbContext db, ServicioInventario inventario)
+    public ServicioVentasAdmin(CobranzaDbContext db, ServicioInventario inventario, ServicioColaWhatsApp colaWhatsApp)
     {
         _db = db;
         _inventario = inventario;
+        _colaWhatsApp = colaWhatsApp;
     }
 
     public async Task<ResultadoVenta> CrearAsync(CrearVentaRequest req, long? idUsuario = null, CancellationToken ct = default)
@@ -234,8 +237,17 @@ public class ServicioVentasAdmin
             // Se registra el usuario autenticado que originó la venta (null solo si el token no lo trae).
             await _inventario.DescontarPorVentaAsync(venta.IdVenta, idZonaCliente, stockDescuento, idUsuario, ct);
 
+            // Encola la notificación de WhatsApp DENTRO de la misma transacción (solo Add, sin guardar).
+            // Si la transacción se revierte, el mensaje tampoco se persiste.
+            var encolado = await _colaWhatsApp.EncolarVentaAsync(venta.IdVenta, ct);
+
             await _db.SaveChangesAsync(ct);
             if (tx is not null) await tx.CommitAsync(ct);
+
+            // Despierta al worker SOLO después de confirmar. Cuando tx es null el commit real lo
+            // controla el método externo (renovación); en ese caso el worker tomará el mensaje por
+            // su polling de respaldo.
+            if (encolado && tx is not null) _colaWhatsApp.Senal.Avisar();
 
             // E. Obtener el DTO de salida unificado (Pasa a la Parte 3)
             var dto = await ObtenerAsync(venta.IdVenta, ct);

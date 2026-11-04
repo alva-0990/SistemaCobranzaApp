@@ -1,0 +1,156 @@
+@page "/mensajes-whatsapp"
+
+@using MudBlazor
+@using SistemaCobranzaApp.Shared.Dtos
+
+<MudPaper Elevation="2" Rounded="true" Class="ma-2 pa-4">
+    <!-- Resumen por estado (clic para filtrar) -->
+    <div class="resumen-estados">
+        @foreach (var e in Estados)
+        {
+            <MudChip T="string"
+                     Color="@ColorEstado(e)"
+                     Variant="@(FiltroEstado == e ? Variant.Filled : Variant.Outlined)"
+                     OnClick="@(() => FiltrarEstado(e))">
+                @e: @Conteo(e)
+            </MudChip>
+        }
+        @if (FiltroEstado is not null)
+        {
+            <MudChip T="string" Variant="Variant.Text" Icon="@Icons.Material.Filled.Clear"
+                     OnClick="@(() => FiltrarEstado(null))">
+                Quitar filtro
+            </MudChip>
+        }
+    </div>
+
+    <div class="barra-acciones">
+        <MudTextField T="string"
+                      @bind-Value="Busqueda"
+                      Immediate="true"
+                      Placeholder="Buscar por teléfono, cliente, mensaje o error..."
+                      Variant="Variant.Outlined"
+                      Adornment="Adornment.Start"
+                      AdornmentIcon="@Icons.Material.Filled.Search"
+                      AdornmentColor="Color.Primary"
+                      Clearable="true"
+                      Class="buscador-remarcado" />
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.Refresh"
+                   OnClick="CargarAsync"
+                   Disabled="Cargando"
+                   Class="boton-nuevo">
+            Actualizar
+        </MudButton>
+    </div>
+
+    @if (Cargando)
+    {
+        <div class="d-flex justify-center pa-8">
+            <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+        </div>
+    }
+    else
+    {
+        <MudTable Items="Filtrados" Hover="true" Dense="true" Breakpoint="Breakpoint.Sm"
+                  Elevation="0" RowsPerPage="15" T="MensajeWhatsAppDto">
+            <HeaderContent>
+                <MudTh Style="width:6%;">#</MudTh>
+                <MudTh Style="width:12%;">Creado</MudTh>
+                <MudTh>Cliente / Teléfono</MudTh>
+                <MudTh Style="width:12%;">Origen</MudTh>
+                <MudTh Style="width:10%;">Estado</MudTh>
+                <MudTh Style="width:7%; text-align:center;">Intentos</MudTh>
+                <MudTh Style="width:12%;">Enviado</MudTh>
+                <MudTh Style="width:6%; text-align:right;">Ver</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="#">@context.Id</MudTd>
+                <MudTd DataLabel="Creado">@context.FechaCreacion.EnZonaProyecto().DateTime.ToString("dd/MM/yyyy HH:mm")</MudTd>
+                <MudTd DataLabel="Cliente / Teléfono">
+                    <b>@(string.IsNullOrWhiteSpace(context.Cliente) ? "—" : context.Cliente)</b>
+                    <div class="texto-secundario">@context.Telefono</div>
+                </MudTd>
+                <MudTd DataLabel="Origen">
+                    @(context.TipoOrigen ?? "—")
+                    @if (!string.IsNullOrWhiteSpace(context.CodigoVenta))
+                    {
+                        <div class="texto-secundario">@context.CodigoVenta</div>
+                    }
+                </MudTd>
+                <MudTd DataLabel="Estado">
+                    <MudChip T="string" Size="Size.Small" Color="@ColorEstado(context.Estado)">@context.Estado</MudChip>
+                </MudTd>
+                <MudTd DataLabel="Intentos" Style="text-align:center;">@context.Intentos</MudTd>
+                <MudTd DataLabel="Enviado">
+                    @(context.FechaEnvio is null ? "—" : context.FechaEnvio.Value.EnZonaProyecto().DateTime.ToString("dd/MM/yyyy HH:mm"))
+                </MudTd>
+                <MudTd DataLabel="Ver" Style="text-align:right;">
+                    <MudIconButton Icon="@(Seleccionado == context.Id ? Icons.Material.Filled.ExpandLess : Icons.Material.Filled.ExpandMore)"
+                                   Size="Size.Small" Color="Color.Info"
+                                   aria-label="Ver mensaje"
+                                   OnClick="@(() => AlternarDetalle(context.Id))" />
+                </MudTd>
+            </RowTemplate>
+            <ChildRowContent>
+                @if (Seleccionado == context.Id)
+                {
+                    <MudTr>
+                        <td colspan="8" class="pa-3">
+                            <MudText Typo="Typo.subtitle2">Mensaje</MudText>
+                            <pre class="texto-mensaje">@context.Mensaje</pre>
+                            @if (!string.IsNullOrWhiteSpace(context.ErrorLog))
+                            {
+                                <MudAlert Severity="Severity.Error" Dense="true" Class="mt-2">@context.ErrorLog</MudAlert>
+                            }
+                        </td>
+                    </MudTr>
+                }
+            </ChildRowContent>
+            <NoRecordsContent>
+                <div class="pa-8 text-center">
+                    <MudIcon Icon="@Icons.Material.Filled.Chat" Size="Size.Large" Color="Color.Secondary" />
+                    <MudText Color="Color.Secondary" Class="mt-2">No hay mensajes que coincidan.</MudText>
+                </div>
+            </NoRecordsContent>
+            <PagerContent>
+                <MudTablePager InfoFormat="{first_item}-{last_item} de {all_items}" RowsPerPageString="Filas:" />
+            </PagerContent>
+        </MudTable>
+    }
+</MudPaper>
+
+<style>
+    .resumen-estados {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
+        margin-bottom: 12px;
+    }
+
+    .barra-acciones {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 16px;
+    }
+
+    .barra-acciones .buscador-remarcado { flex: 1 1 auto; min-width: 0; }
+    .boton-nuevo { white-space: nowrap; flex: 0 0 auto; }
+    .buscador-remarcado .mud-input-outlined-border { border-width: 2px; }
+
+    .texto-secundario { font-size: 0.8rem; opacity: 0.7; }
+
+    .texto-mensaje {
+        white-space: pre-wrap;
+        word-break: break-word;
+        font-family: inherit;
+        font-size: 0.85rem;
+        background: var(--mud-palette-background-gray);
+        border-radius: 6px;
+        padding: 12px;
+        margin: 6px 0 0 0;
+        max-width: 640px;
+    }
+</style>

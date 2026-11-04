@@ -23,4 +23,8 @@ public sealed record TicketPagoDto(
     decimal? MontoAnterior = null,
     // Formato del comprobante: true = ticket compacto; false = ticket detallado (actual).
     // Se resuelve desde el parámetro de sistema TICKET_PAGO_COMPACTO.
-    bool Compacto = false);
+    bool Compacto = false,
+    // Liquidación por acuerdo: saldo perdonado y bonificación automática aplicada. 0 si no aplica;
+    // el comprobante solo muestra estas líneas cuando son mayores a cero.
+    decimal MontoCondonado = 0m,
+    decimal MontoBonificado = 0m);

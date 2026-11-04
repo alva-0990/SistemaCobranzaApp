@@ -49,15 +49,15 @@ CREATE INDEX idx_clientesfotos_cliente ON ClientesFotos(IdCliente);
 -- 7. ÍNDICES PARA BÚSQUEDAS Y REPORTES
 -- ---------------------------------------------------------------------
 
-CREATE INDEX IX_Gastos_FechaON Gastos (FechaGasto DESC);
-CREATE INDEX IX_Gastos_EstatusON Gastos (Estatus);
-CREATE INDEX IX_Gastos_Categoria_FechaON Gastos (IdCategoriaGasto, FechaGasto DESC);
-CREATE INDEX IX_Gastos_Zona_FechaON Gastos (IdZona, FechaGasto DESC);
-CREATE INDEX IX_Gastos_Cobrador_FechaON Gastos (IdCobrador, FechaGasto DESC);
-CREATE INDEX IX_Gastos_Vendedor_FechaON Gastos (IdVendedor, FechaGasto DESC);
-CREATE INDEX IX_GastosPagos_Gasto_FechaON GastosPagos (IdGasto, FechaPago DESC);
-CREATE INDEX IX_MovimientosCuentaGasto_Cuenta_FechaON MovimientosCuentaGasto (IdCuentaGasto, FechaMovimiento DESC);
-CREATE INDEX IX_GastosComprobantes_GastoON GastosComprobantes (IdGasto);
+CREATE INDEX IX_Gastos_Fecha ON Gastos (FechaGasto DESC);
+CREATE INDEX IX_Gastos_Estatus ON Gastos (Estatus);
+CREATE INDEX IX_Gastos_Categoria_Fecha ON Gastos (IdCategoriaGasto, FechaGasto DESC);
+CREATE INDEX IX_Gastos_Zona_Fecha ON Gastos (IdZona, FechaGasto DESC);
+CREATE INDEX IX_Gastos_Cobrador_Fecha ON Gastos (IdCobrador, FechaGasto DESC);
+CREATE INDEX IX_Gastos_Vendedor_Fecha ON Gastos (IdVendedor, FechaGasto DESC);
+CREATE INDEX IX_GastosPagos_Gasto_Fecha ON GastosPagos (IdGasto, FechaPago DESC);
+CREATE INDEX IX_MovimientosCuentaGasto_Cuenta_Fecha ON MovimientosCuentaGasto (IdCuentaGasto, FechaMovimiento DESC);
+CREATE INDEX IX_GastosComprobantes_Gasto ON GastosComprobantes (IdGasto);
 CREATE UNIQUE INDEX IF NOT EXISTS UX_CategoriaGasto_Nombre ON CatalogoCategoriasGasto (LOWER(Nombre));
 CREATE INDEX idx_unificaciones_venta_nueva ON VentaUnificaciones(IdVentaNueva);
 CREATE INDEX idx_unificaciones_venta_vieja ON VentaUnificaciones(IdVentaVieja);
@@ -65,3 +65,13 @@ CREATE INDEX IF NOT EXISTS ix_vendedores_usuario_jornada ON vendedores(idusuario
 CREATE INDEX IF NOT EXISTS ix_cobradores_usuario_jornada ON cobradores(idusuario);
 CREATE UNIQUE INDEX IF NOT EXISTS ux_ventas_ventauuid ON venta(ventauuid);
 CREATE UNIQUE INDEX IF NOT EXISTS ux_ventaunificaciones_origen ON VentaUnificaciones(IdVentaVieja);
+
+-- Índice parcial: la búsqueda de mensajes pendientes es instantánea porque
+-- Postgres solo indexa las filas que realmente faltan por enviarse.
+CREATE INDEX idx_cola_whatsapp_pendientes ON colamensajeswhatsapp (estado, intentos, fecha_creacion) WHERE estado = 'Pendiente';
+
+-- Índice de apoyo para la purga periódica de mensajes ya enviados.
+CREATE INDEX idx_cola_whatsapp_envio ON colamensajeswhatsapp (estado, fecha_envio) WHERE estado = 'Enviado';
+
+-- Idempotencia del alta de clientes capturados offline (jornada)
+CREATE UNIQUE INDEX IF NOT EXISTS ix_clientes_clienteuuid ON clientes (ClienteUuid);

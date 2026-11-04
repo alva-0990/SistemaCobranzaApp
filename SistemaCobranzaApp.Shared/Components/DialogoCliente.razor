@@ -31,14 +31,20 @@
                 <MudItem xs="12" sm="6">
                     <MudTextField T="string" Label="Teléfono principal" @bind-Value="Modelo.TelefonoPrincipal"
                                   Required="true" RequiredError="El teléfono principal es obligatorio."
+                                  Validation="@((Func<string?, string?>)ValidarTelefonoObligatorio)"
+                                  MaxLength="10" InputMode="InputMode.tel"
                                   Variant="Variant.Outlined" Margin="Margin.Dense" />
                 </MudItem>
                 <MudItem xs="12" sm="6">
                     <MudTextField T="string" Label="Teléfono secundario" @bind-Value="Modelo.TelefonoSecundario"
+                                  Validation="@((Func<string?, string?>)ValidarTelefonoOpcional)"
+                                  MaxLength="10" InputMode="InputMode.tel"
                                   Variant="Variant.Outlined" Margin="Margin.Dense" />
                 </MudItem>
                 <MudItem xs="12" sm="6">
                     <MudTextField T="string" Label="Email" @bind-Value="Modelo.Email"
+                                  Validation="@((Func<string?, string?>)ValidarEmail)"
+                                  InputMode="InputMode.email"
                                   Variant="Variant.Outlined" Margin="Margin.Dense" />
                 </MudItem>
                 <MudItem xs="12" sm="6">
@@ -173,6 +179,28 @@
             Modelo.IdRuta = null;
         if (Modelo.IdVendedor is { } v && Vendedores.FirstOrDefault(x => x.IdVendedor == v)?.IdZona != nuevaZona)
             Modelo.IdVendedor = null;
+    }
+
+    private static string? ValidarTelefonoObligatorio(string? valor)
+        => string.IsNullOrWhiteSpace(valor) ? null : ValidarTelefonoOpcional(valor); // "Required" ya cubre el vacío
+
+    private static string? ValidarTelefonoOpcional(string? valor)
+    {
+        if (string.IsNullOrWhiteSpace(valor)) return null;
+        var v = valor.Trim();
+        return v.Length == 10 && v.All(char.IsAsciiDigit)
+            ? null
+            : "El teléfono debe tener exactamente 10 dígitos numéricos.";
+    }
+
+    private static string? ValidarEmail(string? valor)
+    {
+        if (string.IsNullOrWhiteSpace(valor)) return null;
+        return System.Net.Mail.MailAddress.TryCreate(valor.Trim(), out var addr)
+               && addr.Address == valor.Trim()
+               && addr.Host.Contains('.')
+            ? null
+            : "El correo electrónico no es válido.";
     }
 
     private void Cancelar() => MudDialog.Cancel();

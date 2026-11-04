@@ -84,7 +84,8 @@ public static class MauiProgram
         // Producción: la API se expone por Cloudflare Tunnel en el dominio propio.
         // Para pruebas locales con dispositivo físico, reemplaza por la IP LAN de tu máquina
         // (p. ej. "http://192.168.3.17:8081") o un túnel temporal de desarrollo.
-        const string ApiBaseUrlDispositivoFisico = "https://api.cobragil.com";
+        //const string ApiBaseUrlDispositivoFisico = "https://api.cobragil.com";
+        const string ApiBaseUrlDispositivoFisico = "http://192.168.1.5:8081";
         const string ApiBaseUrlEmuladorAndroid   = "http://10.0.2.2:8081";
         const string ApiBaseUrlEscritorio         = "http://localhost:8081";
 

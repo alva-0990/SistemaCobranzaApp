@@ -317,7 +317,7 @@
 
             @if (ModoJornada)
             {
-                @foreach (var op in Jornada.Estado.Operaciones.Where(o => o.Pago?.IdVenta == v.IdVenta && !o.Aplicada))
+                @foreach (var op in Jornada.Estado.Operaciones.Where(o => o.Pago?.IdVenta == v.IdVenta && !o.Aplicada && !SistemaCobranzaApp.Shared.Services.ServicioJornadaLocal.EsCondonacion(o)))
                 {
                     <MudAlert Severity="@(op.Error is null ? Severity.Info : Severity.Warning)" Class="mb-2">
                         Abono local: @op.Pago!.MontoAbona.ToString("C2") · @(op.Error ?? "Pendiente de confirmación") · @op.Uuid.ToString("N")

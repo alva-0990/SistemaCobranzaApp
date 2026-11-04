@@ -1,5 +1,6 @@
 @using MudBlazor
 @using SistemaCobranzaApp.Shared.Dtos
+@using SistemaCobranzaApp.Domain.Seguridad
 
 <MudDialog Class="@ClaseDialogo">
     <TitleContent>
@@ -60,10 +61,34 @@
                         <MudTextField T="string"
                                       Label="@(EsNuevo ? "Contraseña" : "Nueva contraseña (opcional)")"
                                       @bind-Value="Modelo.Password"
-                                      InputType="InputType.Password"
+                                      @bind-Value:after="RevalidarConfirmacion"
+                                      Immediate="true"
+                                      InputType="@(_mostrarPassword ? InputType.Text : InputType.Password)"
+                                      Adornment="Adornment.End"
+                                      AdornmentIcon="@(_mostrarPassword ? Icons.Material.Filled.VisibilityOff : Icons.Material.Filled.Visibility)"
+                                      AdornmentAriaLabel="@(_mostrarPassword ? "Ocultar contraseña" : "Mostrar contraseña")"
+                                      OnAdornmentClick="() => _mostrarPassword = !_mostrarPassword"
                                       Required="@EsNuevo"
                                       RequiredError="La contraseña es obligatoria."
-                                      HelperText="@(EsNuevo ? null : "Déjala vacía para conservar la actual.")"
+                                      Validation="@((Func<string?, string?>)ValidarPassword)"
+                                      HelperText="@(EsNuevo ? ValidacionUsuario.RequisitosPassword : "Déjala vacía para conservar la actual. " + ValidacionUsuario.RequisitosPassword)"
+                                      autocomplete="new-password"
+                                      Variant="Variant.Outlined"
+                                      Margin="Margin.Dense" />
+                    </MudItem>
+
+                    <MudItem xs="12">
+                        <MudTextField T="string" @ref="_campoConfirmacion"
+                                      Label="Confirmar contraseña"
+                                      @bind-Value="_confirmacion"
+                                      Immediate="true"
+                                      InputType="@(_mostrarConfirmacion ? InputType.Text : InputType.Password)"
+                                      Adornment="Adornment.End"
+                                      AdornmentIcon="@(_mostrarConfirmacion ? Icons.Material.Filled.VisibilityOff : Icons.Material.Filled.Visibility)"
+                                      AdornmentAriaLabel="@(_mostrarConfirmacion ? "Ocultar contraseña" : "Mostrar contraseña")"
+                                      OnAdornmentClick="() => _mostrarConfirmacion = !_mostrarConfirmacion"
+                                      Validation="@((Func<string?, string?>)ValidarConfirmacion)"
+                                      autocomplete="new-password"
                                       Variant="Variant.Outlined"
                                       Margin="Margin.Dense" />
                     </MudItem>
@@ -108,6 +133,30 @@
     private string? _error;
     private bool _guardando;
     private MudForm _form = null!;
+
+    // Vacía: la cubre Required en alta; en edición significa "conservar la actual".
+    private static string? ValidarPassword(string? valor)
+        => string.IsNullOrEmpty(valor) ? null : ValidacionUsuario.ValidarPassword(valor);
+
+    private bool _mostrarPassword;
+    private bool _mostrarConfirmacion;
+    private string? _confirmacion;
+    private MudTextField<string> _campoConfirmacion = null!;
+
+    // Solo se exige cuando se escribe una contraseña (alta, o cambio en edición).
+    private string? ValidarConfirmacion(string? valor)
+    {
+        if (string.IsNullOrEmpty(Modelo.Password)) return null;
+        if (string.IsNullOrEmpty(valor)) return "Confirma la contraseña.";
+        return valor == Modelo.Password ? null : "Las contraseñas no coinciden.";
+    }
+
+    // Al cambiar la contraseña se vuelve a evaluar la confirmación ya escrita.
+    private async Task RevalidarConfirmacion()
+    {
+        if (_campoConfirmacion is not null && !string.IsNullOrEmpty(_confirmacion))
+            await _campoConfirmacion.ValidateAsync();
+    }
     private bool _formValido;
 
     // Rol actualmente seleccionado en el autocomplete; se sincroniza con Modelo.IdRol.

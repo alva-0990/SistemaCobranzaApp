@@ -7,7 +7,34 @@ public static class ValidacionUsuario
 {
     public const int MaxUsuario = 50;
     public const int MaxNombre = 100;
-    public const int MinPassword = 6;
+    public const int MinPassword = 8;
+
+    /// <summary>Texto de ayuda con los requisitos de una contraseña segura (para mostrar en pantalla).</summary>
+    public const string RequisitosPassword =
+        "Mínimo 8 caracteres, con mayúscula, minúscula, número y símbolo, sin espacios.";
+
+    /// <summary>
+    /// Valida que la contraseña sea segura. Devuelve el primer requisito que no cumple
+    /// o null si es válida. Se usa igual en la API y en los formularios.
+    /// </summary>
+    public static string? ValidarPassword(string? password)
+    {
+        if (string.IsNullOrEmpty(password))
+            return "La contraseña es obligatoria.";
+        if (password.Length < MinPassword)
+            return $"La contraseña debe tener al menos {MinPassword} caracteres.";
+        if (password.Any(char.IsWhiteSpace))
+            return "La contraseña no debe contener espacios.";
+        if (!password.Any(char.IsUpper))
+            return "La contraseña debe incluir al menos una letra mayúscula.";
+        if (!password.Any(char.IsLower))
+            return "La contraseña debe incluir al menos una letra minúscula.";
+        if (!password.Any(char.IsDigit))
+            return "La contraseña debe incluir al menos un número.";
+        if (password.All(char.IsLetterOrDigit))
+            return "La contraseña debe incluir al menos un símbolo (por ejemplo ! @ # $ % *).";
+        return null;
+    }
 
     /// <summary>
     /// Valida los campos comunes de usuario.
@@ -35,8 +62,8 @@ public static class ValidacionUsuario
         if (requerirPassword && !tienePassword)
             return "La contraseña es obligatoria.";
 
-        if (tienePassword && password!.Length < MinPassword)
-            return $"La contraseña debe tener al menos {MinPassword} caracteres.";
+        if (tienePassword)
+            return ValidarPassword(password);
 
         return null;
     }

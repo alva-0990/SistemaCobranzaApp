@@ -252,8 +252,9 @@
         }
         else
         {
+            // La condonación de una liquidación por acuerdo no es efectivo recibido.
             _pagos = operacionesHoy
-                .Where(o => o.Pago is not null)
+                .Where(o => o.Pago is not null && !ServicioJornadaLocal.EsCondonacion(o))
                 .Select(o =>
                 {
                     var pago = o.Pago!;

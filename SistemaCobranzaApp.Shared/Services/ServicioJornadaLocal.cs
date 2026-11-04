@@ -175,9 +175,10 @@ public sealed class ServicioJornadaLocal : IDisposable
     }
 
     /// <summary>
-    /// Liquidación por ACUERDO sin conexión. Se registran DOS operaciones: (1) el abono por el
-    /// monto acordado y (2) un ajuste (IdMovimiento = AJUSTE) que condona el saldo restante.
-    /// Ambas se sincronizan como pagos normales. Localmente la cuenta queda liquidada (saldo 0).
+    /// Liquidación por ACUERDO sin conexión. Se registra UN solo abono por el monto acordado con la
+    /// marca "LIQUIDACION POR ACUERDO": al sincronizar, central aplica el abono, las bonificaciones
+    /// automáticas y condona el saldo restante en la misma transacción. Localmente la cuenta queda
+    /// liquidada (saldo 0) y el ticket muestra el monto condonado estimado con el saldo local.
     /// </summary>
     public async Task<Guid> GuardarLiquidacionAcuerdoAsync(long venta, decimal montoAcordado, string? observaciones)
     {
@@ -185,27 +186,27 @@ public sealed class ServicioJornadaLocal : IDisposable
         {
             if (m <= 0 || m > saldo)
                 throw new InvalidOperationException("El monto acordado debe ser positivo y no superar el saldo local.");
-            var condonado = saldo - m;
-            var operaciones = new List<OperacionCobro>
+            return new[]
             {
-                // (1) Abono por el monto convenido. Es el ticket principal; se muestra como liquidado.
-                new(m, MovimientoIds.Abono, observaciones,
+                new OperacionCobro(m, MovimientoIds.Abono,
+                    MarcasPago.ConMarca(MarcasPago.LiquidacionAcuerdo, observaciones),
                     EsPrincipal: true, Concepto: "LIQUIDACION POR ACUERDO · PENDIENTE DE CONFIRMACIÓN",
-                    SaldoResultante: 0m)
+                    SaldoResultante: 0m, MontoCondonado: saldo - m)
             };
-            // (2) Ajuste que condona el resto (si lo hay). Resta saldo localmente y se sincroniza como pago.
-            if (condonado > 0)
-                operaciones.Add(new OperacionCobro(condonado, MovimientoIds.Ajuste,
-                    $"CONDONACIÓN POR ACUERDO DE LIQUIDACIÓN. Saldo perdonado de {condonado:C2}.",
-                    EsPrincipal: false, Concepto: null, SaldoResultante: 0m));
-            return operaciones;
         });
     }
+
+    /// <summary>
+    /// True si la operación es una condonación (AJUSTE) de liquidación por acuerdo capturada con una
+    /// versión anterior de la app (antes se enviaba como operación aparte). No es dinero cobrado ni
+    /// lleva ticket: se sincroniza con central, pero no se muestra como abono ni suma a lo recaudado.
+    /// </summary>
+    public static bool EsCondonacion(OperacionJornadaLocal o) => o.Pago?.IdMovimiento == MovimientoIds.Ajuste;
 
     // Una operación de pago a registrar localmente (abono o ajuste).
     private sealed record OperacionCobro(
         decimal Monto, long IdMovimiento, string? Observaciones,
-        bool EsPrincipal, string? Concepto, decimal SaldoResultante);
+        bool EsPrincipal, string? Concepto, decimal SaldoResultante, decimal MontoCondonado = 0m);
 
     // Réplica local de la condición de PRONTO PAGO del trigger central (fn_procesar_abono_cascada):
     // existe un VentaPlan Activo cuyo NumeroMeses >= meses transcurridos del crédito, y el monto
@@ -270,7 +271,8 @@ public sealed class ServicioJornadaLocal : IDisposable
                         DatosTicket(cliente), v.CodigoVenta ?? $"V{v.IdVenta}", v.IdVenta,
                         saldo, op.Monto, op.SaldoResultante,
                         op.Concepto, _api.Sesion?.NombreCompleto, op.SaldoResultante <= 0,
-                        Compacto: EmpresaGlobal.TicketPagoCompacto);
+                        Compacto: EmpresaGlobal.TicketPagoCompacto,
+                        MontoCondonado: op.MontoCondonado);
                     uuidPrincipal = uuid;
                 }
                 await Agregar(o);
@@ -423,7 +425,8 @@ public sealed class ServicioJornadaLocal : IDisposable
                 Compacto: EmpresaGlobal.TicketPagoCompacto);
         }
         return o.PagoCentral is { } p ? ticket with { FolioPago = p.FolioPago, SaldoAnterior = p.SaldoAnterior,
-            SaldoActual = p.SaldoActual, MontoPagado = p.MontoAbona, Liquidada = p.Liquidada, Movimiento = "ABONO" } : ticket;
+            SaldoActual = p.SaldoActual, MontoPagado = p.MontoAbona, Liquidada = p.Liquidada, Movimiento = "ABONO",
+            MontoCondonado = p.MontoCondonado, MontoBonificado = p.MontoBonificado } : ticket;
     }
 
     public List<ClienteDto> BuscarClientes(string? texto)
@@ -441,8 +444,11 @@ public sealed class ServicioJornadaLocal : IDisposable
             return 0;
 
         var pagosDescargados = Estado.Descarga?.Pagos.Select(p => p.PagoUuid).ToHashSet() ?? new();
-        var abonos = Estado.Operaciones.Where(o => o.Pago?.IdVenta == venta.IdVenta && !pagosDescargados.Contains(o.Uuid))
-            .Sum(o => o.Pago!.MontoAbona);
+        var pendientes = Estado.Operaciones.Where(o => o.Pago?.IdVenta == venta.IdVenta && !pagosDescargados.Contains(o.Uuid)).ToList();
+        // Una liquidación por acuerdo pendiente deja la cuenta en 0: central condonará el resto.
+        if (pendientes.Any(o => MarcasPago.EsLiquidacionAcuerdo(o.Pago!.Observaciones)))
+            return 0;
+        var abonos = pendientes.Sum(o => o.Pago!.MontoAbona);
         return Math.Max(0, venta.SaldoPendiente - abonos);
     }
 
@@ -502,7 +508,10 @@ public sealed class ServicioJornadaLocal : IDisposable
                 }
                 var copia = JsonSerializer.Deserialize<JornadaLocal>(JsonSerializer.Serialize(Estado))!;
                 var guardada = copia.Operaciones.Single(x => x.Uuid == o.Uuid);
-                guardada.Aplicada = r.datos.Aplicado && (o.Cliente is not null ? r.datos.Cliente is not null : o.Venta is not null ? r.datos.Venta is not null : r.datos.Pago is not null);
+                guardada.Aplicada = r.datos.Aplicado && (o.Cliente is not null ? r.datos.Cliente is not null : o.Venta is not null ? r.datos.Venta is not null
+                    // Una condonación puede confirmarse sin pago: central ya dejó la cuenta en saldo 0
+                    // (p. ej. por una bonificación automática) y no hizo falta registrar el ajuste.
+                    : r.datos.Pago is not null || EsCondonacion(o));
                 guardada.Error = guardada.Aplicada ? null : r.datos.Error ?? "Central no confirmó la operación.";
                 guardada.ClienteCentral = r.datos.Cliente;
                 guardada.VentaCentral = r.datos.Venta;

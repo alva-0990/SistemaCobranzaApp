@@ -23,4 +23,8 @@ public record RegistrarPagoResponse(
     decimal SaldoAnterior,
     decimal SaldoActual,
     decimal MontoAbona,
-    bool Liquidada);
+    bool Liquidada,
+    // Liquidación por acuerdo: saldo condonado por el AJUSTE automático y bonificaciones
+    // automáticas del trigger (racha / pronto pago) aplicadas con este abono. 0 si no aplica.
+    decimal MontoCondonado = 0m,
+    decimal MontoBonificado = 0m);

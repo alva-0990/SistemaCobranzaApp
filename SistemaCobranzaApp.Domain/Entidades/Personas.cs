@@ -72,6 +72,8 @@ public class Cliente
     public long? IdClasificacion { get; set; }
     public DateTimeOffset FechaAlta { get; set; }
     public Estatus Estatus { get; set; } = Estatus.Activo;
+    
+    public Estatus NotificarWhatsApp { get; set; } = Estatus.Activo;
     public string? Observaciones { get; set; }
     public long? IdUsuarioRegistro { get; set; }
     public DateTimeOffset FechaModificacion { get; set; }

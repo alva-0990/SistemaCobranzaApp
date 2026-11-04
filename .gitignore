@@ -21,9 +21,14 @@ publish/
 # ===== Datos locales de PostgreSQL (volumen Docker) =====
 cobranza_pgdata/
 
+# ===== Datos locales de Evolution API (sesión de WhatsApp) =====
+evolution_instances/
+
 # ===== Compilación .NET =====
 bin/
 obj/
 
 # ===== Sistema =====
 .DS_Store
+
+.env.local

@@ -183,8 +183,22 @@ public class ServicioJornada(
         var existente = await db.Pagos.AsNoTracking().FirstOrDefaultAsync(p => p.PagoUuid == req.Pago.PagoUuid, ct);
         if (existente is not null && (existente.IdUsuarioRegistro != usuario || existente.IdVenta != idVenta))
             throw new UnauthorizedAccessException("El identificador pertenece a otro pago.");
-        var r = await cobranza.RegistrarPagoAsync(req.Pago with { IdVenta = idVenta, IdCobrador = a.IdCobrador,
-            IdUsuarioRegistro = usuario, FechaPago = req.Pago.FechaPago?.ToUniversalTime() }, ct);
+        var pago = req.Pago;
+        // Condonación de una liquidación por acuerdo: el dispositivo la calculó con su saldo local, pero
+        // al aplicar el abono previo central pudo otorgar una bonificación automática (racha de pagos)
+        // que el dispositivo no conocía. La intención es "liquidar la cuenta", así que se condona solo
+        // el saldo que realmente queda; si ya no queda nada, no se registra ajuste.
+        if (existente is null && pago.IdMovimiento == MovimientoIds.Ajuste)
+        {
+            var saldo = await db.Ventas.AsNoTracking().Where(v => v.IdVenta == idVenta)
+                .Select(v => v.SaldoPendiente).FirstOrDefaultAsync(ct);
+            if (saldo <= 0)
+                return new(true, false, null, Pago: null);
+            if (pago.MontoAbona > saldo)
+                pago = pago with { MontoAbona = saldo };
+        }
+        var r = await cobranza.RegistrarPagoAsync(pago with { IdVenta = idVenta, IdCobrador = a.IdCobrador,
+            IdUsuarioRegistro = usuario, FechaPago = pago.FechaPago?.ToUniversalTime() }, ct);
         return new(r.Exito, existente is not null, r.Error, Pago: r.Respuesta);
     }
 }

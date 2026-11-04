@@ -25,6 +25,45 @@ services:
     ports:
       - "127.0.0.1:5432:5432"
 
+  # Evolution API: pasarela a WhatsApp (solo notificaciones salientes).
+  # Evolution v2 REQUIERE una base de datos para guardar la sesión del WhatsApp vinculado,
+  # por lo que reutiliza el mismo Postgres en una base aparte llamada 'evolution'.
+  evolution:
+    image: evoapicloud/evolution-api:v2.3.6
+    container_name: cobranza_evolution
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      # Esta clave DEBE ser la misma que WHATSAPP_APIKEY (la que usa la API para autenticar).
+      AUTHENTICATION_API_KEY: ${WHATSAPP_APIKEY}
+      # Persistencia en Postgres (base 'evolution' en el mismo servidor de la cobranza).
+      DATABASE_ENABLED: "true"
+      DATABASE_PROVIDER: postgresql
+      DATABASE_CONNECTION_URI: "postgresql://cobranza:${POSTGRES_PASSWORD_URL:-cobranza_dev}@postgres:5432/evolution?schema=public"
+      DATABASE_CONNECTION_CLIENT_NAME: cobranza_evolution
+      # Qué guarda en la base (lo mínimo para notificaciones salientes).
+      DATABASE_SAVE_DATA_INSTANCE: "true"
+      DATABASE_SAVE_DATA_NEW_MESSAGE: "false"
+      DATABASE_SAVE_MESSAGE_UPDATE: "false"
+      DATABASE_SAVE_DATA_CONTACTS: "false"
+      DATABASE_SAVE_DATA_CHATS: "false"
+      DATABASE_SAVE_DATA_LABELS: "false"
+      DATABASE_SAVE_DATA_HISTORIC: "false"
+      CACHE_REDIS_ENABLED: "false"
+      CACHE_LOCAL_ENABLED: "true"
+      TZ: America/Mexico_City
+    volumes:
+      # Sesión de WhatsApp (credenciales del QR): si se borra, hay que re-vincular.
+      - ./evolution_instances:/evolution/instances
+    networks:
+      - cobranza_net
+    # Publica la consola/API de Evolution SOLO en el host (para crear la instancia y escanear
+    # el QR). La API de cobranza la alcanza por la red interna como http://evolution:8080.
+    ports:
+      - "127.0.0.1:8083:8080"
+
   api:
     build:
       context: .
@@ -35,6 +74,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      evolution:
+        condition: service_started
     environment:
       ASPNETCORE_ENVIRONMENT: Production
       ASPNETCORE_URLS: http://+:8081
@@ -44,6 +85,11 @@ services:
       Jwt__Audience: SistemaCobranza
       Jwt__Key: ${JWT_KEY}
       Jwt__MinutosVigencia: ${JWT_MINUTOS:-900}
+      # --- WhatsApp (Evolution API) ---
+      Whatsapp__BaseUrl: ${WHATSAPP_BASEURL:-}
+      Whatsapp__Instancia: ${WHATSAPP_INSTANCIA:-}
+      Whatsapp__ApiKey: ${WHATSAPP_APIKEY:-}
+      Whatsapp__WebhookSecret: ${WHATSAPP_WEBHOOK_SECRET:-}
     networks:
       - cobranza_net
 

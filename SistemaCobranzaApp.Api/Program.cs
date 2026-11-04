@@ -21,6 +21,8 @@ using SistemaCobranzaApp.Infrastructure.Reportes;
 using SistemaCobranzaApp.Infrastructure.Seguridad;
 using SistemaCobranzaApp.Infrastructure.Sincronizacion;
 using SistemaCobranzaApp.Infrastructure.Ventas;
+using SistemaCobranzaApp.Infrastructure.Whatsapp;
+using SistemaCobranzaApp.Api.Whatsapp;
 using SistemaCobranzaApp.Shared.Dtos;
 
 
@@ -114,6 +116,36 @@ builder.Services.AddScoped<ServicioReportesGasto>();
 builder.Services.AddScoped<ServicioPagosAdmin>();
 builder.Services.AddScoped<ServicioCatalogoComisionesAdmin>();
 builder.Services.AddScoped<ServicioPagosComisionesAdmin>();
+
+// --- WhatsApp: cola de notificaciones + workers de envío/limpieza ---
+builder.Services.Configure<EvolutionApiOptions>(
+    builder.Configuration.GetSection(EvolutionApiOptions.SeccionConfig));
+var whatsappOpciones = new EvolutionApiOptions();
+builder.Configuration.GetSection(EvolutionApiOptions.SeccionConfig).Bind(whatsappOpciones);
+
+// Detonante en memoria compartido entre el encolado (ventas/pagos) y el worker.
+builder.Services.AddSingleton<SenalColaWhatsApp>();
+// Lee los interruptores/plantillas/purga de parametrossistema con caché corta (singleton).
+builder.Services.AddSingleton<LectorParametrosWhatsApp>();
+// Servicio de encolado usado dentro de las transacciones de venta y pago.
+builder.Services.AddScoped<ServicioColaWhatsApp>();
+// Consulta de la cola de mensajes (pantalla Mensajes WhatsApp).
+builder.Services.AddScoped<ServicioMensajesWhatsAppAdmin>();
+
+// HttpClient con nombre para Evolution API. BaseUrl sale de la configuración (secreto);
+// si está vacío (aún sin credenciales) no se asigna y el worker queda inactivo.
+builder.Services.AddHttpClient(WorkerWhatsApp.HttpClientNombre, cliente =>
+{
+    if (!string.IsNullOrWhiteSpace(whatsappOpciones.BaseUrl))
+    {
+        var baseUrl = whatsappOpciones.BaseUrl.TrimEnd('/') + "/";
+        cliente.BaseAddress = new Uri(baseUrl);
+    }
+    cliente.Timeout = TimeSpan.FromSeconds(EvolutionApiOptions.Defecto.TimeoutSegundos);
+});
+
+builder.Services.AddHostedService<WorkerWhatsApp>();
+builder.Services.AddHostedService<WorkerLimpiezaWhatsApp>();
 
 // --- Autenticación JWT ---
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)

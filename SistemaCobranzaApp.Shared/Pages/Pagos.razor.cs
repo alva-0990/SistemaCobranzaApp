@@ -1,4 +1,5 @@
 using SistemaCobranzaApp.Domain.Comun;
+using SistemaCobranzaApp.Domain.Constantes;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 using MudBlazor;
@@ -460,9 +461,8 @@ public partial class Pagos : ComponentBase, IAsyncDisposable
         await ProcesarPagoAsync(intencion);
     }
 
-    // IdMovimiento del catálogo: 1 = ABONO, 5 = AJUSTE (condonación de saldo).
+    // IdMovimiento del catálogo: 1 = ABONO (la condonación por acuerdo la registra central).
     private const long MovimientoAbono = 1;
-    private const long MovimientoAjuste = 5;
     // Marca que el trigger detecta para aplicar el descuento por plan de pronto pago.
     private const string MarcaProntoPago = "LIQUIDACION PRONTO PAGO";
 
@@ -501,38 +501,19 @@ public partial class Pagos : ComponentBase, IAsyncDisposable
 
             case ModoPagoDialogo.LiquidacionAcuerdo:
             {
-                // Acuerdo sin plan: (1) abono por el monto convenido y (2) ajuste que condona el resto.
+                // Acuerdo sin plan: UN solo abono con la marca de liquidación por acuerdo. Central
+                // aplica el abono, las bonificaciones automáticas y condona el saldo restante en la
+                // misma transacción; la respuesta ya trae la cuenta liquidada y el monto condonado.
                 var abono = new RegistrarPagoRequest(
                     Guid.NewGuid(), Venta.IdVenta, i.Monto, i.IdCobrador,
-                    MovimientoAbono, idUsuario, i.Observaciones, DateTimeOffset.UtcNow);
+                    MovimientoAbono, idUsuario,
+                    MarcasPago.ConMarca(MarcasPago.LiquidacionAcuerdo, i.Observaciones),
+                    DateTimeOffset.UtcNow);
                 var (respAbono, errorAbono) = await Api.RegistrarPagoAdminAsync(abono);
                 if (errorAbono is not null)
                 {
                     Snackbar.Add(errorAbono, Severity.Error);
                     return;
-                }
-
-                var condonado = i.SaldoPendiente - i.Monto;
-                if (condonado > 0 && respAbono is { Liquidada: false })
-                {
-                    var ajuste = new RegistrarPagoRequest(
-                        Guid.NewGuid(), Venta.IdVenta, condonado, i.IdCobrador,
-                        MovimientoAjuste, idUsuario,
-                        $"CONDONACIÓN POR ACUERDO DE LIQUIDACIÓN. Saldo perdonado de {condonado:C2}.",
-                        DateTimeOffset.UtcNow);
-                    var (_, errorAjuste) = await Api.RegistrarPagoAdminAsync(ajuste);
-                    if (errorAjuste is not null)
-                    {
-                        Snackbar.Add($"El abono se registró, pero no se pudo condonar el resto: {errorAjuste}", Severity.Warning);
-                        await SeleccionarClienteAsync(Cliente.IdCliente, Venta.IdVenta);
-                        return;
-                    }
-
-                    // El abono por sí solo deja saldo pendiente (= condonado) y Liquidada=false.
-                    // Tras aplicar el ajuste de condonación, la cuenta queda en cero: corregimos la
-                    // respuesta para que el COMPROBANTE DE PAGO refleje el estado final (saldo 0,
-                    // cuenta liquidada) en lugar del saldo intermedio del abono.
-                    respAbono = respAbono with { SaldoActual = 0m, Liquidada = true };
                 }
 
                 Snackbar.Add("Liquidación por acuerdo registrada. ¡La cuenta quedó liquidada!", Severity.Success);
@@ -658,7 +639,9 @@ public partial class Pagos : ComponentBase, IAsyncDisposable
             Movimiento: "ABONO",
             Cobrador: cobrador,
             Liquidada: resp.Liquidada,
-            Compacto: EmpresaGlobal.TicketPagoCompacto);
+            Compacto: EmpresaGlobal.TicketPagoCompacto,
+            MontoCondonado: resp.MontoCondonado,
+            MontoBonificado: resp.MontoBonificado);
     }
 
     // ===================== Escáner de QR =====================

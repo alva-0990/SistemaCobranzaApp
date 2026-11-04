@@ -164,8 +164,51 @@ VALUES
 -- Es un valor de TEXTO, por eso se inserta explícitamente en ValorTexto.
 INSERT INTO ParametrosSistema (Clave, Descripcion, ValorTexto)
 VALUES
-    ('TICKET_PAGO_COMPACTO', 'Formato del comprobante de pago: SI = compacto, NO = detallado', 'NO')
-    ('PROMO_PAGOS_CONSECUTIVOS_ACTIVA', 'Indica si la promoción de pagos consecutivos está encendida (SI/NO)', 'SI')
+    ('TICKET_PAGO_COMPACTO', 'Formato del comprobante de pago: SI = compacto, NO = detallado', 'NO'),
+    ('PROMO_PAGOS_CONSECUTIVOS_ACTIVA', 'Indica si la promoción de pagos consecutivos está encendida (SI/NO)', 'SI'),
+    ('WHATSAPP_ENVIO_ACTIVO', 'Indica si el flujo de envio de notificaciones whatsapp está encendida (SI/NO)', 'SI'),
+    ('WHATSAPP_NOTIFICAR_VENTA', 'Indica si se envia la notificacion en alta de ventas encendida (SI/NO)', 'SI'),
+    ('WHATSAPP_NOTIFICAR_PAGO', 'Indica si se envia la notificacion en alta de pagos encendida (SI/NO)', 'SI')
+ON CONFLICT (Clave) DO NOTHING;
+
+-- =====================================================================
+-- Notificaciones WhatsApp (interruptores y plantillas editables en caliente)
+-- =====================================================================
+-- Interruptores 'SI' / 'NO' que se administran desde la pantalla de Parámetros.
+-- Secretos de conexión (URL/instancia/apikey) NO van aquí: viven en variables de
+-- entorno del contenedor por seguridad.
+--
+-- Plantillas: el texto del mensaje admite marcadores que el sistema sustituye:
+--   {empresa}        nombre corto de la empresa (mayúsculas)
+--   {cliente}        nombre del cliente
+--   {folio}          código de la venta (venta) o folio del pago (pago)
+--   {codigo_venta}   código de la venta a la que se abona (solo pago)
+--   {fecha}          fecha/hora dd/MM/yyyy HH:mm (hora de México)
+--   {saldo_anterior} saldo antes del abono (solo pago)
+--   {monto}          monto del abono (solo pago)
+--   {saldo}          saldo pendiente tras el abono (solo pago)
+INSERT INTO ParametrosSistema (Clave, Descripcion, ValorTexto)
+VALUES
+    ('WHATSAPP_ENVIO_ACTIVO',    'Interruptor maestro de notificaciones WhatsApp (SI/NO)', 'SI'),
+    ('WHATSAPP_NOTIFICAR_VENTA', 'Enviar WhatsApp al registrar una venta (SI/NO)',        'SI'),
+    ('WHATSAPP_NOTIFICAR_PAGO',  'Enviar WhatsApp al registrar un pago (SI/NO)',          'SI'),
+    ('WHATSAPP_PLANTILLA_VENTA', 'Plantilla del mensaje de venta. Marcadores: {empresa}, {cliente}, {folio}, {fecha}',
+        E'*{empresa}*\n*COMPROBANTE DE VENTA*\n\nEstimado(a) *{cliente}*, confirmamos el registro de su compra.\n\n*Código de venta:* {folio}\n*Fecha/Hora:* {fecha}\n\nAgradecemos su preferencia.\n\n_Mensaje automático. Si desea dejar de recibir notificaciones, responda con la palabra BAJA._'),
+    ('WHATSAPP_PLANTILLA_PAGO',  'Plantilla del mensaje de pago. Marcadores: {empresa}, {cliente}, {folio}, {codigo_venta}, {fecha}, {saldo_anterior}, {monto}, {saldo}',
+        E'*{empresa}*\n*COMPROBANTE DE PAGO*\n\nEstimado(a) *{cliente}*, confirmamos el registro de su pago.\n\n*Folio:* {folio}\n*Fecha/Hora:* {fecha}\n*Saldo anterior:* {saldo_anterior}\n*Monto abonado:* {monto}\n*Saldo actual:* {saldo}\n\nAgradecemos su compromiso de mantener su cuenta al corriente.\n\n_Mensaje automático. Si desea dejar de recibir notificaciones, responda con la palabra BAJA._')
+ON CONFLICT (Clave) DO NOTHING;
+
+-- Purga de la tabla de paso cola_mensajes_whatsapp (interruptor + retención).
+-- WHATSAPP_PURGA_ACTIVA es texto 'SI'/'NO'; WHATSAPP_PURGA_DIAS es numérico (días
+-- que se conservan los mensajes ya 'Enviado' antes de borrarlos).
+INSERT INTO ParametrosSistema (Clave, Descripcion, ValorTexto)
+VALUES
+    ('WHATSAPP_PURGA_ACTIVA', 'Borrado automático de mensajes WhatsApp ya enviados (SI/NO)', 'SI')
+ON CONFLICT (Clave) DO NOTHING;
+
+INSERT INTO ParametrosSistema (Clave, Descripcion, ValorNumerico)
+VALUES
+    ('WHATSAPP_PURGA_DIAS', 'Días que se conservan los mensajes WhatsApp enviados antes de borrarlos', 7)
 ON CONFLICT (Clave) DO NOTHING;
 -- =====================================================================
 -- REALINEACIÓN DE SECUENCIAS

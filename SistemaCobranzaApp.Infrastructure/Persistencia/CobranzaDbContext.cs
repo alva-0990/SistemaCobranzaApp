@@ -60,6 +60,8 @@ public class CobranzaDbContext : DbContext
     public DbSet<ConfiguracionComision> ConfiguracionesComisiones => Set<ConfiguracionComision>();
     public DbSet<ComisionPorPagar> ComisionesPorPagar => Set<ComisionPorPagar>();
 
+    public DbSet<ColaMensajeWhatsApp> ColaMensajesWhatsApp => Set<ColaMensajeWhatsApp>();
+
     protected override void OnModelCreating(ModelBuilder b)
     {
         base.OnModelCreating(b);
@@ -210,6 +212,7 @@ public class CobranzaDbContext : DbContext
             e.Property(x => x.IdClasificacion).HasColumnName("idclasificacion");
             e.Property(x => x.FechaAlta).HasColumnName("fechaalta");
             e.Property(x => x.Estatus).HasColumnName("estatus").HasConversion<int>();
+            e.Property(x => x.NotificarWhatsApp).HasColumnName("notificarwhatsapp").HasConversion<int>();
             e.Property(x => x.Observaciones).HasColumnName("observaciones");
             e.Property(x => x.IdUsuarioRegistro).HasColumnName("idusuarioregistro");
             e.Property(x => x.FechaModificacion).HasColumnName("fechamodificacion");
@@ -1170,6 +1173,32 @@ public class CobranzaDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(x => x.IdUsuarioPago)
                 .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        // ---- COLA DE MENSAJES DE WHATSAPP (tabla de paso cola_mensajes_whatsapp) ----
+        b.Entity<ColaMensajeWhatsApp>(e =>
+        {
+            e.ToTable("colamensajeswhatsapp");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasColumnName("id");
+            e.Property(x => x.Telefono).HasColumnName("telefono").HasMaxLength(20).IsRequired();
+            e.Property(x => x.Mensaje).HasColumnName("mensaje").HasColumnType("text").IsRequired();
+            e.Property(x => x.Estado).HasColumnName("estado").HasMaxLength(20)
+                .HasDefaultValue(EstadoMensajeWhatsApp.Pendiente).IsRequired();
+            e.Property(x => x.Intentos).HasColumnName("intentos").HasDefaultValue(0);
+            e.Property(x => x.TipoOrigen).HasColumnName("tipo_origen").HasMaxLength(20);
+            e.Property(x => x.IdVenta).HasColumnName("id_venta");
+            e.Property(x => x.IdPago).HasColumnName("id_pago");
+            e.Property(x => x.ErrorLog).HasColumnName("error_log").HasColumnType("text");
+            e.Property(x => x.FechaCreacion).HasColumnName("fecha_creacion")
+                .HasColumnType("timestamp with time zone").HasDefaultValueSql("now()");
+            e.Property(x => x.FechaEnvio).HasColumnName("fecha_envio")
+                .HasColumnType("timestamp with time zone");
+
+            // Índice parcial de pendientes (espejo del script SQL de db/init).
+            e.HasIndex(x => new { x.Estado, x.Intentos, x.FechaCreacion })
+                .HasDatabaseName("idx_cola_whatsapp_pendientes")
+                .HasFilter("estado = 'Pendiente'");
         });
     }
 }
