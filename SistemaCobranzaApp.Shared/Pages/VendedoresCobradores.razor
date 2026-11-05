@@ -196,6 +196,18 @@
     /* Buscador remarcado */
     .buscador-remarcado .mud-input-outlined-border { border-width: 2px; }
 
+    /* En pantallas chicas: apilar en columna y colocar el botón "Nuevo" debajo del buscador */
+    @@media (max-width: 599.98px) {
+        .barra-acciones {
+            flex-direction: column;
+            align-items: stretch;
+        }
+
+        .barra-acciones .boton-nuevo {
+            width: 100%;
+        }
+    }
+
     /* ===== Tabs: resaltar claramente el seleccionado ===== */
     /* Tabs inactivos: atenuados para contraste. */
     .tabs-remarcados .mud-tab {

@@ -15,8 +15,11 @@
 @inject NavigationManager _nav
 @inject IJSRuntime _js
 
-<MudPaper Elevation="2" Rounded="true" Class="ma-2 pa-4">
-    <div class="barra-acciones">
+<MudTabs Elevation="2" Rounded="true" Color="Color.Primary" ApplyEffectsToContainer="true"
+         PanelClass="pa-0" SliderColor="Color.Warning" Class="ma-2 tabs-remarcados">
+    <MudTabPanel Text="Clientes" Icon="@Icons.Material.Filled.Groups">
+    <MudPaper Elevation="0" Class="pa-4">
+    <div class="barra-acciones" style="margin-top:16px;">
         <div id="buscador-clientes" class="buscador-remarcado">
             <MudTextField T="string"
                           @ref="_campoBusqueda"
@@ -41,7 +44,14 @@
             <span class="d-none d-sm-inline">Nuevo cliente</span>
         </MudButton>
     </div>
+    <MudText Typo="Typo.caption" Color="Color.Warning">
+        Escribe el <b>nombre</b> o el <b>teléfono</b> del cliente para buscar.
+    </MudText>
+    </MudPaper>
+    </MudTabPanel>
+</MudTabs>
 
+<MudPaper Elevation="2" Rounded="true" Class="ma-2 pa-4">
     @if (_cargando)
     {
         <div class="d-flex justify-center pa-8">
@@ -165,6 +175,10 @@
 }
 
 <style>
+    .tabs-remarcados .mud-tab { opacity: 0.65; font-weight: 500; transition: opacity 0.15s ease, background-color 0.15s ease; }
+    .tabs-remarcados .mud-tab.mud-tab-active { opacity: 1; font-weight: 800; background-color: rgba(255,255,255,0.18); border-radius: 8px 8px 0 0; }
+    .tabs-remarcados .mud-tab-slider { height: 4px; }
+
     .barra-acciones {
         display: flex;
         align-items: center;

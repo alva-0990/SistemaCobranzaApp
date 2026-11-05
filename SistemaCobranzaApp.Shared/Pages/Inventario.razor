@@ -766,6 +766,19 @@
     .boton-nuevo { white-space: nowrap; flex: 0 0 auto; }
     .buscador-remarcado .mud-input-outlined-border { border-width: 2px; }
 
+    /* En pantallas chicas: el botón de Excel ocupa todo el ancho, debajo del buscador.
+       Aplica a Inventario Central y Existencias por Zona (ambas usan .barra-acciones). */
+    @@media (max-width: 599.98px) {
+        .barra-acciones {
+            flex-direction: column;
+            align-items: stretch;
+        }
+
+        .barra-acciones .boton-nuevo {
+            width: 100%;
+        }
+    }
+
     /* ===== Filtros del historial de inventario: compactos para que quepan en una línea ===== */
     .barra-filtros-hist {
         display: flex;
@@ -782,6 +795,20 @@
     /* Botones sin que el texto se parta y sin crecer. */
     .barra-filtros-hist .boton-hist { white-space: nowrap; flex: 0 0 auto; }
 
+    /* En pantallas pequeñas cada filtro/botón del historial ocupa su propia fila (uno debajo del otro). */
+    @@media (max-width: 599.98px) {
+        .barra-filtros-hist { flex-direction: column; align-items: stretch; }
+        .barra-filtros-hist .filtro-hist,
+        .barra-filtros-hist .filtro-hist-fecha,
+        .barra-filtros-hist .boton-hist {
+            /* En columna, el flex-basis se aplica a la ALTURA y deja un hueco vertical.
+               Lo reseteamos para que cada filtro tome su altura natural. */
+            flex: 0 0 auto;
+            max-width: none;
+            width: 100%;
+        }
+    }
+
     /* ===== Filtros de propuestas: todos en una sola fila; se apilan en pantallas pequeñas ===== */
     .barra-filtros-prop {
         display: flex;
@@ -792,15 +819,23 @@
     }
 
     .barra-filtros-prop .filtro-prop { flex: 1 1 140px; min-width: 120px; max-width: 220px; }
-    .barra-filtros-prop .filtro-prop-fecha { flex: 0 1 150px; min-width: 120px; max-width: 170px; }
+    /* Las fechas crecen igual que los selectores para no dejar un hueco entre "Desde" y "Hasta". */
+    .barra-filtros-prop .filtro-prop-fecha { flex: 1 1 150px; min-width: 120px; max-width: 220px; }
     .barra-filtros-prop .boton-prop { white-space: nowrap; flex: 0 0 auto; }
 
     /* En pantallas pequeñas cada filtro/botón ocupa su propia fila (uno debajo del otro). */
-    @@media (max-width: 600px) {
+    @@media (max-width: 599.98px) {
         .barra-filtros-prop { flex-direction: column; align-items: stretch; }
         .barra-filtros-prop .filtro-prop,
         .barra-filtros-prop .filtro-prop-fecha,
-        .barra-filtros-prop .boton-prop { max-width: none; width: 100%; }
+        .barra-filtros-prop .boton-prop {
+            /* En columna, el flex-basis se aplica a la ALTURA y deja un hueco vertical
+               (es lo que hacía que "Desde" y "Hasta" quedaran tan separados).
+               Lo reseteamos para que cada filtro tome su altura natural. */
+            flex: 0 0 auto;
+            max-width: none;
+            width: 100%;
+        }
     }
 
     .encabezado-seccion { display: flex; align-items: center; gap: 12px; }

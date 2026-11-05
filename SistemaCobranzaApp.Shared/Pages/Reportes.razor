@@ -43,9 +43,9 @@
                 </MudItem>
             </MudGrid>
 
-            <div class="d-flex justify-end mt-3">
+            <div class="d-flex justify-end mt-3 contenedor-generar">
                 <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Assessment"
-                           OnClick="GenerarCarteraAsync" Disabled="_cargando">
+                           OnClick="GenerarCarteraAsync" Disabled="_cargando" Class="boton-generar">
                     Generar reporte
                 </MudButton>
             </div>
@@ -154,9 +154,9 @@
                 </MudItem>
             </MudGrid>
 
-            <div class="d-flex justify-end mt-3">
+            <div class="d-flex justify-end mt-3 contenedor-generar">
                 <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Assessment"
-                           OnClick="GenerarPagosAsync" Disabled="_cargando">
+                           OnClick="GenerarPagosAsync" Disabled="_cargando" Class="boton-generar">
                     Generar reporte
                 </MudButton>
             </div>
@@ -262,9 +262,9 @@
                 </MudItem>
             </MudGrid>
 
-            <div class="d-flex justify-end mt-3">
+            <div class="d-flex justify-end mt-3 contenedor-generar">
                 <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Assessment"
-                           OnClick="GenerarVentasAsync" Disabled="_cargando">
+                           OnClick="GenerarVentasAsync" Disabled="_cargando" Class="boton-generar">
                     Generar reporte
                 </MudButton>
             </div>
@@ -357,9 +357,9 @@
                 </MudItem>
             </MudGrid>
 
-            <div class="d-flex justify-end mt-3">
+            <div class="d-flex justify-end mt-3 contenedor-generar">
                 <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Assessment"
-                           OnClick="GenerarRecuperacionAsync" Disabled="_cargando">
+                           OnClick="GenerarRecuperacionAsync" Disabled="_cargando" Class="boton-generar">
                     Generar reporte
                 </MudButton>
             </div>
@@ -442,9 +442,9 @@
                 </MudItem>
             </MudGrid>
 
-            <div class="d-flex justify-end mt-3">
+            <div class="d-flex justify-end mt-3 contenedor-generar">
                 <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Assessment"
-                           OnClick="GenerarClientesAsync" Disabled="_cargando">
+                           OnClick="GenerarClientesAsync" Disabled="_cargando" Class="boton-generar">
                     Generar reporte
                 </MudButton>
             </div>
@@ -526,9 +526,9 @@
                 </MudItem>
             </MudGrid>
 
-            <div class="d-flex justify-end mt-3">
+            <div class="d-flex justify-end mt-3 contenedor-generar">
                 <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Assessment"
-                           OnClick="GenerarSeguimientoAsync" Disabled="_cargando">
+                           OnClick="GenerarSeguimientoAsync" Disabled="_cargando" Class="boton-generar">
                     Generar reporte
                 </MudButton>
             </div>
@@ -620,6 +620,12 @@
     .tabla-seguimiento th.mud-table-cell {
         font-size: 0.72rem;
         padding: 2px 6px;
+    }
+
+    /* En pantallas chicas el botón "Generar reporte" ocupa todo el ancho (todas las pestañas). */
+    @@media (max-width: 599.98px) {
+        .contenedor-generar { justify-content: stretch; }
+        .contenedor-generar .boton-generar { width: 100%; }
     }
 </style>
 

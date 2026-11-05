@@ -94,6 +94,21 @@ public partial class Parametros : ComponentBase
         if (error is null) await CargarAsync();
     }
 
+    // Abre un modal de solo lectura con la descripción y valores del parámetro,
+    // mostrados en un área de trabajo con el texto justificado.
+    protected async Task AbrirVistaPrevia(ParametroSistemaDto p)
+    {
+        var opciones = new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true, CloseButton = true };
+        var parametros = new DialogParameters<DialogoVistaPreviaParametro>
+        {
+            { x => x.Clave, p.Clave },
+            { x => x.Descripcion, p.Descripcion },
+            { x => x.ValorTexto, p.ValorTexto },
+            { x => x.ValorNumerico, p.ValorNumerico }
+        };
+        await Dialogo.ShowAsync<DialogoVistaPreviaParametro>("Vista previa", parametros, opciones);
+    }
+
     // ===================== Eliminación =====================
 
     protected async Task Eliminar(ParametroSistemaDto p)

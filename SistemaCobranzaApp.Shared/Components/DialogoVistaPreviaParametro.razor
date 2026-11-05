@@ -1,0 +1,65 @@
+@using MudBlazor
+
+@*
+    Vista previa de solo lectura de un parámetro del sistema: muestra la clave,
+    la descripción y los valores en un área de trabajo con el texto justificado.
+*@
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6" Style="font-weight:600;">
+            <MudIcon Icon="@Icons.Material.Filled.Visibility" Class="mr-2" Style="vertical-align:middle;" />
+            Vista previa del parámetro
+        </MudText>
+    </TitleContent>
+
+    <DialogContent>
+        <MudText Typo="Typo.caption" Color="Color.Secondary">Clave</MudText>
+        <MudText Typo="Typo.subtitle1" Style="font-weight:600;" Class="mb-3">@Clave</MudText>
+
+        <MudText Typo="Typo.caption" Color="Color.Secondary">Descripción</MudText>
+        <div class="area-trabajo mb-3">@Descripcion</div>
+
+        @if (!string.IsNullOrWhiteSpace(ValorTexto))
+        {
+            <MudText Typo="Typo.caption" Color="Color.Secondary">Valor de texto</MudText>
+            <div class="area-trabajo mb-3">@ValorTexto</div>
+        }
+
+        @if (ValorNumerico is not null)
+        {
+            <MudText Typo="Typo.caption" Color="Color.Secondary">Valor numérico</MudText>
+            <MudText Typo="Typo.body1">@ValorNumerico.Value.ToString("0.####")</MudText>
+        }
+    </DialogContent>
+
+    <DialogActions>
+        <MudButton OnClick="Cerrar" Variant="Variant.Filled" Color="Color.Primary">Cerrar</MudButton>
+    </DialogActions>
+</MudDialog>
+
+<style>
+    .area-trabajo {
+        text-align: justify;
+        white-space: pre-wrap;
+        word-break: break-word;
+        background: var(--mud-palette-background-gray);
+        border: 1px solid var(--mud-palette-divider);
+        border-radius: 6px;
+        padding: 12px;
+        max-height: 300px;
+        overflow-y: auto;
+        line-height: 1.5;
+    }
+</style>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter] public string Clave { get; set; } = "";
+    [Parameter] public string Descripcion { get; set; } = "";
+    [Parameter] public string? ValorTexto { get; set; }
+    [Parameter] public decimal? ValorNumerico { get; set; }
+
+    private void Cerrar() => MudDialog.Close();
+}

@@ -33,7 +33,7 @@
                            OnClick="AbrirModalNuevoUsuario"
                            Class="boton-nuevo">
                     <!-- En Android muestra 'Nuevo', en Web muestra 'Nuevo usuario' -->
-                    <span class="d-inline d-sm-none">Nuevo</span>
+                    <span class="d-inline d-sm-none">Nuevo usuario</span>
                     <span class="d-none d-sm-inline">Nuevo usuario</span>
                 </MudButton>
             </div>
@@ -183,6 +183,18 @@
     .barra-acciones .buscador-remarcado { flex: 1 1 auto; min-width: 0; }
     .boton-nuevo { white-space: nowrap; flex: 0 0 auto; }
     .buscador-remarcado .mud-input-outlined-border { border-width: 2px; }
+
+    /* En pantallas pequeñas: apilar en columna y colocar el botón "Nuevo" debajo del buscador */
+    @@media (max-width: 599.98px) {
+        .barra-acciones {
+            flex-direction: column;
+            align-items: stretch;
+        }
+
+        .barra-acciones .boton-nuevo {
+            width: 100%;
+        }
+    }
 
     .tabs-remarcados .mud-tab { opacity: 0.65; font-weight: 500; transition: opacity 0.15s ease, background-color 0.15s ease; }
     .tabs-remarcados .mud-tab.mud-tab-active { opacity: 1; font-weight: 800; background-color: rgba(255,255,255,0.18); border-radius: 8px 8px 0 0; }

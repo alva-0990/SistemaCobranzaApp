@@ -29,7 +29,7 @@
                     @(EsVendedor ? "Reporte de ventas del día" : "Reporte de pagos del día")
                 </MudText>
             </div>
-            <div class="d-flex flex-wrap gap-2">
+            <div class="d-flex flex-wrap gap-2 acciones-reporte">
                 @if (EsVendedor)
                 {
                     <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small"
@@ -187,6 +187,16 @@
     }
     .resumen-etiqueta { font-size: 0.8rem; color: var(--mud-palette-text-secondary); }
     .resumen-valor { font-weight: 800; line-height: 1.2; }
+
+    /* En pantallas chicas los botones de impresión se apilan y ocupan todo el ancho. */
+    @@media (max-width: 599.98px) {
+        .acciones-reporte {
+            flex-direction: column;
+            align-items: stretch;
+            width: 100%;
+        }
+        .acciones-reporte .mud-button-root { width: 100%; }
+    }
 </style>
 
 @code {

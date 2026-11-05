@@ -5,9 +5,12 @@
 @using SistemaCobranzaApp.Shared.Components
 @using SistemaCobranzaApp.Shared.Utilerias
 
-<MudPaper Elevation="2" Rounded="true" Class="ma-2 pa-4">
+<MudTabs Elevation="2" Rounded="true" Color="Color.Primary" ApplyEffectsToContainer="true"
+         PanelClass="pa-0" SliderColor="Color.Warning" Class="ma-2 tabs-remarcados">
+    <MudTabPanel Text="Mensajes WhatsApp" Icon="@Icons.Material.Filled.Chat">
+    <MudPaper Elevation="0" Class="pa-4">
     <!-- Resumen por estado (clic para filtrar) -->
-    <div class="resumen-estados">
+    <div class="resumen-estados" style="margin-top:16px;">
         @foreach (var e in Estados)
         {
             <MudChip T="string"
@@ -46,7 +49,11 @@
             Actualizar
         </MudButton>
     </div>
+    </MudPaper>
+    </MudTabPanel>
+</MudTabs>
 
+<MudPaper Elevation="2" Rounded="true" Class="ma-2 pa-4">
     @if (Cargando)
     {
         <div class="d-flex justify-center pa-8">
@@ -124,11 +131,36 @@
 </MudPaper>
 
 <style>
+    .tabs-remarcados .mud-tab { opacity: 0.65; font-weight: 500; transition: opacity 0.15s ease, background-color 0.15s ease; }
+    .tabs-remarcados .mud-tab.mud-tab-active { opacity: 1; font-weight: 800; background-color: rgba(255,255,255,0.18); border-radius: 8px 8px 0 0; }
+    .tabs-remarcados .mud-tab-slider { height: 4px; }
+
     .resumen-estados {
         display: flex;
         flex-wrap: wrap;
         gap: 4px;
         margin-bottom: 12px;
+    }
+
+    /* En pantallas chicas: estados 2x2 ocupando todo el ancho */
+    @@media (max-width: 599.98px) {
+        .resumen-estados {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+
+        /* Los chips (botones de estado) ocupan toda la celda */
+        .resumen-estados > .mud-chip {
+            width: 100%;
+            margin: 0;
+            justify-content: center;
+        }
+
+        /* El chip "Quitar filtro" ocupa la fila completa */
+        .resumen-estados > .mud-chip:nth-child(n+5) {
+            grid-column: 1 / -1;
+        }
     }
 
     .barra-acciones {
@@ -141,6 +173,18 @@
     .barra-acciones .buscador-remarcado { flex: 1 1 auto; min-width: 0; }
     .boton-nuevo { white-space: nowrap; flex: 0 0 auto; }
     .buscador-remarcado .mud-input-outlined-border { border-width: 2px; }
+
+    /* En pantallas chicas: apilar en columna y colocar el botón "Actualizar" debajo del buscador */
+    @@media (max-width: 599.98px) {
+        .barra-acciones {
+            flex-direction: column;
+            align-items: stretch;
+        }
+
+        .barra-acciones .boton-nuevo {
+            width: 100%;
+        }
+    }
 
     .texto-secundario { font-size: 0.8rem; opacity: 0.7; }
 
