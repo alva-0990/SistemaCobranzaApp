@@ -2,18 +2,20 @@
 
 @using MudBlazor
 @using SistemaCobranzaApp.Shared.Dtos
+@using SistemaCobranzaApp.Shared.Components
+@using SistemaCobranzaApp.Shared.Utilerias
 
 <MudPaper Elevation="2" Rounded="true" Class="ma-2 pa-4">
     <div class="barra-acciones">
-        <MudTextField T="string"
-                      @bind-Value="Busqueda"
-                      Immediate="true"
-                      Placeholder="Buscar parámetro por clave, descripción o valor..."
-                      Variant="Variant.Outlined"
-                      Adornment="Adornment.Start"
-                      AdornmentIcon="@Icons.Material.Filled.Search"
-                      AdornmentColor="Color.Primary"
-                      Clearable="true"
+        <CampoFiltrado Modo="ModoCampo.AlfanumericoGuiones"
+                       @bind-Value="Busqueda"
+                       Immediate="true"
+                       Placeholder="Buscar parámetro por clave, descripción o valor..."
+                       Variant="Variant.Outlined"
+                       Adornment="Adornment.Start"
+                       AdornmentIcon="@Icons.Material.Filled.Search"
+                       AdornmentColor="Color.Primary"
+                       Clearable="true"
                       Class="buscador-remarcado" />
         <MudButton Variant="Variant.Filled"
                    Color="Color.Primary"

@@ -4,6 +4,7 @@
 @using SistemaCobranzaApp.Shared.Components
 @using SistemaCobranzaApp.Shared.Dtos
 @using SistemaCobranzaApp.Shared.Services
+@using SistemaCobranzaApp.Shared.Utilerias
 @inject ApiCliente Api
 @inject IDialogService _dialogo
 @inject ISnackbar _snackbar
@@ -15,17 +16,16 @@
     <MudTabPanel Text="Clasificación" Icon="@Icons.Material.Filled.GroupWork">
         <MudPaper Elevation="0" Class="pa-4">
             <div class="barra-acciones">
-                <MudTextField T="string"
-                              Value="_busquedaClasificacion"
-                              ValueChanged="@(v => { _busquedaClasificacion = v; })"
-                              Immediate="true"
-                              Placeholder="Buscar clasificación por descripción o ID..."
-                              Variant="Variant.Outlined"
-                              Adornment="Adornment.Start"
-                              AdornmentIcon="@Icons.Material.Filled.Search"
-                              AdornmentColor="Color.Primary"
-                              Clearable="true"
-                              Class="buscador-remarcado" />
+                <CampoFiltrado Modo="ModoCampo.Alfanumerico"
+                               @bind-Value="_busquedaClasificacion"
+                               Immediate="true"
+                               Placeholder="Buscar clasificación por descripción o ID..."
+                               Variant="Variant.Outlined"
+                               Adornment="Adornment.Start"
+                               AdornmentIcon="@Icons.Material.Filled.Search"
+                               AdornmentColor="Color.Primary"
+                               Clearable="true"
+                               Class="buscador-remarcado" />
                 <MudButton Variant="Variant.Filled"
                            Color="Color.Primary"
                            StartIcon="@Icons.Material.Filled.Add"

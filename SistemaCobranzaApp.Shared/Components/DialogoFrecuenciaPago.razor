@@ -1,4 +1,6 @@
 @using MudBlazor
+@using SistemaCobranzaApp.Shared.Components
+@using SistemaCobranzaApp.Shared.Utilerias
 
 <MudDialog>
     <TitleContent>
@@ -25,13 +27,13 @@
 
                 @* Descripción *@
                 <MudItem xs="12" sm="8">
-                    <MudTextField T="string"
-                                  Label="Descripción"
-                                  @bind-Value="Modelo.Descripcion"
-                                  Required="true"
-                                  RequiredError="La descripción es obligatoria."
-                                  Variant="Variant.Outlined"
-                                  Margin="Margin.Dense" />
+                    <CampoFiltrado Modo="ModoCampo.Texto"
+                                   Label="Descripción"
+                                   @bind-Value="Modelo.Descripcion"
+                                   Required="true"
+                                   RequiredError="La descripción es obligatoria."
+                                   Variant="Variant.Outlined"
+                                   Margin="Margin.Dense" />
                 </MudItem>
 
                 @* Estatus *@

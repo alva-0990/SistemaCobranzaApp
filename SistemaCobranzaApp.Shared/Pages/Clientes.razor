@@ -5,27 +5,33 @@
 @using SistemaCobranzaApp.Shared.Dtos
 @using SistemaCobranzaApp.Shared.Services
 @using SistemaCobranzaApp.Domain.Constantes
+@using SistemaCobranzaApp.Shared.Utilerias
+@using Microsoft.JSInterop
+@implements IDisposable
 @inject ApiCliente Api
 @inject IDialogService _dialogo
 @inject ISnackbar _snackbar
 @inject IFormFactor _formFactor
 @inject NavigationManager _nav
+@inject IJSRuntime _js
 
 <MudPaper Elevation="2" Rounded="true" Class="ma-2 pa-4">
     <div class="barra-acciones">
-        <MudTextField T="string"
-                      @ref="_campoBusqueda"
-                      Value="_busqueda"
-                      ValueChanged="OnBuscarChanged"
-                      Immediate="true"
-                      DebounceInterval="400"
-                      Placeholder="Buscar cliente por nombre, teléfono, ruta o zona..."
-                      Variant="Variant.Outlined"
-                      Adornment="Adornment.Start"
-                      AdornmentIcon="@Icons.Material.Filled.Search"
-                      AdornmentColor="Color.Primary"
-                      Clearable="true"
-                      Class="buscador-remarcado" />
+        <div id="buscador-clientes" class="buscador-remarcado">
+            <MudTextField T="string"
+                          @ref="_campoBusqueda"
+                          Value="_busqueda"
+                          ValueChanged="OnBuscarChanged"
+                          Immediate="true"
+                          DebounceInterval="400"
+                          Placeholder="Buscar cliente por nombre o teléfono"
+                          Variant="Variant.Outlined"
+                          Adornment="Adornment.Start"
+                          AdornmentIcon="@Icons.Material.Filled.Search"
+                          AdornmentColor="Color.Primary"
+                          Clearable="true"
+                          AutoFocus="true" />
+        </div>
         <MudButton Variant="Variant.Filled"
                    Color="Color.Primary"
                    StartIcon="@Icons.Material.Filled.PersonAddAlt"
@@ -213,6 +219,8 @@
     private string _busqueda = "";
     private bool _haBuscado;
     private MudTextField<string>? _campoBusqueda;
+    // Referencia .NET que el filtro JS usa para avisar cuando bloquea un carácter.
+    private DotNetObjectReference<Clientes>? _refFiltro;
 
     // El administrador es el usuario con IdUsuario == 1: único autorizado a editar/dar de baja
     // clientes clasificados como MALO/MOROSO.
@@ -223,6 +231,24 @@
         // No cargamos clientes al iniciar: la lista aparece sólo tras una búsqueda.
         await CargarCatalogos();
     }
+
+    // Engancha el filtro JS al input del buscador, pasándole la referencia .NET
+    // para que pueda notificar cuando bloquea un carácter especial.
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        _refFiltro = DotNetObjectReference.Create(this);
+        var modulo = await _js.InvokeAsync<IJSObjectReference>(
+            "import", "./_content/SistemaCobranzaApp.Shared/solo-alfanumerico.js");
+        await modulo.InvokeVoidAsync("engancharPorContenedor", "buscador-clientes", "alfanumerico", _refFiltro);
+    }
+
+    // Llamado desde JS cuando el usuario intenta escribir un carácter no permitido.
+    [JSInvokable]
+    public void NotificarBloqueo()
+        => _snackbar.Add("Solo se permiten letras y números.", Severity.Warning);
+
+    public void Dispose() => _refFiltro?.Dispose();
 
     private async Task CargarCatalogos()
     {

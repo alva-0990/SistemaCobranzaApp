@@ -4,6 +4,7 @@
 @using SistemaCobranzaApp.Shared.Components
 @using SistemaCobranzaApp.Shared.Dtos
 @using SistemaCobranzaApp.Shared.Services
+@using SistemaCobranzaApp.Shared.Utilerias
 @inject ApiCliente Api
 
 <MudTabs Elevation="2" Rounded="true" Color="Color.Primary" ApplyEffectsToContainer="true"
@@ -13,17 +14,17 @@
     <MudTabPanel Text="Cobradores" Icon="@Icons.Material.Filled.Groups">
         <MudPaper Elevation="0" Class="pa-4">
             <div class="barra-acciones">
-                <MudTextField T="string"
-                              Value="_busquedaCobradores"
-                              ValueChanged="@(v => { _busquedaCobradores = v; FiltrarCobradores(); })"
-                              Immediate="true"
-                              Placeholder="Buscar cobrador por nombre, zona o usuario..."
-                              Variant="Variant.Outlined"
-                              Adornment="Adornment.Start"
-                              AdornmentIcon="@Icons.Material.Filled.Search"
-                              AdornmentColor="Color.Primary"
-                              Clearable="true"
-                              Class="buscador-remarcado" />
+                <CampoFiltrado Modo="ModoCampo.Alfanumerico"
+                               Value="@_busquedaCobradores"
+                               ValueChanged="@(v => { _busquedaCobradores = v ?? string.Empty; FiltrarCobradores(); })"
+                               Immediate="true"
+                               Placeholder="Buscar cobrador por nombre, zona o usuario..."
+                               Variant="Variant.Outlined"
+                               Adornment="Adornment.Start"
+                               AdornmentIcon="@Icons.Material.Filled.Search"
+                               AdornmentColor="Color.Primary"
+                               Clearable="true"
+                               Class="buscador-remarcado" />
                 <MudButton Variant="Variant.Filled"
                            Color="Color.Primary"
                            StartIcon="@Icons.Material.Filled.PersonAdd"
@@ -81,11 +82,11 @@
     <MudTabPanel Text="Vendedores" Icon="@Icons.Material.Filled.Badge">
         <MudPaper Elevation="0" Class="pa-4">
             <div class="barra-acciones">
-                <MudTextField T="string"
-                              Value="_busquedaVendedores"
-                              ValueChanged="@(v => { _busquedaVendedores = v; FiltrarVendedores(); })"
-                              Immediate="true"
-                              Placeholder="Buscar vendedor por nombre, zona o usuario..."
+                <CampoFiltrado Modo="ModoCampo.Alfanumerico"
+                               Value="@_busquedaVendedores"
+                               ValueChanged="@(v => { _busquedaVendedores = v ?? string.Empty; FiltrarVendedores(); })"
+                               Immediate="true"
+                               Placeholder="Buscar vendedor por nombre, zona o usuario..."
                               Variant="Variant.Outlined"
                               Adornment="Adornment.Start"
                               AdornmentIcon="@Icons.Material.Filled.Search"

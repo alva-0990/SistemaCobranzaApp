@@ -4,6 +4,7 @@
 @using SistemaCobranzaApp.Shared.Components
 @using SistemaCobranzaApp.Shared.Dtos
 @using SistemaCobranzaApp.Shared.Services
+@using SistemaCobranzaApp.Shared.Utilerias
 @inject ApiCliente Api
 @inject IDialogService _dialogo
 @inject ISnackbar _snackbar
@@ -16,17 +17,16 @@
     <MudTabPanel Text="Usuarios" Icon="@Icons.Material.Filled.ManageAccounts">
         <MudPaper Elevation="0" Class="pa-4">
             <div class="barra-acciones">
-                <MudTextField T="string"
-                              Value="_busquedaUsuario"
-                              ValueChanged="@(v => { _busquedaUsuario = v; })"
-                              Immediate="true"
-                              Placeholder="Buscar usuario por nombre o rol..."
-                              Variant="Variant.Outlined"
-                              Adornment="Adornment.Start"
-                              AdornmentIcon="@Icons.Material.Filled.Search"
-                              AdornmentColor="Color.Primary"
-                              Clearable="true"
-                              Class="buscador-remarcado" />
+                <CampoFiltrado Modo="ModoCampo.Alfanumerico"
+                               @bind-Value="_busquedaUsuario"
+                               Immediate="true"
+                               Placeholder="Buscar usuario por nombre o rol..."
+                               Variant="Variant.Outlined"
+                               Adornment="Adornment.Start"
+                               AdornmentIcon="@Icons.Material.Filled.Search"
+                               AdornmentColor="Color.Primary"
+                               Clearable="true"
+                               Class="buscador-remarcado" />
                 <MudButton Variant="Variant.Filled"
                            Color="Color.Primary"
                            StartIcon="@Icons.Material.Filled.PersonAdd"
@@ -84,17 +84,16 @@
     <MudTabPanel Text="Roles" Icon="@Icons.Material.Filled.AdminPanelSettings">
         <MudPaper Elevation="0" Class="pa-4">
             <div class="barra-acciones">
-                <MudTextField T="string"
-                              Value="_busquedaRol"
-                              ValueChanged="@(v => { _busquedaRol = v; })"
-                              Immediate="true"
-                              Placeholder="Buscar rol por nombre o ID..."
-                              Variant="Variant.Outlined"
-                              Adornment="Adornment.Start"
-                              AdornmentIcon="@Icons.Material.Filled.Search"
-                              AdornmentColor="Color.Secondary"
-                              Clearable="true"
-                              Class="buscador-remarcado" />
+                <CampoFiltrado Modo="ModoCampo.Alfanumerico"
+                               @bind-Value="_busquedaRol"
+                               Immediate="true"
+                               Placeholder="Buscar rol por nombre o ID..."
+                               Variant="Variant.Outlined"
+                               Adornment="Adornment.Start"
+                               AdornmentIcon="@Icons.Material.Filled.Search"
+                               AdornmentColor="Color.Secondary"
+                               Clearable="true"
+                               Class="buscador-remarcado" />
                 <MudButton Variant="Variant.Filled"
                            Color="Color.Secondary"
                            StartIcon="@Icons.Material.Filled.Add"

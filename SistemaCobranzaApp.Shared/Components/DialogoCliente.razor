@@ -1,5 +1,7 @@
 @using MudBlazor
 @using SistemaCobranzaApp.Shared.Dtos
+@using SistemaCobranzaApp.Shared.Components
+@using SistemaCobranzaApp.Shared.Utilerias
 
 <MudDialog Class="@ClaseDialogo">
     <TitleContent>
@@ -14,53 +16,54 @@
             <MudGrid>
                 <!-- Datos personales -->
                 <MudItem xs="12" sm="4">
-                    <MudTextField T="string" Label="Nombre" @bind-Value="Modelo.Nombre"
-                                  Required="true" RequiredError="El nombre es obligatorio."
-                                  Variant="Variant.Outlined" Margin="Margin.Dense" />
+                    <CampoFiltrado Modo="ModoCampo.Texto" Label="Nombre" @bind-Value="Modelo.Nombre"
+                                   Required="true" RequiredError="El nombre es obligatorio."
+                                   Variant="Variant.Outlined" Margin="Margin.Dense" />
                 </MudItem>
                 <MudItem xs="12" sm="4">
-                    <MudTextField T="string" Label="Apellido paterno" @bind-Value="Modelo.ApPaterno"
-                                  Variant="Variant.Outlined" Margin="Margin.Dense" />
+                    <CampoFiltrado Modo="ModoCampo.Texto" Label="Apellido paterno" @bind-Value="Modelo.ApPaterno"
+                                   Variant="Variant.Outlined" Margin="Margin.Dense" />
                 </MudItem>
                 <MudItem xs="12" sm="4">
-                    <MudTextField T="string" Label="Apellido materno" @bind-Value="Modelo.ApMaterno"
-                                  Variant="Variant.Outlined" Margin="Margin.Dense" />
+                    <CampoFiltrado Modo="ModoCampo.Texto" Label="Apellido materno" @bind-Value="Modelo.ApMaterno"
+                                   Variant="Variant.Outlined" Margin="Margin.Dense" />
                 </MudItem>
 
                 <!-- Contacto -->
                 <MudItem xs="12" sm="6">
-                    <MudTextField T="string" Label="Teléfono principal" @bind-Value="Modelo.TelefonoPrincipal"
-                                  Required="true" RequiredError="El teléfono principal es obligatorio."
-                                  Validation="@((Func<string?, string?>)ValidarTelefonoObligatorio)"
-                                  MaxLength="10" InputMode="InputMode.tel"
-                                  Variant="Variant.Outlined" Margin="Margin.Dense" />
+                    <CampoFiltrado Modo="ModoCampo.Numeros" Label="Teléfono principal" @bind-Value="Modelo.TelefonoPrincipal"
+                                   Required="true" RequiredError="El teléfono principal es obligatorio."
+                                   Validation="@((Func<string?, string?>)ValidarTelefonoObligatorio)"
+                                   MaxLength="10" InputMode="InputMode.tel"
+                                   Variant="Variant.Outlined" Margin="Margin.Dense" />
                 </MudItem>
                 <MudItem xs="12" sm="6">
-                    <MudTextField T="string" Label="Teléfono secundario" @bind-Value="Modelo.TelefonoSecundario"
-                                  Validation="@((Func<string?, string?>)ValidarTelefonoOpcional)"
-                                  MaxLength="10" InputMode="InputMode.tel"
-                                  Variant="Variant.Outlined" Margin="Margin.Dense" />
+                    <CampoFiltrado Modo="ModoCampo.Numeros" Label="Teléfono secundario" @bind-Value="Modelo.TelefonoSecundario"
+                                   Validation="@((Func<string?, string?>)ValidarTelefonoOpcional)"
+                                   MaxLength="10" InputMode="InputMode.tel"
+                                   Variant="Variant.Outlined" Margin="Margin.Dense" />
                 </MudItem>
                 <MudItem xs="12" sm="6">
-                    <MudTextField T="string" Label="Email" @bind-Value="Modelo.Email"
-                                  Validation="@((Func<string?, string?>)ValidarEmail)"
-                                  InputMode="InputMode.email"
-                                  Variant="Variant.Outlined" Margin="Margin.Dense" />
+                    <CampoFiltrado Modo="ModoCampo.Correo" Label="Email" @bind-Value="Modelo.Email"
+                                   Validation="@((Func<string?, string?>)ValidarEmail)"
+                                   InputMode="InputMode.email"
+                                   Variant="Variant.Outlined" Margin="Margin.Dense" />
                 </MudItem>
                 <MudItem xs="12" sm="6">
-                    <MudTextField T="string" Label="Código postal" @bind-Value="Modelo.CodigoPostal"
-                                  Variant="Variant.Outlined" Margin="Margin.Dense" />
+                    <CampoFiltrado Modo="ModoCampo.Numeros" Label="Código postal" @bind-Value="Modelo.CodigoPostal"
+                                   MaxLength="5" InputMode="InputMode.numeric"
+                                   Variant="Variant.Outlined" Margin="Margin.Dense" />
                 </MudItem>
 
                 <!-- Ubicación -->
                 <MudItem xs="12">
-                    <MudTextField T="string" Label="Dirección" @bind-Value="Modelo.Direccion"
-                                  Required="true" RequiredError="La dirección es obligatoria."
-                                  Variant="Variant.Outlined" Margin="Margin.Dense" />
+                    <CampoFiltrado Modo="ModoCampo.Direccion" Label="Dirección" @bind-Value="Modelo.Direccion"
+                                   Required="true" RequiredError="La dirección es obligatoria."
+                                   Variant="Variant.Outlined" Margin="Margin.Dense" />
                 </MudItem>
                 <MudItem xs="12">
-                    <MudTextField T="string" Label="Referencia de ubicación" @bind-Value="Modelo.ReferenciaUbicacion"
-                                  Variant="Variant.Outlined" Margin="Margin.Dense" />
+                    <CampoFiltrado Modo="ModoCampo.Direccion" Label="Referencia de ubicación" @bind-Value="Modelo.ReferenciaUbicacion"
+                                   Variant="Variant.Outlined" Margin="Margin.Dense" />
                 </MudItem>
 
                 <!-- Asignación territorial: Zona -> Ruta / Vendedor -->
@@ -114,8 +117,8 @@
                 </MudItem>
 
                 <MudItem xs="12">
-                    <MudTextField T="string" Label="Observaciones" @bind-Value="Modelo.Observaciones"
-                                  Lines="2" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                    <CampoFiltrado Modo="ModoCampo.Direccion" Label="Observaciones" @bind-Value="Modelo.Observaciones"
+                                   Lines="2" Variant="Variant.Outlined" Margin="Margin.Dense" />
                 </MudItem>
 
                 @if (!EsNuevo)

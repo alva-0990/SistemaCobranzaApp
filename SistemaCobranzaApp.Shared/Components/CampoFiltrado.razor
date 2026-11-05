@@ -1,0 +1,171 @@
+@using MudBlazor
+@using Microsoft.JSInterop
+@using SistemaCobranzaApp.Shared.Utilerias
+@inject IJSRuntime _js
+@inject ISnackbar _snackbar
+@implements IDisposable
+
+@*
+    Campo de texto reutilizable que FILTRA la entrada según un Modo, impidiendo
+    escribir caracteres fuera del conjunto permitido (web y Android) y avisando
+    cuando bloquea uno.
+
+    Modos (ModoCampo):
+      Texto        -> letras y espacios
+      Numeros      -> solo dígitos
+      Alfanumerico -> letras, dígitos y espacios
+      Direccion    -> letras, dígitos, espacios y , . - _ # ( )
+      Correo       -> letras, dígitos y @ . - _
+
+    Uso:
+      <CampoFiltrado Modo="ModoCampo.Texto"    Label="Nombre"    @bind-Value="_nombre" />
+      <CampoFiltrado Modo="ModoCampo.Numeros"  Label="Teléfono"  @bind-Value="_tel" />
+      <CampoFiltrado Modo="ModoCampo.Direccion" Label="Dirección" @bind-Value="_dir" />
+      <CampoFiltrado Modo="ModoCampo.Correo"   Label="Correo"    @bind-Value="_correo" />
+*@
+
+<div id="@_idContenedor" style="@(FullWidth ? "width:100%;" : null)">
+    <MudTextField T="string"
+                  @ref="_campo"
+                  Value="_valorInterno"
+                  ValueChanged="OnValueChanged"
+                  Label="@Label"
+                  Placeholder="@Placeholder"
+                  Variant="@Variant"
+                  Margin="@Margin"
+                  Immediate="@Immediate"
+                  DebounceInterval="@DebounceInterval"
+                  Clearable="@Clearable"
+                  Required="@Required"
+                  RequiredError="@RequiredError"
+                  Disabled="@Disabled"
+                  ReadOnly="@ReadOnly"
+                  MaxLength="@MaxLength"
+                  Lines="@Lines"
+                  FullWidth="@FullWidth"
+                  InputMode="@InputMode"
+                  HelperText="@HelperText"
+                  Validation="@Validation"
+                  Adornment="@Adornment"
+                  AdornmentIcon="@AdornmentIcon"
+                  AdornmentColor="@AdornmentColor"
+                  AutoFocus="@AutoFocus"
+                  OnKeyUp="@OnKeyUp"
+                  Class="@Class" />
+</div>
+
+@code {
+    private readonly string _idContenedor = $"campo-filtrado-{Guid.NewGuid():N}";
+    private MudTextField<string>? _campo;
+    private DotNetObjectReference<CampoFiltrado>? _ref;
+    // Valor interno: única fuente de verdad del MudTextField. Se sincroniza
+    // desde el parámetro Value solo cuando el padre realmente lo cambia, de
+    // modo que el input nunca "revierte" lo tecleado aunque el padre no haga
+    // re-render propio al asignar su campo en ValueChanged.
+    private string? _valorInterno;
+
+    [Parameter] public ModoCampo Modo { get; set; } = ModoCampo.Alfanumerico;
+
+    [Parameter] public string? Value { get; set; }
+    [Parameter] public EventCallback<string?> ValueChanged { get; set; }
+
+    [Parameter] public string? Label { get; set; }
+    [Parameter] public string? Placeholder { get; set; }
+    [Parameter] public Variant Variant { get; set; } = Variant.Outlined;
+    [Parameter] public Margin Margin { get; set; } = Margin.None;
+    [Parameter] public bool Immediate { get; set; }
+    [Parameter] public double DebounceInterval { get; set; }
+    [Parameter] public bool Clearable { get; set; }
+    [Parameter] public bool Required { get; set; }
+    [Parameter] public string RequiredError { get; set; } = "Este campo es obligatorio.";
+    [Parameter] public bool Disabled { get; set; }
+    [Parameter] public bool ReadOnly { get; set; }
+    [Parameter] public int MaxLength { get; set; } = 524288;
+    [Parameter] public int Lines { get; set; } = 1;
+    [Parameter] public bool FullWidth { get; set; } = true;
+    [Parameter] public InputMode InputMode { get; set; } = InputMode.text;
+    [Parameter] public string? HelperText { get; set; }
+    // Validación MudForm opcional (p. ej. formato de teléfono o correo).
+    [Parameter] public object? Validation { get; set; }
+    [Parameter] public Adornment Adornment { get; set; } = Adornment.None;
+    [Parameter] public string? AdornmentIcon { get; set; }
+    [Parameter] public Color AdornmentColor { get; set; } = Color.Default;
+    [Parameter] public bool AutoFocus { get; set; }
+    [Parameter] public string? Class { get; set; }
+    [Parameter] public EventCallback<Microsoft.AspNetCore.Components.Web.KeyboardEventArgs> OnKeyUp { get; set; }
+
+    // Mensaje mostrado al bloquear un carácter. Si es null, se usa uno según el modo.
+    [Parameter] public string? MensajeBloqueo { get; set; }
+
+    public ValueTask FocusAsync() => _campo?.FocusAsync() ?? ValueTask.CompletedTask;
+
+    // Sincroniza el valor interno cuando el padre cambia Value (binding entrante).
+    protected override void OnParametersSet()
+    {
+        if (!string.Equals(_valorInterno, Value, StringComparison.Ordinal))
+            _valorInterno = Value;
+    }
+
+    private Task OnValueChanged(string? valor)
+    {
+        // El valor interno es la fuente de verdad del input; se actualiza aquí y
+        // se notifica al padre. Así el input nunca revierte lo tecleado aunque el
+        // padre enlace con una lambda que solo asigna un campo sin re-render.
+        _valorInterno = valor;
+        return ValueChanged.InvokeAsync(valor);
+    }
+
+    private IJSObjectReference? _modulo;
+
+    // Engancha el filtro al <input> del contenedor. Se re-intenta en CADA render
+    // porque dentro de MudTabs el panel (y su <input>) se crea/recrea al cambiar
+    // de pestaña; el JS es idempotente por modo, así que repetir es seguro.
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            _ref = DotNetObjectReference.Create(this);
+            _modulo = await _js.InvokeAsync<IJSObjectReference>(
+                "import", "./_content/SistemaCobranzaApp.Shared/solo-alfanumerico.js?v=9");
+        }
+        if (_modulo is not null && _ref is not null)
+        {
+            await _modulo.InvokeVoidAsync(
+                "engancharPorContenedor", _idContenedor, TextFieldHelpers.NombreJs(Modo), _ref);
+        }
+    }
+
+    // El JS pasa el modo del input que disparó el bloqueo, para mostrar el mensaje
+    // correcto aunque la referencia .NET registrada sea de otra instancia.
+    [JSInvokable]
+    public void NotificarBloqueo(string? modo)
+    {
+        if (MensajeBloqueo is not null)
+        {
+            _snackbar.Add(MensajeBloqueo, Severity.Warning);
+            return;
+        }
+        var m = ParseModo(modo) ?? Modo;
+        _snackbar.Add(MensajePorModo(m), Severity.Warning);
+    }
+
+    private static ModoCampo? ParseModo(string? modo)
+        => Enum.TryParse<ModoCampo>(modo, ignoreCase: true, out var m) ? m : null;
+
+    private static string MensajePorModo(ModoCampo modo) => modo switch
+    {
+        ModoCampo.Texto     => "Solo se permiten letras.",
+        ModoCampo.TextoGuionBajo => "Solo se permiten letras y guion bajo.",
+        ModoCampo.Numeros   => "Solo se permiten números.",
+        ModoCampo.Direccion => "Carácter no permitido en la dirección.",
+        ModoCampo.Correo    => "Carácter no permitido en el correo.",
+        ModoCampo.Codigo    => "Solo se permiten letras, números y guion.",
+        ModoCampo.AlfanumericoGuion => "Solo se permiten letras, números y guion.",
+        ModoCampo.FrecuenciaTexto => "Solo se permiten letras, números y los signos % . : ; - _",
+        ModoCampo.Observaciones => "Solo se permiten letras, números y los signos , . - ; : _ [ ] ( )",
+        ModoCampo.AlfanumericoGuiones => "Solo se permiten letras, números, guion, guion bajo y corchetes.",
+        _                   => "Solo se permiten letras y números."
+    };
+
+    public void Dispose() => _ref?.Dispose();
+}

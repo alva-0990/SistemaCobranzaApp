@@ -4,6 +4,7 @@
 @using SistemaCobranzaApp.Shared.Components
 @using SistemaCobranzaApp.Shared.Dtos
 @using SistemaCobranzaApp.Shared.Services
+@using SistemaCobranzaApp.Shared.Utilerias
 @inject ApiCliente Api
 @inject IDialogService _dialogo
 @inject ISnackbar _snackbar
@@ -15,12 +16,11 @@
     <MudTabPanel Text="Zonas" Icon="@Icons.Material.Filled.Place">
         <MudPaper Elevation="0" Class="pa-4">
             <div class="barra-acciones">
-                <MudTextField T="string"
-                              Value="_busquedaZona"
-                              ValueChanged="@(v => { _busquedaZona = v; })"
-                              Immediate="true"
-                              Placeholder="Buscar zona por nombre o ID..."
-                              Variant="Variant.Outlined"
+                <CampoFiltrado Modo="ModoCampo.Alfanumerico"
+                               @bind-Value="_busquedaZona"
+                               Immediate="true"
+                               Placeholder="Buscar zona por nombre o ID..."
+                               Variant="Variant.Outlined"
                               Adornment="Adornment.Start"
                               AdornmentIcon="@Icons.Material.Filled.Search"
                               AdornmentColor="Color.Primary"
@@ -73,12 +73,11 @@
     <MudTabPanel Text="Rutas" Icon="@Icons.Material.Filled.AltRoute">
         <MudPaper Elevation="0" Class="pa-4">
             <div class="barra-acciones">
-                <MudTextField T="string"
-                              Value="_busquedaRuta"
-                              ValueChanged="@(v => { _busquedaRuta = v; })"
-                              Immediate="true"
-                              Placeholder="Buscar ruta por nombre, ID o zona..."
-                              Variant="Variant.Outlined"
+                <CampoFiltrado Modo="ModoCampo.Alfanumerico"
+                               @bind-Value="_busquedaRuta"
+                               Immediate="true"
+                               Placeholder="Buscar ruta por nombre, ID o zona..."
+                               Variant="Variant.Outlined"
                               Adornment="Adornment.Start"
                               AdornmentIcon="@Icons.Material.Filled.Search"
                               AdornmentColor="Color.Secondary"

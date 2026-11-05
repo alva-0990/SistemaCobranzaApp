@@ -1,5 +1,7 @@
 @using MudBlazor
 @using SistemaCobranzaApp.Shared.Dtos
+@using SistemaCobranzaApp.Shared.Components
+@using SistemaCobranzaApp.Shared.Utilerias
 
 <MudDialog>
     <TitleContent>
@@ -13,13 +15,13 @@
         <MudForm @ref="_form" @bind-IsValid="@_formValido">
             <MudGrid>
                 <MudItem xs="12">
-                    <MudTextField T="string"
-                                  Label="@LabelNombre"
-                                  @bind-Value="Modelo.Nombre"
-                                  Required="true"
-                                  RequiredError="El nombre es obligatorio."
-                                  Variant="Variant.Outlined"
-                                  Margin="Margin.Dense" />
+                    <CampoFiltrado Modo="ModoCampo.Texto"
+                                   Label="@LabelNombre"
+                                   @bind-Value="Modelo.Nombre"
+                                   Required="true"
+                                   RequiredError="El nombre es obligatorio."
+                                   Variant="Variant.Outlined"
+                                   Margin="Margin.Dense" />
                 </MudItem>
 
                 @if (MostrarZona)

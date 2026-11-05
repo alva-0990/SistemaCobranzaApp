@@ -1,4 +1,6 @@
 @using MudBlazor
+@using SistemaCobranzaApp.Shared.Components
+@using SistemaCobranzaApp.Shared.Utilerias
 
 <MudDialog>
     <TitleContent>
@@ -11,10 +13,10 @@
         <MudForm @ref="_form">
             <MudGrid>
                 <MudItem xs="12">
-                    <MudTextField T="string" Label="Nombre del esquema" @bind-Value="Modelo.NombreEsquema"
-                                  Required="true" RequiredError="El nombre del esquema es obligatorio."
-                                  Validation="@(new Func<string, string?>(ValidarNombre))"
-                                  Variant="Variant.Outlined" Margin="Margin.Dense" />
+                    <CampoFiltrado Modo="ModoCampo.FrecuenciaTexto" Label="Nombre del esquema" @bind-Value="Modelo.NombreEsquema"
+                                   Required="true" RequiredError="El nombre del esquema es obligatorio."
+                                   Validation="@(new Func<string, string?>(ValidarNombre))"
+                                   Variant="Variant.Outlined" Margin="Margin.Dense" />
                 </MudItem>
                 <MudItem xs="12">
                     <MudSelect T="string" Label="Tipo de cálculo" @bind-Value="Modelo.TipoCalculo"

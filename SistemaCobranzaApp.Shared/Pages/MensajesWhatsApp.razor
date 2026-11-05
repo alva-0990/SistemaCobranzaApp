@@ -2,6 +2,8 @@
 
 @using MudBlazor
 @using SistemaCobranzaApp.Shared.Dtos
+@using SistemaCobranzaApp.Shared.Components
+@using SistemaCobranzaApp.Shared.Utilerias
 
 <MudPaper Elevation="2" Rounded="true" Class="ma-2 pa-4">
     <!-- Resumen por estado (clic para filtrar) -->
@@ -25,16 +27,16 @@
     </div>
 
     <div class="barra-acciones">
-        <MudTextField T="string"
-                      @bind-Value="Busqueda"
-                      Immediate="true"
-                      Placeholder="Buscar por teléfono, cliente, mensaje o error..."
-                      Variant="Variant.Outlined"
-                      Adornment="Adornment.Start"
-                      AdornmentIcon="@Icons.Material.Filled.Search"
-                      AdornmentColor="Color.Primary"
-                      Clearable="true"
-                      Class="buscador-remarcado" />
+        <CampoFiltrado Modo="ModoCampo.Alfanumerico"
+                       @bind-Value="Busqueda"
+                       Immediate="true"
+                       Placeholder="Buscar por teléfono, cliente, mensaje o error..."
+                       Variant="Variant.Outlined"
+                       Adornment="Adornment.Start"
+                       AdornmentIcon="@Icons.Material.Filled.Search"
+                       AdornmentColor="Color.Primary"
+                       Clearable="true"
+                       Class="buscador-remarcado" />
         <MudButton Variant="Variant.Filled"
                    Color="Color.Primary"
                    StartIcon="@Icons.Material.Filled.Refresh"

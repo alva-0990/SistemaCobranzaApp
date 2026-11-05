@@ -1,6 +1,8 @@
 @using MudBlazor
 @using SistemaCobranzaApp.Shared.Dtos
 @using SistemaCobranzaApp.Domain.Seguridad
+@using SistemaCobranzaApp.Shared.Components
+@using SistemaCobranzaApp.Shared.Utilerias
 
 <MudDialog Class="@ClaseDialogo">
     <TitleContent>
@@ -14,23 +16,23 @@
         <MudForm Disabled="_guardando" @ref="_form" @bind-IsValid="@_formValido">
             <MudGrid>
                 <MudItem xs="12">
-                    <MudTextField T="string"
-                                  Label="Nombre de usuario"
-                                  @bind-Value="Modelo.Usuario"
-                                  Required="true"
-                                  RequiredError="El usuario es obligatorio."
-                                  Variant="Variant.Outlined"
-                                  Margin="Margin.Dense" />
+                    <CampoFiltrado Modo="ModoCampo.Alfanumerico"
+                                   Label="Nombre de usuario"
+                                   @bind-Value="Modelo.Usuario"
+                                   Required="true"
+                                   RequiredError="El usuario es obligatorio."
+                                   Variant="Variant.Outlined"
+                                   Margin="Margin.Dense" />
                 </MudItem>
 
                 <MudItem xs="12">
-                    <MudTextField T="string"
-                                  Label="Nombre completo"
-                                  @bind-Value="Modelo.NombreCompleto"
-                                  Required="true"
-                                  RequiredError="El nombre completo es obligatorio."
-                                  Variant="Variant.Outlined"
-                                  Margin="Margin.Dense" />
+                    <CampoFiltrado Modo="ModoCampo.Texto"
+                                   Label="Nombre completo"
+                                   @bind-Value="Modelo.NombreCompleto"
+                                   Required="true"
+                                   RequiredError="El nombre completo es obligatorio."
+                                   Variant="Variant.Outlined"
+                                   Margin="Margin.Dense" />
                 </MudItem>
 
                 @if (!EsPerfil)

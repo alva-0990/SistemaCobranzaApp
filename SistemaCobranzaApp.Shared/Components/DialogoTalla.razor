@@ -1,4 +1,6 @@
 @using MudBlazor
+@using SistemaCobranzaApp.Shared.Components
+@using SistemaCobranzaApp.Shared.Utilerias
 
 <MudDialog>
     <TitleContent>
@@ -13,14 +15,14 @@
             <MudGrid>
                 @* Descripción (ej: '26', 'M', 'CH') *@
                 <MudItem xs="12" sm="6">
-                    <MudTextField T="string"
-                                  Label="Descripción"
-                                  @bind-Value="Modelo.Descripcion"
-                                  Required="true"
-                                  RequiredError="La descripción es obligatoria."
-                                  HelperText="Ej: '26', 'M', 'CH'"
-                                  Variant="Variant.Outlined"
-                                  Margin="Margin.Dense" />
+                    <CampoFiltrado Modo="ModoCampo.AlfanumericoGuion"
+                                   Label="Descripción"
+                                   @bind-Value="Modelo.Descripcion"
+                                   Required="true"
+                                   RequiredError="La descripción es obligatoria."
+                                   HelperText="Ej: '26', 'M', 'CH'"
+                                   Variant="Variant.Outlined"
+                                   Margin="Margin.Dense" />
                 </MudItem>
 
                 @* Tipo (para agrupar) *@

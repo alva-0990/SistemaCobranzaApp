@@ -4,6 +4,7 @@
 @using SistemaCobranzaApp.Shared.Components
 @using SistemaCobranzaApp.Shared.Dtos
 @using SistemaCobranzaApp.Shared.Services
+@using SistemaCobranzaApp.Shared.Utilerias
 @inject ApiCliente Api
 @inject IDialogService _dialogo
 @inject ISnackbar _snackbar
@@ -70,10 +71,10 @@
                                          Variant="Variant.Outlined" Dense="true" Min="0" Class="mb-3"
                                          Disabled="@(_centralSeleccion is null)" />
 
-                        <MudTextField T="string" @bind-Value="_centralObservaciones"
-                                      Label="Observaciones (opcional)" Variant="Variant.Outlined"
-                                      Lines="3" Dense="true" Class="mb-3"
-                                      Disabled="@(_centralSeleccion is null)" />
+                        <CampoFiltrado Modo="ModoCampo.Observaciones" @bind-Value="_centralObservaciones"
+                                       Label="Observaciones (opcional)" Variant="Variant.Outlined"
+                                       Lines="3" Class="mb-3"
+                                       Disabled="@(_centralSeleccion is null)" />
 
                         <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true"
                                    StartIcon="@Icons.Material.Filled.Save" Class="mb-2"
@@ -94,16 +95,16 @@
                 <!-- Tabla derecha: existencias centrales -->
                 <MudItem xs="12" md="8" lg="9">
                     <div class="barra-acciones">
-                        <MudTextField T="string"
-                                      @bind-Value="_busquedaCentral"
-                                      Immediate="true"
-                                      Placeholder="Filtrar por nombre o clave..."
-                                      Variant="Variant.Outlined"
-                                      Adornment="Adornment.Start"
-                                      AdornmentIcon="@Icons.Material.Filled.Search"
-                                      AdornmentColor="Color.Primary"
-                                      Clearable="true"
-                                      Class="buscador-remarcado" />
+                        <CampoFiltrado Modo="ModoCampo.Observaciones"
+                                       @bind-Value="_busquedaCentral"
+                                       Immediate="true"
+                                       Placeholder="Filtrar por nombre o clave..."
+                                       Variant="Variant.Outlined"
+                                       Adornment="Adornment.Start"
+                                       AdornmentIcon="@Icons.Material.Filled.Search"
+                                       AdornmentColor="Color.Primary"
+                                       Clearable="true"
+                                       Class="buscador-remarcado" />
                         <MudButton Variant="Variant.Filled" Color="Color.Success"
                                    StartIcon="@Icons.Material.Filled.FileDownload"
                                    OnClick="ExportarCentral" Class="boton-nuevo"
@@ -218,10 +219,10 @@
                                          Dense="true" Min="0" Class="mb-3"
                                          Disabled="@(_zonaSeleccion is null)" />
 
-                        <MudTextField T="string" @bind-Value="_zonaObservaciones"
-                                      Label="Motivo / Observaciones (opcional)" Variant="Variant.Outlined"
-                                      Lines="3" Dense="true" Class="mb-3"
-                                      Disabled="@(_zonaSeleccion is null)" />
+                        <CampoFiltrado Modo="ModoCampo.Observaciones" @bind-Value="_zonaObservaciones"
+                                       Label="Motivo / Observaciones (opcional)" Variant="Variant.Outlined"
+                                       Lines="3" Class="mb-3"
+                                       Disabled="@(_zonaSeleccion is null)" />
 
                         <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true"
                                    StartIcon="@Icons.Material.Filled.Save" Class="mb-2"
@@ -242,16 +243,16 @@
                 <!-- Tabla derecha: existencias por zona -->
                 <MudItem xs="12" md="8" lg="9">
                     <div class="barra-acciones">
-                        <MudTextField T="string"
-                                      @bind-Value="_busquedaZona"
-                                      Immediate="true"
-                                      Placeholder="Filtrar por nombre o clave..."
-                                      Variant="Variant.Outlined"
-                                      Adornment="Adornment.Start"
-                                      AdornmentIcon="@Icons.Material.Filled.Search"
-                                      AdornmentColor="Color.Primary"
-                                      Clearable="true"
-                                      Class="buscador-remarcado" />
+                        <CampoFiltrado Modo="ModoCampo.Observaciones"
+                                       @bind-Value="_busquedaZona"
+                                       Immediate="true"
+                                       Placeholder="Filtrar por nombre o clave..."
+                                       Variant="Variant.Outlined"
+                                       Adornment="Adornment.Start"
+                                       AdornmentIcon="@Icons.Material.Filled.Search"
+                                       AdornmentColor="Color.Primary"
+                                       Clearable="true"
+                                       Class="buscador-remarcado" />
                         <MudButton Variant="Variant.Filled" Color="Color.Success"
                                    StartIcon="@Icons.Material.Filled.FileDownload"
                                    OnClick="ExportarZona" Class="boton-nuevo"
@@ -344,9 +345,9 @@
                                                        ObtenerId="@(z => z.IdZona)"
                                                        ObtenerTexto="@(z => z.Descripcion)" />
 
-                                <MudTextField T="string" @bind-Value="_propObservaciones"
-                                              Label="Observaciones (opcional)" Variant="Variant.Outlined"
-                                              Lines="2" Dense="true" Class="mb-4" />
+                                <CampoFiltrado Modo="ModoCampo.Observaciones" @bind-Value="_propObservaciones"
+                                               Label="Observaciones (opcional)" Variant="Variant.Outlined"
+                                               Lines="2" Class="mb-4" />
 
                                 <MudDivider Class="mb-3" />
 

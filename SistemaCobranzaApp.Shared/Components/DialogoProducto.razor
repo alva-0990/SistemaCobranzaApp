@@ -1,5 +1,7 @@
 @using MudBlazor
 @using SistemaCobranzaApp.Shared.Dtos
+@using SistemaCobranzaApp.Shared.Components
+@using SistemaCobranzaApp.Shared.Utilerias
 
 <MudDialog Class="@ClaseDialogo">
     <TitleContent>
@@ -13,23 +15,23 @@
         <MudForm @ref="_form" @bind-IsValid="@_formValido">
             <MudGrid>
                 <MudItem xs="12" sm="4">
-                    <MudTextField T="string"
-                                  Label="Código / Clave"
-                                  @bind-Value="Modelo.CodigoClave"
-                                  Required="true"
-                                  RequiredError="El código es obligatorio."
-                                  Variant="Variant.Outlined"
-                                  Margin="Margin.Dense" />
+                    <CampoFiltrado Modo="ModoCampo.AlfanumericoGuion"
+                                   Label="Código / Clave"
+                                   @bind-Value="Modelo.CodigoClave"
+                                   Required="true"
+                                   RequiredError="El código es obligatorio."
+                                   Variant="Variant.Outlined"
+                                   Margin="Margin.Dense" />
                 </MudItem>
 
                 <MudItem xs="12" sm="8">
-                    <MudTextField T="string"
-                                  Label="Descripción"
-                                  @bind-Value="Modelo.Descripcion"
-                                  Required="true"
-                                  RequiredError="La descripción es obligatoria."
-                                  Variant="Variant.Outlined"
-                                  Margin="Margin.Dense" />
+                    <CampoFiltrado Modo="ModoCampo.AlfanumericoGuion"
+                                   Label="Descripción"
+                                   @bind-Value="Modelo.Descripcion"
+                                   Required="true"
+                                   RequiredError="La descripción es obligatoria."
+                                   Variant="Variant.Outlined"
+                                   Margin="Margin.Dense" />
                 </MudItem>
 
                 <MudItem xs="12" sm="6">

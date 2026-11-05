@@ -2,6 +2,8 @@
 
 @using MudBlazor
 @using SistemaCobranzaApp.Shared.Dtos
+@using SistemaCobranzaApp.Shared.Components
+@using SistemaCobranzaApp.Shared.Utilerias
 
 <div class="ma-2">
     <!-- ===================== Buscador (dos pestañas) — se oculta al abrir una cuenta ===================== -->
@@ -14,17 +16,18 @@
         <MudTabPanel Text="Cliente" Icon="@Icons.Material.Filled.PersonSearch">
             <MudPaper Elevation="0" Class="pa-4">
                 <div class="barra-busqueda">
-                    <MudTextField T="string"
-                                  @bind-Value="BusquedaCliente"
-                                  Immediate="true"
-                                  OnKeyUp="OnKeyUpCliente"
-                                  Placeholder="Id del cliente, nombre y apellidos..."
-                                  Variant="Variant.Outlined"
-                                  Adornment="Adornment.Start"
-                                  AdornmentIcon="@Icons.Material.Filled.Search"
-                                  AdornmentColor="Color.Primary"
-                                  Clearable="true"
-                                  Class="buscador-remarcado" />
+                    <CampoFiltrado Modo="ModoCampo.Alfanumerico"
+                                   @bind-Value="BusquedaCliente"
+                                   Immediate="true"
+                                   OnKeyUp="OnKeyUpCliente"
+                                   Placeholder="Id del cliente, nombre y apellidos..."
+                                   Variant="Variant.Outlined"
+                                   Adornment="Adornment.Start"
+                                   AdornmentIcon="@Icons.Material.Filled.Search"
+                                   AdornmentColor="Color.Primary"
+                                   Clearable="true"
+                                   Class="buscador-remarcado" 
+                                   AutoFocus="true" />
                     <MudButton Variant="Variant.Filled" Color="Color.Primary"
                                StartIcon="@Icons.Material.Filled.Search"
                                OnClick="BuscarClienteAsync" Class="boton-buscar">
@@ -41,17 +44,18 @@
         <MudTabPanel Text="Venta" Icon="@Icons.Material.Filled.ReceiptLong">
             <MudPaper Elevation="0" Class="pa-4">
                 <div class="barra-busqueda">
-                    <MudTextField T="string"
-                                  @bind-Value="BusquedaVenta"
-                                  Immediate="true"
-                                  OnKeyUp="OnKeyUpVenta"
-                                  Placeholder="Id de la venta o código..."
-                                  Variant="Variant.Outlined"
-                                  Adornment="Adornment.Start"
-                                  AdornmentIcon="@Icons.Material.Filled.Search"
-                                  AdornmentColor="Color.Primary"
-                                  Clearable="true"
-                                  Class="buscador-remarcado" />
+                    <CampoFiltrado Modo="ModoCampo.Codigo"
+                                   @bind-Value="BusquedaVenta"
+                                   Immediate="true"
+                                   OnKeyUp="OnKeyUpVenta"
+                                   Placeholder="Id de la venta o código..."
+                                   Variant="Variant.Outlined"
+                                   Adornment="Adornment.Start"
+                                   AdornmentIcon="@Icons.Material.Filled.Search"
+                                   AdornmentColor="Color.Primary"
+                                   Clearable="true"
+                                   Class="buscador-remarcado" 
+                                   AutoFocus="true" />
                     <MudButton Variant="Variant.Filled" Color="Color.Primary"
                                StartIcon="@Icons.Material.Filled.Search"
                                OnClick="BuscarVentaAsync" Class="boton-buscar">

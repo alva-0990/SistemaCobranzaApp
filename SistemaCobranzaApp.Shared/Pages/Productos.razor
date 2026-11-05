@@ -4,6 +4,7 @@
 @using SistemaCobranzaApp.Shared.Components
 @using SistemaCobranzaApp.Shared.Dtos
 @using SistemaCobranzaApp.Shared.Services
+@using SistemaCobranzaApp.Shared.Utilerias
 @inject ApiCliente Api
 @inject IDialogService _dialogo
 @inject ISnackbar _snackbar
@@ -16,18 +17,18 @@
     <MudTabPanel Text="Productos" Icon="@Icons.Material.Filled.Inventory2">
         <MudPaper Elevation="0" Class="pa-4">
             <div class="barra-acciones">
-                <MudTextField T="string"
-                              Value="_busquedaProducto"
-                              ValueChanged="@(async v => { _busquedaProducto = v; await RecargarProductosAsync(); })"
-                              Immediate="false"
-                              DebounceInterval="400"
-                              Placeholder="Buscar por código o descripción..."
-                              Variant="Variant.Outlined"
-                              Adornment="Adornment.Start"
-                              AdornmentIcon="@Icons.Material.Filled.Search"
-                              AdornmentColor="Color.Primary"
-                              Clearable="true"
-                              Class="buscador-remarcado" />
+                <CampoFiltrado Modo="ModoCampo.AlfanumericoGuion"
+                               Value="@_busquedaProducto"
+                               ValueChanged="@(async v => { _busquedaProducto = v ?? string.Empty; await RecargarProductosAsync(); })"
+                               Immediate="false"
+                               DebounceInterval="400"
+                               Placeholder="Buscar por código o descripción..."
+                               Variant="Variant.Outlined"
+                               Adornment="Adornment.Start"
+                               AdornmentIcon="@Icons.Material.Filled.Search"
+                               AdornmentColor="Color.Primary"
+                               Clearable="true"
+                               Class="buscador-remarcado" />
 
                 <MudSwitch T="bool"
                            Value="_incluirInactivosProducto"
@@ -101,15 +102,14 @@
     <MudTabPanel Text="Categorías" Icon="@Icons.Material.Filled.Category">
         <MudPaper Elevation="0" Class="pa-4">
             <div class="barra-acciones">
-                <MudTextField T="string"
-                              Value="_busquedaCategoria"
-                              ValueChanged="@(v => { _busquedaCategoria = v; })"
-                              Immediate="true"
-                              Placeholder="Buscar categoría..."
-                              Variant="Variant.Outlined"
-                              Adornment="Adornment.Start"
-                              AdornmentIcon="@Icons.Material.Filled.Search"
-                              AdornmentColor="Color.Primary"
+                <CampoFiltrado Modo="ModoCampo.Alfanumerico"
+                               @bind-Value="_busquedaCategoria"
+                               Immediate="true"
+                               Placeholder="Buscar categoría..."
+                               Variant="Variant.Outlined"
+                               Adornment="Adornment.Start"
+                               AdornmentIcon="@Icons.Material.Filled.Search"
+                               AdornmentColor="Color.Primary"
                               Clearable="true"
                               Class="buscador-remarcado" />
                 <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add"
@@ -151,15 +151,14 @@
     <MudTabPanel Text="Marcas" Icon="@Icons.Material.Filled.Sell">
         <MudPaper Elevation="0" Class="pa-4">
             <div class="barra-acciones">
-                <MudTextField T="string"
-                              Value="_busquedaMarca"
-                              ValueChanged="@(v => { _busquedaMarca = v; })"
-                              Immediate="true"
-                              Placeholder="Buscar marca..."
-                              Variant="Variant.Outlined"
-                              Adornment="Adornment.Start"
-                              AdornmentIcon="@Icons.Material.Filled.Search"
-                              AdornmentColor="Color.Primary"
+                <CampoFiltrado Modo="ModoCampo.Alfanumerico"
+                               @bind-Value="_busquedaMarca"
+                               Immediate="true"
+                               Placeholder="Buscar marca..."
+                               Variant="Variant.Outlined"
+                               Adornment="Adornment.Start"
+                               AdornmentIcon="@Icons.Material.Filled.Search"
+                               AdornmentColor="Color.Primary"
                               Clearable="true"
                               Class="buscador-remarcado" />
                 <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add"
@@ -201,15 +200,14 @@
     <MudTabPanel Text="Colores" Icon="@Icons.Material.Filled.Palette">
         <MudPaper Elevation="0" Class="pa-4">
             <div class="barra-acciones">
-                <MudTextField T="string"
-                              Value="_busquedaColor"
-                              ValueChanged="@(v => { _busquedaColor = v; })"
-                              Immediate="true"
-                              Placeholder="Buscar color..."
-                              Variant="Variant.Outlined"
-                              Adornment="Adornment.Start"
-                              AdornmentIcon="@Icons.Material.Filled.Search"
-                              AdornmentColor="Color.Primary"
+                <CampoFiltrado Modo="ModoCampo.Alfanumerico"
+                               @bind-Value="_busquedaColor"
+                               Immediate="true"
+                               Placeholder="Buscar color..."
+                               Variant="Variant.Outlined"
+                               Adornment="Adornment.Start"
+                               AdornmentIcon="@Icons.Material.Filled.Search"
+                               AdornmentColor="Color.Primary"
                               Clearable="true"
                               Class="buscador-remarcado" />
                 <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add"
@@ -251,13 +249,12 @@
     <MudTabPanel Text="Tallas" Icon="@Icons.Material.Filled.Straighten">
         <MudPaper Elevation="0" Class="pa-4">
             <div class="barra-acciones">
-                <MudTextField T="string"
-                              Value="_busquedaTalla"
-                              ValueChanged="@(v => { _busquedaTalla = v; })"
-                              Immediate="true"
-                              Placeholder="Buscar talla por descripción o tipo..."
-                              Variant="Variant.Outlined"
-                              Adornment="Adornment.Start"
+                <CampoFiltrado Modo="ModoCampo.AlfanumericoGuion"
+                               @bind-Value="_busquedaTalla"
+                               Immediate="true"
+                               Placeholder="Buscar talla por descripción o tipo..."
+                               Variant="Variant.Outlined"
+                               Adornment="Adornment.Start"
                               AdornmentIcon="@Icons.Material.Filled.Search"
                               AdornmentColor="Color.Primary"
                               Clearable="true"
@@ -796,7 +793,8 @@
             { x => x.Titulo, titulo },
             { x => x.Icono, icono },
             { x => x.LabelNombre, labelNombre },
-            { x => x.Modelo, modelo }
+            { x => x.Modelo, modelo },
+            { x => x.Modo, ModoCampo.Alfanumerico }
         };
         var dialogo = await _dialogo.ShowAsync<DialogoGenerico>(titulo, parametros, opciones);
         var resultado = await dialogo.Result;

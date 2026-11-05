@@ -1,5 +1,7 @@
 @using System.ComponentModel.DataAnnotations
 @using MudBlazor 
+@using SistemaCobranzaApp.Shared.Components
+@using SistemaCobranzaApp.Shared.Utilerias
 
 <MudDialog>
     <TitleContent>
@@ -14,13 +16,13 @@
             <MudGrid>
                 @* Campo Dinámico 1: Nombre / Título / Concepto *@
                 <MudItem xs="12">
-                    <MudTextField T="string" 
-                                  Label="@LabelNombre" 
-                                  @bind-Value="Modelo.Nombre" 
-                                  Required="true" 
-                                  RequiredError="@($"{LabelNombre} es obligatorio.")"
-                                  Variant="Variant.Outlined"
-                                  Margin="Margin.Dense" />
+                    <CampoFiltrado Modo="@Modo"
+                                   Label="@LabelNombre"
+                                   @bind-Value="Modelo.Nombre"
+                                   Required="true"
+                                   RequiredError="@($"{LabelNombre} es obligatorio.")"
+                                   Variant="Variant.Outlined"
+                                   Margin="Margin.Dense" />
                 </MudItem>
 
                 @* Campo: Estatus *@
@@ -56,6 +58,10 @@
 
     [Parameter] 
     public string Icono { get; set; } = Icons.Material.Filled.Edit;
+
+    // Modo de filtrado del campo Nombre. Por defecto solo texto.
+    [Parameter]
+    public ModoCampo Modo { get; set; } = ModoCampo.Texto;
 
     [Parameter] 
     public string LabelNombre { get; set; } = "Nombre";

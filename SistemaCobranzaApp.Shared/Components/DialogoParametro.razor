@@ -1,4 +1,6 @@
 @using MudBlazor
+@using SistemaCobranzaApp.Shared.Components
+@using SistemaCobranzaApp.Shared.Utilerias
 
 <MudDialog>
     <TitleContent>
@@ -13,26 +15,26 @@
             <MudGrid>
                 @* Clave (solo editable en alta) *@
                 <MudItem xs="12">
-                    <MudTextField T="string"
-                                  Label="Clave"
-                                  @bind-Value="Modelo.Clave"
-                                  Disabled="@(!EsNuevo)"
-                                  Required="@EsNuevo"
-                                  RequiredError="La clave es obligatoria."
-                                  HelperText="@(EsNuevo ? "Se guardará en MAYÚSCULAS. Ej.: PROMO_PAGOS_CONSECUTIVOS_ACTIVA" : "La clave no se puede modificar.")"
-                                  Variant="Variant.Outlined"
-                                  Margin="Margin.Dense" />
+                    <CampoFiltrado Modo="ModoCampo.TextoGuionBajo"
+                                   Label="Clave"
+                                   @bind-Value="Modelo.Clave"
+                                   Disabled="@(!EsNuevo)"
+                                   Required="@EsNuevo"
+                                   RequiredError="La clave es obligatoria."
+                                   HelperText="@(EsNuevo ? "Se guardará en MAYÚSCULAS. Ej.: PROMO_PAGOS_CONSECUTIVOS_ACTIVA" : "La clave no se puede modificar.")"
+                                   Variant="Variant.Outlined"
+                                   Margin="Margin.Dense" />
                 </MudItem>
 
                 @* Descripción *@
                 <MudItem xs="12">
-                    <MudTextField T="string"
-                                  Label="Descripción"
-                                  @bind-Value="Modelo.Descripcion"
-                                  Required="true"
-                                  RequiredError="La descripción es obligatoria."
-                                  Variant="Variant.Outlined"
-                                  Margin="Margin.Dense" />
+                    <CampoFiltrado Modo="ModoCampo.AlfanumericoGuiones"
+                                   Label="Descripción"
+                                   @bind-Value="Modelo.Descripcion"
+                                   Required="true"
+                                   RequiredError="La descripción es obligatoria."
+                                   Variant="Variant.Outlined"
+                                   Margin="Margin.Dense" />
                 </MudItem>
 
                 @* Valor numérico *@
@@ -49,12 +51,12 @@
 
                 @* Valor de texto *@
                 <MudItem xs="12" sm="6">
-                    <MudTextField T="string"
-                                  Label="Valor de texto"
-                                  @bind-Value="Modelo.ValorTexto"
-                                  HelperText="Opcional. Ej.: SI / NO."
-                                  Variant="Variant.Outlined"
-                                  Margin="Margin.Dense" />
+                    <CampoFiltrado Modo="ModoCampo.Texto"
+                                   Label="Valor de texto"
+                                   @bind-Value="Modelo.ValorTexto"
+                                   HelperText="Opcional. Ej.: SI / NO."
+                                   Variant="Variant.Outlined"
+                                   Margin="Margin.Dense" />
                 </MudItem>
             </MudGrid>
 

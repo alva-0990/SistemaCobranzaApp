@@ -4,6 +4,7 @@
 @using SistemaCobranzaApp.Shared.Components
 @using SistemaCobranzaApp.Shared.Dtos
 @using SistemaCobranzaApp.Shared.Services
+@using SistemaCobranzaApp.Shared.Utilerias
 @inject ApiCliente Api
 @inject IDialogService _dialogo
 @inject ISnackbar _snackbar
@@ -15,17 +16,16 @@
     <MudTabPanel Text="Condiciones" Icon="@Icons.Material.Filled.CreditCard">
         <MudPaper Elevation="0" Class="pa-4">
             <div class="barra-acciones">
-                <MudTextField T="string"
-                              Value="_busquedaCondicion"
-                              ValueChanged="@(v => { _busquedaCondicion = v; })"
-                              Immediate="true"
-                              Placeholder="Buscar condición por descripción o ID..."
-                              Variant="Variant.Outlined"
-                              Adornment="Adornment.Start"
-                              AdornmentIcon="@Icons.Material.Filled.Search"
-                              AdornmentColor="Color.Primary"
-                              Clearable="true"
-                              Class="buscador-remarcado" />
+                <CampoFiltrado Modo="ModoCampo.Alfanumerico"
+                               @bind-Value="_busquedaCondicion"
+                               Immediate="true"
+                               Placeholder="Buscar condición por descripción o ID..."
+                               Variant="Variant.Outlined"
+                               Adornment="Adornment.Start"
+                               AdornmentIcon="@Icons.Material.Filled.Search"
+                               AdornmentColor="Color.Primary"
+                               Clearable="true"
+                               Class="buscador-remarcado" />
                 <MudButton Variant="Variant.Filled"
                            Color="Color.Primary"
                            StartIcon="@Icons.Material.Filled.Add"
@@ -73,12 +73,11 @@
     <MudTabPanel Text="Plazos / Meses" Icon="@Icons.Material.Filled.CalendarMonth">
         <MudPaper Elevation="0" Class="pa-4">
             <div class="barra-acciones">
-                <MudTextField T="string"
-                              Value="_busquedaMes"
-                              ValueChanged="@(v => { _busquedaMes = v; })"
-                              Immediate="true"
-                              Placeholder="Buscar plazo por descripción, meses o ID..."
-                              Variant="Variant.Outlined"
+                <CampoFiltrado Modo="ModoCampo.Alfanumerico"
+                               @bind-Value="_busquedaMes"
+                               Immediate="true"
+                               Placeholder="Buscar plazo por descripción, meses o ID..."
+                               Variant="Variant.Outlined"
                               Adornment="Adornment.Start"
                               AdornmentIcon="@Icons.Material.Filled.Search"
                               AdornmentColor="Color.Secondary"
@@ -137,12 +136,11 @@
     <MudTabPanel Text="Movimientos" Icon="@Icons.Material.Filled.SwapHoriz">
         <MudPaper Elevation="0" Class="pa-4">
             <div class="barra-acciones">
-                <MudTextField T="string"
-                              Value="_busquedaMovimiento"
-                              ValueChanged="@(v => { _busquedaMovimiento = v; })"
-                              Immediate="true"
-                              Placeholder="Buscar movimiento por descripción o ID..."
-                              Variant="Variant.Outlined"
+                <CampoFiltrado Modo="ModoCampo.Alfanumerico"
+                               @bind-Value="_busquedaMovimiento"
+                               Immediate="true"
+                               Placeholder="Buscar movimiento por descripción o ID..."
+                               Variant="Variant.Outlined"
                               Adornment="Adornment.Start"
                               AdornmentIcon="@Icons.Material.Filled.Search"
                               AdornmentColor="Color.Primary"
@@ -195,12 +193,11 @@
     <MudTabPanel Text="Estatus Venta" Icon="@Icons.Material.Filled.FactCheck">
         <MudPaper Elevation="0" Class="pa-4">
             <div class="barra-acciones">
-                <MudTextField T="string"
-                              Value="_busquedaEstatus"
-                              ValueChanged="@(v => { _busquedaEstatus = v; })"
-                              Immediate="true"
-                              Placeholder="Buscar estatus por descripción o ID..."
-                              Variant="Variant.Outlined"
+                <CampoFiltrado Modo="ModoCampo.Alfanumerico"
+                               @bind-Value="_busquedaEstatus"
+                               Immediate="true"
+                               Placeholder="Buscar estatus por descripción o ID..."
+                               Variant="Variant.Outlined"
                               Adornment="Adornment.Start"
                               AdornmentIcon="@Icons.Material.Filled.Search"
                               AdornmentColor="Color.Secondary"
@@ -253,12 +250,11 @@
     <MudTabPanel Text="Frecuencias de Pago" Icon="@Icons.Material.Filled.EventRepeat">
         <MudPaper Elevation="0" Class="pa-4">
             <div class="barra-acciones">
-                <MudTextField T="string"
-                              Value="_busquedaFrecuencia"
-                              ValueChanged="@(v => { _busquedaFrecuencia = v; })"
-                              Immediate="true"
-                              Placeholder="Buscar frecuencia por descripción, días o ID..."
-                              Variant="Variant.Outlined"
+                <CampoFiltrado Modo="ModoCampo.Alfanumerico"
+                               @bind-Value="_busquedaFrecuencia"
+                               Immediate="true"
+                               Placeholder="Buscar frecuencia por descripción, días o ID..."
+                               Variant="Variant.Outlined"
                               Adornment="Adornment.Start"
                               AdornmentIcon="@Icons.Material.Filled.Search"
                               AdornmentColor="Color.Primary"
@@ -316,11 +312,11 @@
     <MudTabPanel Text="Catálogo de comisión ventas" Icon="@Icons.Material.Filled.Percent">
         <MudPaper Elevation="0" Class="pa-4">
             <div class="barra-acciones">
-                <MudTextField T="string" @bind-Value="_busquedaComision" Immediate="true"
-                              Placeholder="Buscar comisión por nombre, tipo de cálculo o ID..."
-                              Variant="Variant.Outlined" Adornment="Adornment.Start"
-                              AdornmentIcon="@Icons.Material.Filled.Search" AdornmentColor="Color.Primary"
-                              Clearable="true" Class="buscador-remarcado" />
+                <CampoFiltrado Modo="ModoCampo.FrecuenciaTexto" @bind-Value="_busquedaComision" Immediate="true"
+                               Placeholder="Buscar comisión por nombre, tipo de cálculo o ID..."
+                               Variant="Variant.Outlined" Adornment="Adornment.Start"
+                               AdornmentIcon="@Icons.Material.Filled.Search" AdornmentColor="Color.Primary"
+                               Clearable="true" Class="buscador-remarcado" />
                 <MudButton Variant="Variant.Filled" Color="Color.Primary"
                            StartIcon="@Icons.Material.Filled.Add" OnClick="AbrirModalNuevaComision"
                            Class="boton-nuevo">Nueva comisión</MudButton>
