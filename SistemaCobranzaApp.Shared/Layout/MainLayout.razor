@@ -207,7 +207,11 @@ else if (EsEntornoMovil && ApiClienteService.Autenticado)
             <button type="button" class="mas-item" @onclick="@(() => IrA("parametros"))">
                 <MudIcon Icon="@Icons.Material.Filled.Tune" Size="Size.Medium" Class="mr-3" />
                 <span>Parámetros Generales</span>
-            </button>            
+            </button>
+            <button type="button" class="mas-item" @onclick="@(() => IrA("mensajes-whatsapp"))">
+                <MudIcon Icon="@Icons.Material.Filled.Chat" Size="Size.Medium" Class="mr-3" />
+                <span>Mensajes WhatsApp</span>
+            </button>
             <button type="button" class="mas-item" @onclick="@(() => IrA("empresa"))">
                 <MudIcon Icon="@Icons.Material.Filled.Business" Size="Size.Medium" Class="mr-3" />
                 <span>Datos de la Empresa</span>
@@ -344,6 +348,25 @@ else if (EsEntornoMovil && ApiClienteService.Autenticado)
 
     private async Task ManejarCerrarSesion()
     {
+        var parametros = new DialogParameters<DialogoConfirmacion>
+        {
+            { x => x.Titulo, "Cerrar sesión" },
+            { x => x.Mensaje, "¿Seguro que deseas cerrar la sesión?" },
+            { x => x.Icono, Icons.Material.Filled.Logout },
+            { x => x.ColorIcono, Color.Error },
+            { x => x.TextoAceptar, "Cerrar sesión" },
+            { x => x.TextoCancelar, "Cancelar" },
+            { x => x.ColorAceptar, Color.Error }
+        };
+        var opciones = new DialogOptions
+        {
+            MaxWidth = MaxWidth.ExtraSmall,
+            FullWidth = true,
+            CloseButton = true
+        };
+        var dialogo = await Dialogos.ShowAsync<DialogoConfirmacion>("Cerrar sesión", parametros, opciones);
+        if (await dialogo.Result is not { Canceled: false, Data: true }) return;
+
         await ApiClienteService.CerrarSesionAsync();
         NavigationManagerService.NavigateTo("/login");
     }
