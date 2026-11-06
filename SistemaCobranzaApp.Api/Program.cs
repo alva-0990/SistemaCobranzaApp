@@ -145,6 +145,19 @@ builder.Services.AddHttpClient(WorkerWhatsApp.HttpClientNombre, cliente =>
     cliente.Timeout = TimeSpan.FromSeconds(EvolutionApiOptions.Defecto.TimeoutSegundos);
 });
 
+// API oficial de WhatsApp (Cloud API de Meta): alternativa a Evolution API, elegida con el parámetro
+// WHATSAPP_PROVEEDOR. Sus credenciales (secretos) vienen de la sección "WhatsappOficial".
+builder.Services.Configure<WhatsAppOficialOptions>(
+    builder.Configuration.GetSection(WhatsAppOficialOptions.SeccionConfig));
+var whatsappOficialOpciones = new WhatsAppOficialOptions();
+builder.Configuration.GetSection(WhatsAppOficialOptions.SeccionConfig).Bind(whatsappOficialOpciones);
+builder.Services.AddHttpClient(WhatsAppOficialOptions.HttpClientNombre, cliente =>
+{
+    if (!string.IsNullOrWhiteSpace(whatsappOficialOpciones.BaseUrl))
+        cliente.BaseAddress = new Uri(whatsappOficialOpciones.BaseUrl.TrimEnd('/') + "/");
+    cliente.Timeout = TimeSpan.FromSeconds(EvolutionApiOptions.Defecto.TimeoutSegundos);
+});
+
 builder.Services.AddHostedService<WorkerWhatsApp>();
 builder.Services.AddHostedService<WorkerLimpiezaWhatsApp>();
 

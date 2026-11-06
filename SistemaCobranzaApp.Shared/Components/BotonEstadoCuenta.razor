@@ -1,7 +1,7 @@
 @using MudBlazor
 @using SistemaCobranzaApp.Shared.Services
 @inject ApiCliente Api
-@inject IDescargaArchivo Descarga
+@inject IFormFactor FormFactor
 @inject ISnackbar Snackbar
 @inject IDialogService Dialogo
 
@@ -65,7 +65,20 @@
                 Snackbar.Add(error ?? "No se pudo generar el estado de cuenta.", Severity.Error);
                 return;
             }
-            await Descarga.GuardarAsync($"EstadoCuenta-{IdCliente}-{FechaProyecto.Ahora:yyyyMMdd-HHmm}.pdf", pdf, "application/pdf");
+            var parametros = new DialogParameters<VisorPdfDialogo>
+            {
+                { x => x.Titulo, "Estado de cuenta" },
+                { x => x.NombreArchivo, $"EstadoCuenta-{IdCliente}-{FechaProyecto.Ahora:yyyyMMdd-HHmm}.pdf" },
+                { x => x.Contenido, pdf },
+                { x => x.TextoCompartir, "Estado de cuenta" }
+            };
+            await Dialogo.ShowAsync<VisorPdfDialogo>("Estado de cuenta", parametros,
+                new DialogOptions
+                {
+                    MaxWidth = MaxWidth.Medium, FullWidth = true, CloseButton = true,
+                    // En Android el visor ocupa toda la pantalla.
+                    FullScreen = FormFactor.GetPlatform().StartsWith("Android", StringComparison.OrdinalIgnoreCase)
+                });
         }
         catch (Exception ex) { Snackbar.Add($"No se pudo exportar el estado de cuenta: {ex.Message}", Severity.Error); }
         finally { _generando = false; }

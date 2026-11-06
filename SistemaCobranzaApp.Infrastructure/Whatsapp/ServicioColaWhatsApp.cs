@@ -115,10 +115,13 @@ public class ServicioColaWhatsApp
             EsContado = esContado
         };
 
+        var armado = MensajesWhatsApp.ArmarVenta(ticket);
         _db.ColaMensajesWhatsApp.Add(new ColaMensajeWhatsApp
         {
             Telefono = contacto.Telefono,
-            Mensaje = MensajesWhatsApp.ConstruirTextoWhatsAppVenta(ticket),
+            Mensaje = armado.Texto,
+            Plantilla = armado.Plantilla,
+            Variables = System.Text.Json.JsonSerializer.Serialize(armado.Variables),
             Estado = EstadoMensajeWhatsApp.Pendiente,
             TipoOrigen = TipoOrigenWhatsApp.Venta,
             IdVenta = idVenta,
@@ -169,10 +172,13 @@ public class ServicioColaWhatsApp
             MontoCondonado: respuesta.MontoCondonado,
             MontoBonificado: respuesta.MontoBonificado);
 
+        var armado = MensajesWhatsApp.ArmarPago(ticket);
         _db.ColaMensajesWhatsApp.Add(new ColaMensajeWhatsApp
         {
             Telefono = contacto.Telefono,
-            Mensaje = MensajesWhatsApp.ConstruirTextoWhatsAppPago(ticket),
+            Mensaje = armado.Texto,
+            Plantilla = armado.Plantilla,
+            Variables = System.Text.Json.JsonSerializer.Serialize(armado.Variables),
             Estado = EstadoMensajeWhatsApp.Pendiente,
             TipoOrigen = TipoOrigenWhatsApp.Pago,
             IdPago = pago.IdPago,

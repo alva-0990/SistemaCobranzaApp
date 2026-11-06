@@ -28,6 +28,8 @@ public sealed class WorkerWhatsApp : BackgroundService
     private readonly SenalColaWhatsApp _senal;
     private readonly IHttpClientFactory _httpFactory;
     private readonly EvolutionApiOptions _opciones;
+    private readonly WhatsAppOficialOptions _opcionesOficial;
+    private readonly LectorParametrosWhatsApp _parametros;
     private readonly ILogger<WorkerWhatsApp> _log;
 
     public WorkerWhatsApp(
@@ -35,19 +37,24 @@ public sealed class WorkerWhatsApp : BackgroundService
         SenalColaWhatsApp senal,
         IHttpClientFactory httpFactory,
         IOptions<EvolutionApiOptions> opciones,
+        IOptions<WhatsAppOficialOptions> opcionesOficial,
+        LectorParametrosWhatsApp parametros,
         ILogger<WorkerWhatsApp> log)
     {
         _scopeFactory = scopeFactory;
         _senal = senal;
         _httpFactory = httpFactory;
         _opciones = opciones.Value;
+        _opcionesOficial = opcionesOficial.Value;
+        _parametros = parametros;
         _log = log;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        _log.LogInformation("WorkerWhatsApp iniciado. Configurado={Configurado}, polling={Segundos}s.",
-            _opciones.EstaConfigurado(), EvolutionApiOptions.Defecto.SegundosPollingRespaldo);
+        _log.LogInformation(
+            "WorkerWhatsApp iniciado. Evolution configurada={Evolution}, API oficial configurada={Oficial}, polling={Segundos}s.",
+            _opciones.EstaConfigurado(), _opcionesOficial.EstaConfigurado(), EvolutionApiOptions.Defecto.SegundosPollingRespaldo);
 
         var respaldo = TimeSpan.FromSeconds(EvolutionApiOptions.Defecto.SegundosPollingRespaldo);
 
@@ -101,17 +108,23 @@ public sealed class WorkerWhatsApp : BackgroundService
 
         if (lote.Count == 0) return 0;
 
-        // Si no hay datos de conexión, no quemamos intentos: dejamos todo en Pendiente.
+        // El flujo (Evolution u oficial) se lee de parametrossistema en cada lote: el cambio aplica en caliente.
+        var config = await _parametros.ObtenerAsync(ct);
+        var oficial = config.Proveedor == ProveedorWhatsApp.Oficial;
+
+        // Si no hay datos de conexión del flujo elegido, no quemamos intentos: dejamos todo en Pendiente.
         // (El interruptor de negocio WHATSAPP_ENVIO_ACTIVO ya evitó encolar aguas arriba.)
-        if (!_opciones.EstaConfigurado())
+        if (oficial ? !_opcionesOficial.EstaConfigurado() : !_opciones.EstaConfigurado())
         {
             _log.LogWarning(
-                "WorkerWhatsApp: hay {Cantidad} mensaje(s) pendientes pero Evolution API no está configurada. Se dejan en 'Pendiente'.",
-                lote.Count);
+                "WorkerWhatsApp: hay {Cantidad} mensaje(s) pendientes pero el flujo {Proveedor} no está configurado. Se dejan en 'Pendiente'.",
+                lote.Count, config.Proveedor);
             return 0;
         }
 
-        var cliente = _httpFactory.CreateClient(HttpClientNombre);
+        var cliente = _httpFactory.CreateClient(oficial ? WhatsAppOficialOptions.HttpClientNombre : HttpClientNombre);
+        // La API oficial no necesita el freno anti-baneo de la sesión no oficial.
+        var pausa = TimeSpan.FromSeconds(oficial ? 1 : EvolutionApiOptions.Defecto.SegundosEntreMensajes);
 
         foreach (var msg in lote)
         {
@@ -121,7 +134,10 @@ public sealed class WorkerWhatsApp : BackgroundService
 
             try
             {
-                await EnviarAsync(cliente, msg.Telefono, msg.Mensaje, ct);
+                if (oficial)
+                    await EnviarOficialAsync(cliente, msg, config, ct);
+                else
+                    await EnviarAsync(cliente, msg.Telefono, msg.Mensaje, ct);
 
                 msg.Estado = EstadoMensajeWhatsApp.Enviado;
                 msg.FechaEnvio = DateTimeOffset.UtcNow;
@@ -151,11 +167,65 @@ public sealed class WorkerWhatsApp : BackgroundService
 
             await db.SaveChangesAsync(ct);
 
-            // Freno anti-baneo: pausa entre mensajes para simular un ritmo humano.
-            await Task.Delay(TimeSpan.FromSeconds(EvolutionApiOptions.Defecto.SegundosEntreMensajes), ct);
+            await Task.Delay(pausa, ct);
         }
 
         return lote.Count;
+    }
+
+    /// <summary>
+    /// Envía el mensaje por la API oficial (WhatsApp Cloud API): POST {BaseUrl}/{version}/{phoneNumberId}/messages
+    /// con Bearer token y una plantilla aprobada (type=template) cuyas variables {{1}}..{{n}} son las
+    /// guardadas en la cola. Las plantillas aprobadas permiten escribir al cliente fuera de la ventana de 24 h.
+    /// </summary>
+    private async Task EnviarOficialAsync(HttpClient cliente, ColaMensajeWhatsApp msg, ConfiguracionWhatsApp config, CancellationToken ct)
+    {
+        var nombrePlantilla = config.NombrePlantillaOficial(msg.Plantilla);
+        if (string.IsNullOrWhiteSpace(nombrePlantilla) || string.IsNullOrWhiteSpace(msg.Variables))
+            throw new InvalidOperationException(
+                "El mensaje no tiene plantilla/variables (se encoló antes de usar la API oficial); no se puede enviar por ese flujo.");
+
+        var variables = System.Text.Json.JsonSerializer.Deserialize<List<string>>(msg.Variables) ?? new List<string>();
+        var cuerpo = new
+        {
+            messaging_product = "whatsapp",
+            to = msg.Telefono,
+            type = "template",
+            template = new
+            {
+                name = nombrePlantilla,
+                language = new { code = config.OficialIdioma },
+                components = new object[]
+                {
+                    new
+                    {
+                        type = "body",
+                        parameters = variables.Select(v => new { type = "text", text = LimpiarVariable(v) }).ToArray()
+                    }
+                }
+            }
+        };
+
+        var ruta = $"{_opcionesOficial.VersionApi.Trim('/')}/{Uri.EscapeDataString(_opcionesOficial.PhoneNumberId)}/messages";
+        using var req = new HttpRequestMessage(HttpMethod.Post, ruta) { Content = JsonContent.Create(cuerpo) };
+        req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _opcionesOficial.AccessToken);
+        req.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+
+        using var resp = await cliente.SendAsync(req, ct);
+        if (!resp.IsSuccessStatusCode)
+        {
+            var detalle = await resp.Content.ReadAsStringAsync(ct);
+            throw new HttpRequestException(
+                $"API oficial de WhatsApp respondió {(int)resp.StatusCode} {resp.StatusCode}: {Recortar(detalle, 500)}");
+        }
+    }
+
+    // Meta rechaza variables con saltos de línea, tabuladores o más de 4 espacios seguidos.
+    private static string LimpiarVariable(string? valor)
+    {
+        if (string.IsNullOrWhiteSpace(valor)) return "-";
+        var limpio = System.Text.RegularExpressions.Regex.Replace(valor, @"\s+", " ").Trim();
+        return limpio.Length == 0 ? "-" : limpio;
     }
 
     /// <summary>

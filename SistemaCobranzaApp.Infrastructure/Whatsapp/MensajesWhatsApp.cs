@@ -5,14 +5,54 @@ using SistemaCobranzaApp.Shared.Dtos;
 namespace SistemaCobranzaApp.Infrastructure.Whatsapp;
 
 /// <summary>
+/// Mensaje ya armado para la cola:
+///   * Texto: comprobante COMPLETO para el flujo EVOLUTION (texto libre, sin cambios respecto al original).
+///   * Variables: valores posicionales {{1}}, {{2}}... del flujo OFICIAL, donde el mensaje CORTO vive en la
+///     plantilla aprobada en Meta (el sistema solo envía el nombre de la plantilla y estas variables).
+/// El proveedor se decide al enviar, por eso se guardan ambos.
+/// </summary>
+public sealed record MensajeWhatsAppArmado(string Plantilla, string Texto, IReadOnlyList<string> Variables);
+
+/// <summary>
 /// Textos corporativos (sin emojis, formato 24 h) de los comprobantes enviados por WhatsApp.
 /// Reciben los mismos DTO del ticket impreso (<see cref="TicketPagoDto"/> / <see cref="TicketVentaDto"/>)
 /// para que el mensaje y el ticket muestren exactamente los mismos datos.
 /// La moneda se formatea siempre en es-MX para no depender de la cultura del servidor/contenedor.
+///
+/// Variables del flujo OFICIAL (el cuerpo de la plantilla en Meta usa {{1}}, {{2}}...):
+///   VENTA_CREDITO: 1 cliente, 2 folio, 3 total, 4 plan
+///   VENTA_CONTADO: 1 cliente, 2 folio, 3 total
+///   PAGO:          1 cliente, 2 folio, 3 monto, 4 saldo actual
 /// </summary>
 public static class MensajesWhatsApp
 {
     private static readonly CultureInfo Mx = CultureInfo.GetCultureInfo("es-MX");
+
+    public static MensajeWhatsAppArmado ArmarVenta(TicketVentaDto ticket)
+    {
+        var total = ticket.Total.ToString("C2", Mx);
+        var texto = ConstruirTextoWhatsAppVenta(ticket);
+
+        return ticket.EsContado
+            ? new(PlantillaWhatsApp.VentaContado, texto,
+                [ticket.Cliente.NombreCompleto, ticket.CodigoVenta, total])
+            : new(PlantillaWhatsApp.VentaCredito, texto,
+                [ticket.Cliente.NombreCompleto, ticket.CodigoVenta, total, DescribirPlan(ticket)]);
+    }
+
+    public static MensajeWhatsAppArmado ArmarPago(TicketPagoDto ticket)
+        => new(PlantillaWhatsApp.Pago, ConstruirTextoWhatsAppPago(ticket),
+            [ticket.Cliente.NombreCompleto, ticket.FolioPago,
+             ticket.MontoPagado.ToString("C2", Mx), ticket.SaldoActual.ToString("C2", Mx)]);
+
+    /// <summary>Resumen de una línea del plan de pagos (las variables de Meta no admiten saltos de línea).</summary>
+    private static string DescribirPlan(TicketVentaDto ticket)
+    {
+        if (ticket.NumeroCuotas <= 0) return "pago convenido";
+        var plan = $"{ticket.NumeroCuotas} cuotas de {ticket.CuotaFija.ToString("C2", Mx)}";
+        if (!string.IsNullOrWhiteSpace(ticket.FrecuenciaPago)) plan += $" ({ticket.FrecuenciaPago.Trim().ToLowerInvariant()})";
+        return plan;
+    }
 
     public static string ConstruirTextoWhatsAppPago(TicketPagoDto ticket)
     {

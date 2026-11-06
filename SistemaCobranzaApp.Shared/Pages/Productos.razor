@@ -9,6 +9,8 @@
 @inject IDialogService _dialogo
 @inject ISnackbar _snackbar
 @inject IFormFactor _formFactor
+@inject IDescargaArchivo _descarga
+@inject EstadoEmpresaGlobal _empresaGlobal
 
 <MudTabs Elevation="2" Rounded="true" Color="Color.Primary" ApplyEffectsToContainer="true"
          PanelClass="pa-0 pt-4" SliderColor="Color.Warning" Class="ma-2 tabs-remarcados">
@@ -37,6 +39,15 @@
                            Label="Incluir inactivos"
                            Class="switch-inactivos" />
 
+                <MudButton Variant="Variant.Outlined"
+                           Color="Color.Success"
+                           StartIcon="@Icons.Material.Filled.FileDownload"
+                           OnClick="ExportarProductosAsync"
+                           Disabled="@_exportando"
+                           Class="boton-nuevo">
+                    Exportar a Excel
+                </MudButton>
+
                 <MudButton Variant="Variant.Filled"
                            Color="Color.Primary"
                            StartIcon="@Icons.Material.Filled.Add"
@@ -53,16 +64,17 @@
                       Dense="true"
                       Breakpoint="Breakpoint.Sm"
                       Elevation="0"
-                      RowsPerPage="20">
+                      RowsPerPage="20"
+                      Class="tabla-seguimiento">
                 <HeaderContent>
-                    <MudTh Style="width:7%;">ID</MudTh>
-                    <MudTh Style="width:13%;">Código</MudTh>
-                    <MudTh>Descripción</MudTh>
-                    <MudTh>Categoría</MudTh>
-                    <MudTh>Marca</MudTh>
-                    <MudTh Style="text-align:right;">Costo</MudTh>
-                    <MudTh Style="text-align:right;">P. Sugerido</MudTh>
-                    <MudTh Style="width:10%;">Estatus</MudTh>
+                    <MudTh Style="width:7%;"><MudTableSortLabel SortLabel="id" T="ProductoDto">ID</MudTableSortLabel></MudTh>
+                    <MudTh Style="width:13%;"><MudTableSortLabel SortLabel="codigo" T="ProductoDto">Código</MudTableSortLabel></MudTh>
+                    <MudTh><MudTableSortLabel SortLabel="descripcion" T="ProductoDto">Descripción</MudTableSortLabel></MudTh>
+                    <MudTh><MudTableSortLabel SortLabel="categoria" T="ProductoDto">Categoría</MudTableSortLabel></MudTh>
+                    <MudTh><MudTableSortLabel SortLabel="marca" T="ProductoDto">Marca</MudTableSortLabel></MudTh>
+                    <MudTh Style="text-align:right;"><MudTableSortLabel SortLabel="costo" T="ProductoDto">Costo</MudTableSortLabel></MudTh>
+                    <MudTh Style="text-align:right;"><MudTableSortLabel SortLabel="precio" T="ProductoDto">P. Sugerido</MudTableSortLabel></MudTh>
+                    <MudTh Style="width:10%;"><MudTableSortLabel SortLabel="estatus" T="ProductoDto">Estatus</MudTableSortLabel></MudTh>
                     <MudTh Style="width:12%; text-align:right;">Acciones</MudTh>
                 </HeaderContent>
                 <RowTemplate>
@@ -122,11 +134,11 @@
             }
             else
             {
-                <MudTable Items="CategoriasFiltradas" Hover="true" Dense="true" Breakpoint="Breakpoint.Sm" Elevation="0" RowsPerPage="10">
+                <MudTable Items="CategoriasFiltradas" Hover="true" Dense="true" Breakpoint="Breakpoint.Sm" Elevation="0" RowsPerPage="20" Class="tabla-seguimiento">
                     <HeaderContent>
-                        <MudTh Style="width:10%;">ID</MudTh>
-                        <MudTh>Descripción</MudTh>
-                        <MudTh Style="width:15%;">Estatus</MudTh>
+                        <MudTh Style="width:10%;"><MudTableSortLabel SortBy="new Func<CategoriaDto, object>(x => x.Id)">ID</MudTableSortLabel></MudTh>
+                        <MudTh><MudTableSortLabel SortBy="new Func<CategoriaDto, object>(x => x.Descripcion ?? string.Empty)">Descripción</MudTableSortLabel></MudTh>
+                        <MudTh Style="width:15%;"><MudTableSortLabel SortBy="new Func<CategoriaDto, object>(x => x.Activo)">Estatus</MudTableSortLabel></MudTh>
                         <MudTh Style="width:15%; text-align:right;">Acciones</MudTh>
                     </HeaderContent>
                     <RowTemplate>
@@ -171,11 +183,11 @@
             }
             else
             {
-                <MudTable Items="MarcasFiltradas" Hover="true" Dense="true" Breakpoint="Breakpoint.Sm" Elevation="0" RowsPerPage="10">
+                <MudTable Items="MarcasFiltradas" Hover="true" Dense="true" Breakpoint="Breakpoint.Sm" Elevation="0" RowsPerPage="20" Class="tabla-seguimiento">
                     <HeaderContent>
-                        <MudTh Style="width:10%;">ID</MudTh>
-                        <MudTh>Descripción</MudTh>
-                        <MudTh Style="width:15%;">Estatus</MudTh>
+                        <MudTh Style="width:10%;"><MudTableSortLabel SortBy="new Func<MarcaDto, object>(x => x.Id)">ID</MudTableSortLabel></MudTh>
+                        <MudTh><MudTableSortLabel SortBy="new Func<MarcaDto, object>(x => x.Descripcion ?? string.Empty)">Descripción</MudTableSortLabel></MudTh>
+                        <MudTh Style="width:15%;"><MudTableSortLabel SortBy="new Func<MarcaDto, object>(x => x.Activo)">Estatus</MudTableSortLabel></MudTh>
                         <MudTh Style="width:15%; text-align:right;">Acciones</MudTh>
                     </HeaderContent>
                     <RowTemplate>
@@ -220,11 +232,11 @@
             }
             else
             {
-                <MudTable Items="ColoresFiltrados" Hover="true" Dense="true" Breakpoint="Breakpoint.Sm" Elevation="0" RowsPerPage="10">
+                <MudTable Items="ColoresFiltrados" Hover="true" Dense="true" Breakpoint="Breakpoint.Sm" Elevation="0" RowsPerPage="20" Class="tabla-seguimiento">
                     <HeaderContent>
-                        <MudTh Style="width:10%;">ID</MudTh>
-                        <MudTh>Descripción</MudTh>
-                        <MudTh Style="width:15%;">Estatus</MudTh>
+                        <MudTh Style="width:10%;"><MudTableSortLabel SortBy="new Func<ColorDto, object>(x => x.Id)">ID</MudTableSortLabel></MudTh>
+                        <MudTh><MudTableSortLabel SortBy="new Func<ColorDto, object>(x => x.Descripcion ?? string.Empty)">Descripción</MudTableSortLabel></MudTh>
+                        <MudTh Style="width:15%;"><MudTableSortLabel SortBy="new Func<ColorDto, object>(x => x.Activo)">Estatus</MudTableSortLabel></MudTh>
                         <MudTh Style="width:15%; text-align:right;">Acciones</MudTh>
                     </HeaderContent>
                     <RowTemplate>
@@ -269,12 +281,12 @@
             }
             else
             {
-                <MudTable Items="TallasFiltradas" Hover="true" Dense="true" Breakpoint="Breakpoint.Sm" Elevation="0" RowsPerPage="10">
+                <MudTable Items="TallasFiltradas" Hover="true" Dense="true" Breakpoint="Breakpoint.Sm" Elevation="0" RowsPerPage="20" Class="tabla-seguimiento">
                     <HeaderContent>
-                        <MudTh Style="width:10%;">ID</MudTh>
-                        <MudTh>Descripción</MudTh>
-                        <MudTh>Tipo</MudTh>
-                        <MudTh Style="width:15%;">Estatus</MudTh>
+                        <MudTh Style="width:10%;"><MudTableSortLabel SortBy="new Func<TallaDto, object>(x => x.Id)">ID</MudTableSortLabel></MudTh>
+                        <MudTh><MudTableSortLabel SortBy="new Func<TallaDto, object>(x => x.Descripcion ?? string.Empty)">Descripción</MudTableSortLabel></MudTh>
+                        <MudTh><MudTableSortLabel SortBy="new Func<TallaDto, object>(x => x.Tipo ?? string.Empty)">Tipo</MudTableSortLabel></MudTh>
+                        <MudTh Style="width:15%;"><MudTableSortLabel SortBy="new Func<TallaDto, object>(x => x.Activo)">Estatus</MudTableSortLabel></MudTh>
                         <MudTh Style="width:15%; text-align:right;">Acciones</MudTh>
                     </HeaderContent>
                     <RowTemplate>
@@ -362,6 +374,14 @@
     .tabs-remarcados .mud-tab { opacity: 0.65; font-weight: 500; transition: opacity 0.15s ease, background-color 0.15s ease; }
     .tabs-remarcados .mud-tab.mud-tab-active { opacity: 1; font-weight: 800; background-color: rgba(255,255,255,0.18); border-radius: 8px 8px 0 0; }
     .tabs-remarcados .mud-tab-slider { height: 4px; }
+
+    /* Texto compacto en tablas (mismo estándar que Reportes > Seguimiento). */
+    .tabla-seguimiento .mud-table-cell,
+    .tabla-seguimiento .mud-table-cell .mud-button-label,
+    .tabla-seguimiento th.mud-table-cell {
+        font-size: 0.72rem;
+        padding: 2px 6px;
+    }
 
     /* ==========================================================================
        Diálogo de producto a pantalla completa en móvil.
@@ -534,9 +554,82 @@
 
         return new TableData<ProductoDto>
         {
-            Items = datos?.Items ?? (IReadOnlyList<ProductoDto>)Array.Empty<ProductoDto>(),
+            Items = Ordenar(datos?.Items ?? (IReadOnlyList<ProductoDto>)Array.Empty<ProductoDto>(), state),
             TotalItems = datos?.Total ?? 0
         };
+    }
+
+    // La paginación es del servidor; el orden por columna se aplica sobre la página mostrada.
+    private static IEnumerable<ProductoDto> Ordenar(IEnumerable<ProductoDto> items, TableState state)
+    {
+        if (string.IsNullOrEmpty(state.SortLabel) || state.SortDirection == SortDirection.None) return items;
+        Func<ProductoDto, object> clave = state.SortLabel switch
+        {
+            "id" => p => p.Id,
+            "codigo" => p => p.CodigoClave ?? string.Empty,
+            "descripcion" => p => p.Descripcion ?? string.Empty,
+            "categoria" => p => p.CategoriaDescripcion ?? string.Empty,
+            "marca" => p => p.MarcaDescripcion ?? string.Empty,
+            "costo" => p => p.Costo,
+            "precio" => p => p.PrecioSugerido,
+            "estatus" => p => p.Activo,
+            _ => p => p.Id
+        };
+        return state.SortDirection == SortDirection.Descending ? items.OrderByDescending(clave) : items.OrderBy(clave);
+    }
+
+    // ---- Exportación a Excel (formato estándar de Reportes) ----
+    private bool _exportando;
+
+    // Exporta TODOS los productos que cumplen la búsqueda e "incluir inactivos" actuales (no solo la página visible).
+    private async Task ExportarProductosAsync()
+    {
+        if (_exportando) return;
+        _exportando = true;
+        try
+        {
+            var todos = new List<ProductoDto>();
+            for (var pagina = 1; ; pagina++)
+            {
+                var (datos, error) = await Api.ListarProductosAsync(
+                    texto: string.IsNullOrWhiteSpace(_busquedaProducto) ? null : _busquedaProducto,
+                    incluirInactivos: _incluirInactivosProducto, pagina: pagina, tamanoPagina: 200);
+                if (error is not null) { _snackbar.Add(error, Severity.Error); return; }
+                var items = datos?.Items ?? (IReadOnlyList<ProductoDto>)Array.Empty<ProductoDto>();
+                todos.AddRange(items);
+                if (items.Count == 0 || todos.Count >= (datos?.Total ?? 0)) break;
+            }
+
+            var info = new ReporteExcelInfo
+            {
+                Empresa = _empresaGlobal.Info?.NombreCorto ?? _empresaGlobal.Identidad?.NombreCorto ?? "Sistema Cobranza",
+                Titulo = "CATÁLOGO DE PRODUCTOS",
+                FechaGeneracion = FechaProyecto.Ahora.DateTime,
+                Filtros = new()
+                {
+                    ["Búsqueda"] = string.IsNullOrWhiteSpace(_busquedaProducto) ? "Todos" : _busquedaProducto.Trim(),
+                    ["Incluir inactivos"] = _incluirInactivosProducto ? "Sí" : "No"
+                },
+                Kpis =
+                [
+                    new ReporteExcelKpi { Nombre = "Productos", Valor = todos.Count.ToString() },
+                    new ReporteExcelKpi { Nombre = "Activos", Valor = todos.Count(p => p.Activo).ToString() },
+                    new ReporteExcelKpi { Nombre = "Inactivos", Valor = todos.Count(p => !p.Activo).ToString() }
+                ]
+            };
+            var bytes = ExportadorExcel.Crear(info,
+                ["ID", "Código", "Descripción", "Categoría", "Marca", "Color", "Talla", "Costo", "P. sugerido", "P. mínimo", "Stock mínimo", "Estatus"],
+                todos.Select(p => new object?[]
+                {
+                    p.Id, p.CodigoClave, p.Descripcion, p.CategoriaDescripcion, p.MarcaDescripcion,
+                    p.ColorDescripcion, p.TallaDescripcion, p.Costo, p.PrecioSugerido, p.PrecioMinimo, p.StockMini,
+                    p.Activo ? "Activo" : "Inactivo"
+                }),
+                [7, 8, 9]);
+            await _descarga.GuardarAsync($"Productos-{FechaProyecto.Ahora:yyyyMMdd-HHmmssfff}.xlsx", bytes);
+        }
+        catch (Exception ex) { _snackbar.Add($"No se pudo exportar: {ex.Message}", Severity.Error); }
+        finally { _exportando = false; }
     }
 
     private Task RecargarProductosAsync() => _tablaProductos.ReloadServerData();

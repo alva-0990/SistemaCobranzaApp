@@ -1187,6 +1187,8 @@ public class CobranzaDbContext : DbContext
                 .HasDefaultValue(EstadoMensajeWhatsApp.Pendiente).IsRequired();
             e.Property(x => x.Intentos).HasColumnName("intentos").HasDefaultValue(0);
             e.Property(x => x.TipoOrigen).HasColumnName("tipo_origen").HasMaxLength(20);
+            e.Property(x => x.Plantilla).HasColumnName("plantilla").HasMaxLength(30);
+            e.Property(x => x.Variables).HasColumnName("variables").HasColumnType("text");
             e.Property(x => x.IdVenta).HasColumnName("id_venta");
             e.Property(x => x.IdPago).HasColumnName("id_pago");
             e.Property(x => x.ErrorLog).HasColumnName("error_log").HasColumnType("text");

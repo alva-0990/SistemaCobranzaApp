@@ -1,0 +1,88 @@
+@using MudBlazor
+@using SistemaCobranzaApp.Shared.Services
+@using Microsoft.JSInterop
+@implements IAsyncDisposable
+@inject IJSRuntime JS
+@inject IDescargaArchivo Descarga
+@inject ISnackbar Snackbar
+
+@*
+    Visor de PDF dentro de la app con acciones de compartir (WhatsApp / hoja del sistema) y descargar.
+*@
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6" Style="font-weight: 600;">
+            <MudIcon Icon="@Icons.Material.Filled.PictureAsPdf" Class="mr-2" Style="vertical-align: middle;" />
+            @Titulo
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        @if (_cargando)
+        {
+            <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+        }
+        @if (_errorVisor is not null)
+        {
+            <MudAlert Severity="Severity.Warning" Dense="true">
+                No se pudo mostrar la vista previa (@_errorVisor). Puedes compartir o descargar el archivo.
+            </MudAlert>
+        }
+        <div id="@_idContenedor" style="max-height: calc(100vh - 190px); min-height: 50vh; overflow: auto; background: #e0e0e0; padding: 4px;"></div>
+    </DialogContent>
+    <DialogActions>
+        <MudButton Color="Color.Success" Variant="Variant.Filled"
+                   StartIcon="@Icons.Material.Filled.Share"
+                   OnClick="CompartirAsync">Compartir</MudButton>
+        <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Download"
+                   OnClick="DescargarAsync">Descargar</MudButton>
+        <MudButton OnClick="@(() => MudDialog.Close())">Cerrar</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter] public string Titulo { get; set; } = "Estado de cuenta";
+    [Parameter] public string NombreArchivo { get; set; } = "documento.pdf";
+    [Parameter] public byte[] Contenido { get; set; } = [];
+    [Parameter] public string? TextoCompartir { get; set; }
+
+    private readonly string _idContenedor = $"visor-pdf-{Guid.NewGuid():N}";
+    private IJSObjectReference? _modulo;
+    private bool _cargando = true;
+    private string? _errorVisor;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        try
+        {
+            _modulo = await JS.InvokeAsync<IJSObjectReference>("import", "./_content/SistemaCobranzaApp.Shared/visor-pdf.js");
+            using var stream = new MemoryStream(Contenido);
+            using var referencia = new DotNetStreamReference(stream);
+            await _modulo.InvokeAsync<int>("mostrar", _idContenedor, referencia);
+        }
+        catch (Exception ex) { _errorVisor = ex.Message; }
+        finally { _cargando = false; StateHasChanged(); }
+    }
+
+    private async Task CompartirAsync()
+    {
+        try { await Descarga.CompartirAsync(NombreArchivo, Contenido, "application/pdf", TextoCompartir); }
+        catch (Exception ex) { Snackbar.Add($"No se pudo compartir: {ex.Message}", Severity.Error); }
+    }
+
+    private async Task DescargarAsync()
+    {
+        try { await Descarga.GuardarAsync(NombreArchivo, Contenido, "application/pdf"); }
+        catch (Exception ex) { Snackbar.Add($"No se pudo guardar: {ex.Message}", Severity.Error); }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_modulo is not null)
+        {
+            try { await _modulo.DisposeAsync(); } catch (JSDisconnectedException) { }
+        }
+    }
+}

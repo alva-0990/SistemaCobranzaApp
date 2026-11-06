@@ -17,8 +17,10 @@
             <MudPaper Elevation="0" Class="pa-4">
                 <div class="barra-busqueda">
                     <CampoFiltrado Modo="ModoCampo.Alfanumerico"
-                                   @bind-Value="BusquedaCliente"
+                                   Value="@BusquedaCliente"
+                                   ValueChanged="OnBusquedaClienteChanged"
                                    Immediate="true"
+                                   DebounceInterval="400"
                                    OnKeyUp="OnKeyUpCliente"
                                    Placeholder="Id del cliente, nombre y apellidos..."
                                    Variant="Variant.Outlined"
@@ -35,7 +37,7 @@
                     </MudButton>
                 </div>
                 <MudText Typo="Typo.caption" Color="Color.Secondary">
-                    Escribe el <b>Id del cliente</b> o su <b>nombre y apellidos</b>.
+                    Escribe el <b>nombre y apellidos</b> para buscar mientras escribes, o el <b>Id del cliente</b> y pulsa Enter / Buscar.
                 </MudText>
             </MudPaper>
         </MudTabPanel>
@@ -306,6 +308,18 @@
         else if (Venta is not null)
         {
             var v = Venta;
+
+            <!-- Aviso destacado: la venta/crédito ya está liquidada (no hay saldo por cobrar). -->
+            @if (v.SaldoPendiente <= 0)
+            {
+                <MudAlert Severity="Severity.Success" Variant="Variant.Filled" Elevation="2"
+                          Icon="@Icons.Material.Filled.CheckCircle" Class="mb-2 aviso-liquidada">
+                    <MudText Typo="Typo.subtitle1" Style="font-weight:700;">Venta liquidada</MudText>
+                    <MudText Typo="Typo.body2">
+                        Este crédito ya está pagado en su totalidad; no tiene saldo pendiente.
+                    </MudText>
+                </MudAlert>
+            }
 
             <!-- Acción principal: registrar pago (botón grande, pensado para móvil). -->
             @if (PuedeRegistrarPago)

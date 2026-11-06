@@ -95,7 +95,20 @@ public partial class PagosOffline : ComponentBase, IAsyncDisposable
     // ===================== Buscador: pestaña por CLIENTE (Id o nombre/apellidos) =====================
 
     // Dispara la búsqueda por cliente desde el botón o la tecla Enter de la pestaña.
-    protected async Task BuscarClienteAsync()
+    protected Task BuscarClienteAsync() => BuscarClienteCoreAsync(enVivo: false);
+
+    // Búsqueda mientras se escribe (con debounce del campo): exige 2+ caracteres, no interpreta
+    // números como Id (eso queda para Enter/botón) y no abre la cuenta automáticamente.
+    protected async Task OnBusquedaClienteChanged(string? valor)
+    {
+        BusquedaCliente = valor ?? string.Empty;
+        var texto = BusquedaCliente.Trim();
+        if (texto.Length < 2) { Limpiar(); return; }
+        if (long.TryParse(texto, out _)) return;
+        await BuscarClienteCoreAsync(enVivo: true);
+    }
+
+    private async Task BuscarClienteCoreAsync(bool enVivo)
     {
         var texto = BusquedaCliente?.Trim();
         if (string.IsNullOrWhiteSpace(texto))
@@ -119,7 +132,7 @@ public partial class PagosOffline : ComponentBase, IAsyncDisposable
             if (long.TryParse(texto, out var idCliente))
                 await BuscarClientePorIdAsync(idCliente);
             else
-                await BuscarPorNombreAsync(texto);
+                await BuscarPorNombreAsync(texto, enVivo);
         }
         finally
         {
@@ -135,10 +148,10 @@ public partial class PagosOffline : ComponentBase, IAsyncDisposable
 
     // Búsqueda por nombre/apellidos/teléfono. Usa el mismo listado administrativo que la pantalla
     // de Clientes (texto único con OR en nombre/apellidos/teléfono) e incluye inactivos para cobranza.
-    private async Task BuscarPorNombreAsync(string texto)
+    private async Task BuscarPorNombreAsync(string texto, bool enVivo)
     {
         ClientesEncontrados = Jornada.BuscarClientes(texto);
-        if (ClientesEncontrados.Count == 1) await SeleccionarClienteAsync(ClientesEncontrados[0].IdCliente);
+        if (!enVivo && ClientesEncontrados.Count == 1) await SeleccionarClienteAsync(ClientesEncontrados[0].IdCliente);
     }
 
     // ===================== Buscador: pestaña por VENTA (Id de venta) =====================

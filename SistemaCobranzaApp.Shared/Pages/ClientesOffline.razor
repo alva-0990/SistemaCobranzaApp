@@ -19,21 +19,26 @@
 }
 else
 {
-<MudPaper Elevation="2" Rounded="true" Class="ma-2 pa-4">
-    <div class="barra-acciones">
-        <MudTextField T="string"
-                      @ref="_campoBusqueda"
-                      Value="_busqueda"
-                      ValueChanged="OnBuscarChanged"
-                      Immediate="true"
-                      DebounceInterval="400"
-                      Placeholder="Buscar cliente por nombre, teléfono, ruta o zona..."
-                      Variant="Variant.Outlined"
-                      Adornment="Adornment.Start"
-                      AdornmentIcon="@Icons.Material.Filled.Search"
-                      AdornmentColor="Color.Primary"
-                      Clearable="true"
-                      Class="buscador-remarcado" />
+<MudTabs Elevation="2" Rounded="true" Color="Color.Primary" ApplyEffectsToContainer="true"
+         PanelClass="pa-0" SliderColor="Color.Warning" Class="ma-2 tabs-remarcados">
+    <MudTabPanel Text="Clientes" Icon="@Icons.Material.Filled.Groups">
+    <MudPaper Elevation="0" Class="pa-4">
+    <div class="barra-acciones" style="margin-top:16px;">
+        <div id="buscador-clientes" class="buscador-remarcado">
+            <MudTextField T="string"
+                          @ref="_campoBusqueda"
+                          Value="_busqueda"
+                          ValueChanged="OnBuscarChanged"
+                          Immediate="true"
+                          DebounceInterval="400"
+                          Placeholder="Buscar cliente por nombre, teléfono, ruta o zona"
+                          Variant="Variant.Outlined"
+                          Adornment="Adornment.Start"
+                          AdornmentIcon="@Icons.Material.Filled.Search"
+                          AdornmentColor="Color.Primary"
+                          Clearable="true"
+                          AutoFocus="true" />
+        </div>
         <MudButton Variant="Variant.Filled"
                    Color="Color.Primary"
                    StartIcon="@Icons.Material.Filled.PersonAddAlt"
@@ -43,6 +48,14 @@ else
             <span class="d-none d-sm-inline">Nuevo cliente</span>
         </MudButton>
     </div>
+    <MudText Typo="Typo.caption" Color="Color.Warning">
+        Escribe el <b>nombre</b>, <b>teléfono</b>, <b>ruta</b> o <b>zona</b> del cliente para buscar.
+    </MudText>
+    </MudPaper>
+    </MudTabPanel>
+</MudTabs>
+
+<MudPaper Elevation="2" Rounded="true" Class="ma-2 pa-4">
 
     @if (_cargando)
     {

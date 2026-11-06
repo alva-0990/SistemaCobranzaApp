@@ -858,6 +858,8 @@ CREATE TABLE ColaMensajesWhatsapp (
     estado         VARCHAR(20)  NOT NULL DEFAULT 'Pendiente',   -- 'Pendiente', 'Procesando', 'Enviado', 'Fallido'
     intentos       INT          NOT NULL DEFAULT 0,             -- Contador para reintentos automáticos (máximo 3)
     tipo_origen    VARCHAR(20),                                 -- 'VENTA' | 'PAGO' (trazabilidad; informativo)
+    plantilla      VARCHAR(30),                                 -- 'VENTA_CREDITO' | 'VENTA_CONTADO' | 'PAGO' (plantilla Meta con API oficial)
+    variables      TEXT,                                        -- Variables posicionales {{1}}..{{n}} en JSON (API oficial)
     id_venta       BIGINT,                                      -- Referencia informativa (sin FK dura: tabla de paso)
     id_pago        BIGINT,                                      -- Referencia informativa (sin FK dura: tabla de paso)
     error_log      TEXT,                                        -- Detalle técnico del último fallo de envío

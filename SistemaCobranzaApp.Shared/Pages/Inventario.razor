@@ -9,6 +9,7 @@
 @inject IDialogService _dialogo
 @inject ISnackbar _snackbar
 @inject IDescargaArchivo _descarga
+@inject EstadoEmpresaGlobal _empresaGlobal
 
 <MudTabs Elevation="2" Rounded="true" Color="Color.Primary" ApplyEffectsToContainer="true"
          PanelClass="pa-0 pt-4" SliderColor="Color.Warning" Class="ma-2 tabs-remarcados">
@@ -123,16 +124,16 @@
                     {
                         <MudTable Items="CentralFiltrado" Hover="true" Dense="true" FixedHeader="true"
                                   Height="60vh" Breakpoint="Breakpoint.Sm" Elevation="0" RowsPerPage="25"
-                                  T="ExistenciaCentralDto"
+                                  T="ExistenciaCentralDto" Class="tabla-seguimiento"
                                   OnRowClick="@((TableRowClickEventArgs<ExistenciaCentralDto> e) => SeleccionarCentral(e.Item))"
                                   RowClassFunc="@FilaCentralClass">
                             <HeaderContent>
-                                <MudTh Style="width:8%;">ID</MudTh>
-                                <MudTh Style="width:14%;">Clave</MudTh>
-                                <MudTh>Descripción / Artículo</MudTh>
-                                <MudTh Style="width:10%; text-align:right;">Existencia</MudTh>
-                                <MudTh Style="width:8%; text-align:right;">Mín.</MudTh>
-                                <MudTh Style="width:13%; text-align:center;">Estado Stock</MudTh>
+                                <MudTh Style="width:8%;"><MudTableSortLabel SortBy="new Func<ExistenciaCentralDto, object>(x => x.IdProducto)">ID</MudTableSortLabel></MudTh>
+                                <MudTh Style="width:14%;"><MudTableSortLabel SortBy="new Func<ExistenciaCentralDto, object>(x => x.CodigoClave ?? string.Empty)">Clave</MudTableSortLabel></MudTh>
+                                <MudTh><MudTableSortLabel SortBy="new Func<ExistenciaCentralDto, object>(x => x.Descripcion ?? string.Empty)">Descripción / Artículo</MudTableSortLabel></MudTh>
+                                <MudTh Style="width:10%; text-align:right;"><MudTableSortLabel SortBy="new Func<ExistenciaCentralDto, object>(x => x.Cantidad)">Existencia</MudTableSortLabel></MudTh>
+                                <MudTh Style="width:8%; text-align:right;"><MudTableSortLabel SortBy="new Func<ExistenciaCentralDto, object>(x => x.StockMini)">Mín.</MudTableSortLabel></MudTh>
+                                <MudTh Style="width:13%; text-align:center;"><MudTableSortLabel SortBy="new Func<ExistenciaCentralDto, object>(x => x.Cantidad - x.StockMini)">Estado Stock</MudTableSortLabel></MudTh>
                             </HeaderContent>
                             <RowTemplate>
                                 <MudTd DataLabel="ID">@context.IdProducto</MudTd>
@@ -275,14 +276,14 @@
                     {
                         <MudTable Items="ZonaFiltrado" Hover="true" Dense="true" FixedHeader="true"
                                   Height="60vh" Breakpoint="Breakpoint.Sm" Elevation="0" RowsPerPage="25"
-                                  T="ExistenciaZonaDto"
+                                  T="ExistenciaZonaDto" Class="tabla-seguimiento"
                                   OnRowClick="@((TableRowClickEventArgs<ExistenciaZonaDto> e) => SeleccionarZona(e.Item))"
                                   RowClassFunc="@FilaZonaClass">
                             <HeaderContent>
-                                <MudTh Style="width:8%;">ID</MudTh>
-                                <MudTh Style="width:16%;">Clave</MudTh>
-                                <MudTh>Descripción / Artículo</MudTh>
-                                <MudTh Style="width:12%; text-align:right;">Existencia</MudTh>
+                                <MudTh Style="width:8%;"><MudTableSortLabel SortBy="new Func<ExistenciaZonaDto, object>(x => x.IdProducto)">ID</MudTableSortLabel></MudTh>
+                                <MudTh Style="width:16%;"><MudTableSortLabel SortBy="new Func<ExistenciaZonaDto, object>(x => x.CodigoClave ?? string.Empty)">Clave</MudTableSortLabel></MudTh>
+                                <MudTh><MudTableSortLabel SortBy="new Func<ExistenciaZonaDto, object>(x => x.Descripcion ?? string.Empty)">Descripción / Artículo</MudTableSortLabel></MudTh>
+                                <MudTh Style="width:12%; text-align:right;"><MudTableSortLabel SortBy="new Func<ExistenciaZonaDto, object>(x => x.Cantidad)">Existencia</MudTableSortLabel></MudTh>
                             </HeaderContent>
                             <RowTemplate>
                                 <MudTd DataLabel="ID">@context.IdProducto</MudTd>
@@ -479,18 +480,22 @@
                                     }
                                     else
                                     {
+                                        <MudTextField T="string" @bind-Value="_propBusqueda" Immediate="true"
+                                                      Placeholder="Buscar por #, zona, estatus, clave o producto…" Variant="Variant.Outlined"
+                                                      Margin="Margin.Dense" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
+                                                      Clearable="true" Class="mb-3" />
                                         <MudTable Items="PropuestasFiltradas" Hover="true" Dense="true"
                                                   Breakpoint="Breakpoint.Sm" Elevation="0" RowsPerPage="15"
-                                                  T="PropuestaDto" Height="56vh" FixedHeader="true"
+                                                  T="PropuestaDto" Height="56vh" FixedHeader="true" Class="tabla-seguimiento"
                                                   OnRowClick="@((TableRowClickEventArgs<PropuestaDto> e) => SeleccionarPropuesta(e.Item))"
                                                   RowClassFunc="@FilaPropuestaClass">
                                             <HeaderContent>
-                                                <MudTh Style="width:7%;">#</MudTh>
-                                                <MudTh>Zona</MudTh>
-                                                <MudTh Style="width:11%; text-align:center;">Líneas</MudTh>
-                                                <MudTh Style="width:11%; text-align:center;">Piezas</MudTh>
-                                                <MudTh>Fecha</MudTh>
-                                                <MudTh Style="width:16%; text-align:center;">Estatus</MudTh>
+                                                <MudTh Style="width:7%;"><MudTableSortLabel InitialDirection="SortDirection.Descending" SortBy="new Func<PropuestaDto, object>(x => x.IdPropuesta)">#</MudTableSortLabel></MudTh>
+                                                <MudTh><MudTableSortLabel SortBy="new Func<PropuestaDto, object>(x => x.ZonaDestino ?? string.Empty)">Zona</MudTableSortLabel></MudTh>
+                                                <MudTh Style="width:11%; text-align:center;"><MudTableSortLabel SortBy="new Func<PropuestaDto, object>(x => x.Detalles.Count)">Líneas</MudTableSortLabel></MudTh>
+                                                <MudTh Style="width:11%; text-align:center;"><MudTableSortLabel SortBy="new Func<PropuestaDto, object>(x => x.Detalles.Sum(d => d.Cantidad))">Piezas</MudTableSortLabel></MudTh>
+                                                <MudTh><MudTableSortLabel SortBy="new Func<PropuestaDto, object>(x => x.FechaCreacion)">Fecha</MudTableSortLabel></MudTh>
+                                                <MudTh Style="width:16%; text-align:center;"><MudTableSortLabel SortBy="new Func<PropuestaDto, object>(x => x.Estatus ?? string.Empty)">Estatus</MudTableSortLabel></MudTh>
                                             </HeaderContent>
                                             <RowTemplate>
                                                 <MudTd DataLabel="#">@context.IdPropuesta</MudTd>
@@ -642,6 +647,12 @@
                                            OnClick="LimpiarFiltrosHistorial" Class="boton-hist">
                                     Limpiar
                                 </MudButton>
+                                <MudButton Variant="Variant.Outlined" Color="Color.Success" Size="Size.Small"
+                                           StartIcon="@Icons.Material.Filled.FileDownload"
+                                           OnClick="ExportarHistorial" Class="boton-hist"
+                                           Disabled="@(_exportando || _cargandoHistorial || _historial.Count == 0)">
+                                    Exportar a Excel
+                                </MudButton>
                             </div>
 
                             @if (_cargandoHistorial)
@@ -652,19 +663,24 @@
                             }
                             else
                             {
+                                <MudTextField T="string" @bind-Value="_histBusqueda" Immediate="true"
+                                              Placeholder="Buscar por clave, producto, usuario, zona u observaciones…" Variant="Variant.Outlined"
+                                              Margin="Margin.Dense" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
+                                              Clearable="true" Class="mb-3 mx-2" />
                                 <MudTable Items="_historial" Hover="true" Dense="true"
                                           Breakpoint="Breakpoint.Sm" Elevation="0" RowsPerPage="25"
-                                          T="MovimientoHistorialDto" Height="56vh" FixedHeader="true">
+                                          T="MovimientoHistorialDto" Height="56vh" FixedHeader="true" Class="tabla-seguimiento"
+                                          Filter="new Func<MovimientoHistorialDto, bool>(FiltrarHistorial)">
                                     <HeaderContent>
-                                        <MudTh>Fecha</MudTh>
-                                        <MudTh>Tipo</MudTh>
-                                        <MudTh Style="width:12%;">Clave</MudTh>
-                                        <MudTh>Producto</MudTh>
-                                        <MudTh Style="width:8%; text-align:right;">Cant.</MudTh>
-                                        <MudTh Style="width:8%; text-align:right;">Antes</MudTh>
-                                        <MudTh Style="width:8%; text-align:right;">Después</MudTh>
-                                        <MudTh>Zona</MudTh>
-                                        <MudTh>Usuario</MudTh>
+                                        <MudTh><MudTableSortLabel InitialDirection="SortDirection.Descending" SortBy="new Func<MovimientoHistorialDto, object>(x => x.FechaMovimiento)">Fecha</MudTableSortLabel></MudTh>
+                                        <MudTh><MudTableSortLabel SortBy="new Func<MovimientoHistorialDto, object>(x => x.TipoMovimiento ?? string.Empty)">Tipo</MudTableSortLabel></MudTh>
+                                        <MudTh Style="width:12%;"><MudTableSortLabel SortBy="new Func<MovimientoHistorialDto, object>(x => x.CodigoClave ?? string.Empty)">Clave</MudTableSortLabel></MudTh>
+                                        <MudTh><MudTableSortLabel SortBy="new Func<MovimientoHistorialDto, object>(x => x.Descripcion ?? string.Empty)">Producto</MudTableSortLabel></MudTh>
+                                        <MudTh Style="width:8%; text-align:right;"><MudTableSortLabel SortBy="new Func<MovimientoHistorialDto, object>(x => x.Cantidad)">Cant.</MudTableSortLabel></MudTh>
+                                        <MudTh Style="width:8%; text-align:right;"><MudTableSortLabel SortBy="new Func<MovimientoHistorialDto, object>(x => x.ExistenciaAnterior)">Antes</MudTableSortLabel></MudTh>
+                                        <MudTh Style="width:8%; text-align:right;"><MudTableSortLabel SortBy="new Func<MovimientoHistorialDto, object>(x => x.ExistenciaNueva)">Después</MudTableSortLabel></MudTh>
+                                        <MudTh><MudTableSortLabel SortBy="new Func<MovimientoHistorialDto, object>(x => x.Zona ?? string.Empty)">Zona</MudTableSortLabel></MudTh>
+                                        <MudTh><MudTableSortLabel SortBy="new Func<MovimientoHistorialDto, object>(x => x.Usuario ?? string.Empty)">Usuario</MudTableSortLabel></MudTh>
                                     </HeaderContent>
                                     <RowTemplate>
                                         <MudTd DataLabel="Fecha">@context.FechaMovimiento.EnZonaProyecto().DateTime.ToString("dd/MM/yyyy HH:mm")</MudTd>
@@ -693,6 +709,16 @@
         </MudPaper>
     </MudTabPanel>
 </MudTabs>
+
+<style>
+    /* Texto compacto para tablas con muchas columnas (mismo estándar que Reportes > Seguimiento). */
+    .tabla-seguimiento .mud-table-cell,
+    .tabla-seguimiento .mud-table-cell .mud-button-label,
+    .tabla-seguimiento th.mud-table-cell {
+        font-size: 0.72rem;
+        padding: 2px 6px;
+    }
+</style>
 
 @{
     RenderFragment ChipStock(int cantidad, int minimo) => __builder =>
@@ -929,14 +955,37 @@
                 q = q.Where(p => p.FechaCreacion.EnZonaProyecto().Date >= desde.Date);
             if (_propFiltroHasta is { } hasta)
                 q = q.Where(p => p.FechaCreacion.EnZonaProyecto().Date <= hasta.Date);
+            if (!string.IsNullOrWhiteSpace(_propBusqueda))
+            {
+                var texto = _propBusqueda.Trim();
+                q = q.Where(p =>
+                    p.IdPropuesta.ToString().Contains(texto, StringComparison.OrdinalIgnoreCase)
+                    || (p.ZonaDestino?.Contains(texto, StringComparison.OrdinalIgnoreCase) ?? false)
+                    || EtiquetaEstatus(p.Estatus).Contains(texto, StringComparison.OrdinalIgnoreCase)
+                    || p.Detalles.Any(d =>
+                        (d.CodigoClave?.Contains(texto, StringComparison.OrdinalIgnoreCase) ?? false)
+                        || (d.Producto?.Contains(texto, StringComparison.OrdinalIgnoreCase) ?? false)));
+            }
             return q;
         }
     }
+
+    private string? _propBusqueda;
 
     // Historial de inventario (vista global con filtros).
     private List<MovimientoHistorialDto> _historial = new();
     private bool _cargandoHistorial;
     private string? _histTipo;
+    private string? _histBusqueda;
+
+    // Búsqueda en memoria sobre el historial ya cargado (sin volver a consultar la API).
+    private bool FiltrarHistorial(MovimientoHistorialDto x)
+    {
+        var texto = _histBusqueda?.Trim();
+        if (string.IsNullOrWhiteSpace(texto)) return true;
+        return new[] { x.CodigoClave, x.Descripcion, x.Usuario, x.Zona, x.Observaciones, x.Marca, x.Categoria, EtiquetaTipoMovimiento(x.TipoMovimiento) }
+            .Any(c => c?.Contains(texto, StringComparison.OrdinalIgnoreCase) == true);
+    }
     private long? _histZona;
     private DateTime? _histDesde;
     private DateTime? _histHasta;
@@ -1148,9 +1197,11 @@
 
     private Task<IEnumerable<ExistenciaCentralDto>> BuscarProductoCentral(string? valor, CancellationToken ct)
     {
+        // Solo productos con existencia en central (no tiene sentido proponer envíos de lo que no hay).
+        var conExistencia = _central.Where(p => p.Cantidad > 0);
         IEnumerable<ExistenciaCentralDto> resultado = string.IsNullOrWhiteSpace(valor)
-            ? _central.Take(50)
-            : FiltrarCentral(_central, valor).Take(50);
+            ? conExistencia.Take(50)
+            : FiltrarCentral(conExistencia, valor).Take(50);
         return Task.FromResult(resultado);
     }
 
@@ -1282,7 +1333,7 @@
     private static bool EsConfirmada(string? estatus)
         => string.Equals(estatus?.Trim(), "CONFIRMADA", StringComparison.OrdinalIgnoreCase);
 
-    private static IEnumerable<ExistenciaCentralDto> FiltrarCentral(List<ExistenciaCentralDto> fuente, string? busqueda)
+    private static IEnumerable<ExistenciaCentralDto> FiltrarCentral(IEnumerable<ExistenciaCentralDto> fuente, string? busqueda)
     {
         var q = busqueda?.Trim() ?? "";
         if (string.IsNullOrEmpty(q)) return fuente;
@@ -1332,25 +1383,74 @@
         finally { _exportando = false; }
     }
 
-    private Task ExportarCentral() => ExportarAsync(
-        "Inventario Central",
-        ["ID", "Clave", "Descripción", "Marca", "Categoría", "Color", "Talla", "Existencia", "Stock mínimo"],
-        CentralFiltrado.Select(x => new object?[]
-        {
-            x.IdProducto, x.CodigoClave, x.Descripcion, x.Marca, x.Categoria, x.Color, x.Talla, x.Cantidad, x.StockMini
-        }));
+    private Task ExportarCentral()
+    {
+        var filas = CentralFiltrado.ToList();
+        return ExportarReporteAsync(
+            "InventarioCentral", "INVENTARIO CENTRAL",
+            new()
+            {
+                ["Búsqueda"] = string.IsNullOrWhiteSpace(_busquedaCentral) ? "Todos" : _busquedaCentral.Trim()
+            },
+            [
+                new ReporteExcelKpi { Nombre = "Productos", Valor = filas.Count.ToString() },
+                new ReporteExcelKpi { Nombre = "Existencia total", Valor = filas.Sum(x => x.Cantidad).ToString() },
+                new ReporteExcelKpi { Nombre = "Bajo mínimo", Valor = filas.Count(x => x.Cantidad <= x.StockMini).ToString() }
+            ],
+            ["ID", "Clave", "Descripción", "Marca", "Categoría", "Color", "Talla", "Existencia", "Stock mínimo"],
+            filas.Select(x => new object?[]
+            {
+                x.IdProducto, x.CodigoClave, x.Descripcion, x.Marca, x.Categoria, x.Color, x.Talla, x.Cantidad, x.StockMini
+            }));
+    }
 
     private Task ExportarZona()
     {
         if (_zonaSeleccionada is null) return Task.CompletedTask;
         var nombreZona = _zonas.FirstOrDefault(z => z.IdZona == _zonaSeleccionada.Value)?.Descripcion
                          ?? $"Zona {_zonaSeleccionada.Value}";
-        return ExportarAsync(
-            nombreZona,
+        var filas = ZonaFiltrado.ToList();
+        return ExportarReporteAsync(
+            "ExistenciaZona", $"EXISTENCIA EN {nombreZona.ToUpperInvariant()}",
+            new()
+            {
+                ["Zona"] = nombreZona,
+                ["Búsqueda"] = string.IsNullOrWhiteSpace(_busquedaZona) ? "Todos" : _busquedaZona.Trim()
+            },
+            [
+                new ReporteExcelKpi { Nombre = "Productos", Valor = filas.Count.ToString() },
+                new ReporteExcelKpi { Nombre = "Existencia total", Valor = filas.Sum(x => x.Cantidad).ToString() }
+            ],
             ["ID", "Clave", "Descripción", "Marca", "Categoría", "Color", "Talla", "Existencia"],
-            ZonaFiltrado.Select(x => new object?[]
+            filas.Select(x => new object?[]
             {
                 x.IdProducto, x.CodigoClave, x.Descripcion, x.Marca, x.Categoria, x.Color, x.Talla, x.Cantidad
+            }));
+    }
+
+    // Historial de inventario con los filtros activos (el listado ya viene filtrado desde la API).
+    private Task ExportarHistorial()
+    {
+        var filas = _historial.Where(FiltrarHistorial).ToList();
+        return ExportarReporteAsync(
+            "HistorialInventario", "HISTORIAL DE INVENTARIO",
+            new()
+            {
+                ["Tipo"] = string.IsNullOrWhiteSpace(_histTipo) ? "Todos" : EtiquetaTipoMovimiento(_histTipo),
+                ["Zona"] = _zonas.FirstOrDefault(z => z.IdZona == _histZona)?.Descripcion ?? "Todas",
+                ["Desde"] = _histDesde is { } d ? d.ToString("dd/MM/yyyy") : "Sin límite",
+                ["Hasta"] = _histHasta is { } h ? h.ToString("dd/MM/yyyy") : "Sin límite"
+            },
+            [
+                new ReporteExcelKpi { Nombre = "Movimientos", Valor = filas.Count.ToString() },
+                new ReporteExcelKpi { Nombre = "Piezas movidas", Valor = filas.Sum(x => x.Cantidad).ToString() }
+            ],
+            ["Fecha", "Tipo", "Clave", "Producto", "Marca", "Categoría", "Cantidad", "Antes", "Después", "Zona", "Usuario", "Observaciones"],
+            filas.Select(x => new object?[]
+            {
+                x.FechaMovimiento.EnZonaProyecto().DateTime.ToString("dd/MM/yyyy HH:mm"),
+                EtiquetaTipoMovimiento(x.TipoMovimiento), x.CodigoClave, x.Descripcion, x.Marca, x.Categoria,
+                x.Cantidad, x.ExistenciaAnterior, x.ExistenciaNueva, x.Zona ?? "—", x.Usuario ?? "—", x.Observaciones
             }));
     }
 
@@ -1361,19 +1461,30 @@
         if (_propuestaDetalle is null) return Task.CompletedTask;
         var p = _propuestaDetalle;
         var zona = string.IsNullOrWhiteSpace(p.ZonaDestino) ? $"Zona #{p.IdZonaDestino}" : p.ZonaDestino!;
-        // Bloque de títulos arriba de la tabla (zona, estatus y fechas de cabecera).
-        // La fecha de confirmación solo aparece si la propuesta está confirmada.
-        var titulos = new List<string>
+        // Formato estándar de los reportes (empresa, título, filtros/datos de cabecera, KPIs, tabla y pie).
+        // Confirmada = ya es un envío; pendiente sigue siendo propuesta; rechazada se indica como tal.
+        var confirmada = EsConfirmada(p.Estatus);
+        var rechazada = string.Equals(p.Estatus, "RECHAZADA", StringComparison.OrdinalIgnoreCase);
+        var filtros = new Dictionary<string, string>
         {
-            $"Zona: {zona}",
-            $"Estatus: {p.Estatus}",
-            $"Fecha de la propuesta: {p.FechaCreacion.EnZonaProyecto().DateTime:dd/MM/yyyy HH:mm}"
+            ["Zona"] = zona,
+            ["Estatus"] = EtiquetaEstatus(p.Estatus),
+            [confirmada ? "Fecha del envío" : "Fecha de la propuesta"] = p.FechaCreacion.EnZonaProyecto().DateTime.ToString("dd/MM/yyyy HH:mm")
         };
-        if (EsConfirmada(p.Estatus) && p.FechaResolucion is { } fr)
-            titulos.Add($"Fecha de confirmación: {fr.EnZonaProyecto().DateTime:dd/MM/yyyy HH:mm}");
+        if ((confirmada || rechazada) && p.FechaResolucion is { } fr)
+            filtros[confirmada ? "Fecha de confirmación" : "Fecha de rechazo"] = fr.EnZonaProyecto().DateTime.ToString("dd/MM/yyyy HH:mm");
 
-        return ExportarAsync(
-            zona,
+        var destino = zona.ToUpperInvariant();
+        return ExportarReporteAsync(
+            confirmada ? "Envio" : rechazada ? "PropuestaRechazada" : "Propuesta",
+            confirmada ? $"ENVÍO A {destino}"
+                : rechazada ? $"PROPUESTA RECHAZADA DE ENVÍO A {destino}"
+                : $"PROPUESTA DE ENVÍO A {destino}",
+            filtros,
+            [
+                new ReporteExcelKpi { Nombre = "Artículos", Valor = p.Detalles.Count.ToString() },
+                new ReporteExcelKpi { Nombre = "Piezas", Valor = p.Detalles.Sum(d => d.Cantidad).ToString() }
+            ],
             ["Clave", "Producto", "Marca", "Categoría", "Cantidad"],
             p.Detalles.Select(d => new object?[]
             {
@@ -1382,8 +1493,32 @@
                 d.Marca,
                 d.Categoria,
                 d.Cantidad
-            }),
-            titulos);
+            }));
+    }
+
+    // Exportación con el formato estándar de Reportes.
+    private async Task ExportarReporteAsync(string archivo, string titulo, Dictionary<string, string> filtros,
+        List<ReporteExcelKpi> kpis, string[] columnas, IEnumerable<object?[]> filas)
+    {
+        if (_exportando) return;
+        _exportando = true;
+        try
+        {
+            var info = new ReporteExcelInfo
+            {
+                Empresa = _empresaGlobal.Info?.NombreCorto
+                          ?? _empresaGlobal.Identidad?.NombreCorto
+                          ?? "Sistema Cobranza",
+                Titulo = titulo,
+                FechaGeneracion = FechaProyecto.Ahora.DateTime,
+                Filtros = filtros,
+                Kpis = kpis
+            };
+            var bytes = ExportadorExcel.Crear(info, columnas, filas);
+            await _descarga.GuardarAsync($"{archivo}-{FechaProyecto.Ahora:yyyyMMdd-HHmmssfff}.xlsx", bytes);
+        }
+        catch (Exception ex) { _snackbar.Add($"No se pudo exportar: {ex.Message}", Severity.Error); }
+        finally { _exportando = false; }
     }
 
     // ===================== Búsqueda en filtros de selección =====================

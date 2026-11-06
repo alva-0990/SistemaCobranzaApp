@@ -74,20 +74,25 @@
                         Exportar a Excel
                     </MudButton>
                 </div>
+                <MudTextField T="string" @bind-Value="_cartBusqueda" Immediate="true"
+                              Placeholder="Buscar por venta, código, cliente, producto, ruta o zona…" Variant="Variant.Outlined"
+                              Margin="Margin.Dense" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
+                              Clearable="true" Class="mb-3" />
                 <MudTable Items="_cartera.Filas" Hover="true" Dense="true" Breakpoint="Breakpoint.Sm"
-                          Elevation="0" RowsPerPage="15" T="ReporteCarteraFila">
+                          Elevation="0" RowsPerPage="20" T="ReporteCarteraFila" Class="tabla-seguimiento"
+                          Filter="new Func<ReporteCarteraFila, bool>(FiltrarCartera)">
                     <HeaderContent>
-                        <MudTh>Venta</MudTh>
-                        <MudTh>Código</MudTh>
-                        <MudTh>Cliente</MudTh>
+                        <MudTh><MudTableSortLabel SortBy="new Func<ReporteCarteraFila, object>(x => x.IdVenta)">Venta</MudTableSortLabel></MudTh>
+                        <MudTh><MudTableSortLabel SortBy="new Func<ReporteCarteraFila, object>(x => x.CodigoVenta ?? string.Empty)">Código</MudTableSortLabel></MudTh>
+                        <MudTh><MudTableSortLabel SortBy="new Func<ReporteCarteraFila, object>(x => x.Cliente ?? string.Empty)">Cliente</MudTableSortLabel></MudTh>
                         <MudTh>Producto</MudTh>
-                        <MudTh>Ruta</MudTh>
-                        <MudTh>Zona</MudTh>
-                        <MudTh Style="text-align:right;">Total</MudTh>
-                        <MudTh Style="text-align:right;">Abonado</MudTh>
-                        <MudTh Style="text-align:right;">Saldo</MudTh>
-                        <MudTh>Estado</MudTh>
-                        <MudTh>Último pago</MudTh>
+                        <MudTh><MudTableSortLabel SortBy="new Func<ReporteCarteraFila, object>(x => x.Ruta ?? string.Empty)">Ruta</MudTableSortLabel></MudTh>
+                        <MudTh><MudTableSortLabel SortBy="new Func<ReporteCarteraFila, object>(x => x.Zona ?? string.Empty)">Zona</MudTableSortLabel></MudTh>
+                        <MudTh Style="text-align:right;"><MudTableSortLabel SortBy="new Func<ReporteCarteraFila, object>(x => x.TotalFinal)">Total</MudTableSortLabel></MudTh>
+                        <MudTh Style="text-align:right;"><MudTableSortLabel SortBy="new Func<ReporteCarteraFila, object>(x => x.TotalAbonos)">Abonado</MudTableSortLabel></MudTh>
+                        <MudTh Style="text-align:right;"><MudTableSortLabel InitialDirection="SortDirection.Descending" SortBy="new Func<ReporteCarteraFila, object>(x => x.Saldo)">Saldo</MudTableSortLabel></MudTh>
+                        <MudTh><MudTableSortLabel SortBy="new Func<ReporteCarteraFila, object>(x => x.Estado ?? string.Empty)">Estado</MudTableSortLabel></MudTh>
+                        <MudTh><MudTableSortLabel SortBy="new Func<ReporteCarteraFila, object>(x => (object?)x.FechaUltimoPago ?? DateTimeOffset.MinValue)">Último pago</MudTableSortLabel></MudTh>
                     </HeaderContent>
                     <RowTemplate>
                         <MudTd DataLabel="Venta">@context.IdVenta</MudTd>
@@ -185,20 +190,25 @@
                         Exportar a Excel
                     </MudButton>
                 </div>
+                <MudTextField T="string" @bind-Value="_pagBusqueda" Immediate="true"
+                              Placeholder="Buscar por folio, venta, cliente, producto, cobrador o movimiento…" Variant="Variant.Outlined"
+                              Margin="Margin.Dense" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
+                              Clearable="true" Class="mb-3" />
                 <MudTable Items="_pagos.Filas" Hover="true" Dense="true" Breakpoint="Breakpoint.Sm"
-                          Elevation="0" RowsPerPage="15" T="ReportePagoFila">
+                          Elevation="0" RowsPerPage="20" T="ReportePagoFila" Class="tabla-seguimiento"
+                          Filter="new Func<ReportePagoFila, bool>(FiltrarPagos)">
                     <HeaderContent>
-                        <MudTh>Pago</MudTh>
-                        <MudTh>Folio</MudTh>
-                        <MudTh>Venta</MudTh>
-                        <MudTh>Cliente</MudTh>
+                        <MudTh><MudTableSortLabel SortBy="new Func<ReportePagoFila, object>(x => x.IdPago)">Pago</MudTableSortLabel></MudTh>
+                        <MudTh><MudTableSortLabel SortBy="new Func<ReportePagoFila, object>(x => x.FolioPago ?? string.Empty)">Folio</MudTableSortLabel></MudTh>
+                        <MudTh><MudTableSortLabel SortBy="new Func<ReportePagoFila, object>(x => x.IdVenta)">Venta</MudTableSortLabel></MudTh>
+                        <MudTh><MudTableSortLabel SortBy="new Func<ReportePagoFila, object>(x => x.Cliente ?? string.Empty)">Cliente</MudTableSortLabel></MudTh>
                         <MudTh>Producto</MudTh>
-                        <MudTh>Cobrador</MudTh>
-                        <MudTh>Movimiento</MudTh>
-                        <MudTh Style="text-align:right;">Total de venta</MudTh>
-                        <MudTh Style="text-align:right;">Abono</MudTh>
-                        <MudTh Style="text-align:right;">Saldo act.</MudTh>
-                        <MudTh>Fecha</MudTh>
+                        <MudTh><MudTableSortLabel SortBy="new Func<ReportePagoFila, object>(x => x.Cobrador ?? string.Empty)">Cobrador</MudTableSortLabel></MudTh>
+                        <MudTh><MudTableSortLabel SortBy="new Func<ReportePagoFila, object>(x => x.Movimiento ?? string.Empty)">Movimiento</MudTableSortLabel></MudTh>
+                        <MudTh Style="text-align:right;"><MudTableSortLabel SortBy="new Func<ReportePagoFila, object>(x => x.TotalVenta)">Total de venta</MudTableSortLabel></MudTh>
+                        <MudTh Style="text-align:right;"><MudTableSortLabel SortBy="new Func<ReportePagoFila, object>(x => x.MontoAbona)">Abono</MudTableSortLabel></MudTh>
+                        <MudTh Style="text-align:right;"><MudTableSortLabel SortBy="new Func<ReportePagoFila, object>(x => x.SaldoActual)">Saldo act.</MudTableSortLabel></MudTh>
+                        <MudTh><MudTableSortLabel InitialDirection="SortDirection.Descending" SortBy="new Func<ReportePagoFila, object>(x => x.FechaPago)">Fecha</MudTableSortLabel></MudTh>
                     </HeaderContent>
                     <RowTemplate>
                         <MudTd DataLabel="Pago">@context.IdPago</MudTd>
@@ -300,19 +310,24 @@
                         Exportar a Excel
                     </MudButton>
                 </div>
+                <MudTextField T="string" @bind-Value="_venBusqueda" Immediate="true"
+                              Placeholder="Buscar por venta, código, cliente, producto, vendedor o condición…" Variant="Variant.Outlined"
+                              Margin="Margin.Dense" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
+                              Clearable="true" Class="mb-3" />
                 <MudTable Items="_ventas.Filas" Hover="true" Dense="true" Breakpoint="Breakpoint.Sm"
-                          Elevation="0" RowsPerPage="15" T="ReporteVentaFila">
+                          Elevation="0" RowsPerPage="20" T="ReporteVentaFila" Class="tabla-seguimiento"
+                          Filter="new Func<ReporteVentaFila, bool>(FiltrarVentas)">
                     <HeaderContent>
-                        <MudTh>Venta</MudTh>
-                        <MudTh>Código</MudTh>
-                        <MudTh>Cliente</MudTh>
+                        <MudTh><MudTableSortLabel SortBy="new Func<ReporteVentaFila, object>(x => x.IdVenta)">Venta</MudTableSortLabel></MudTh>
+                        <MudTh><MudTableSortLabel SortBy="new Func<ReporteVentaFila, object>(x => x.CodigoVenta ?? string.Empty)">Código</MudTableSortLabel></MudTh>
+                        <MudTh><MudTableSortLabel SortBy="new Func<ReporteVentaFila, object>(x => x.Cliente ?? string.Empty)">Cliente</MudTableSortLabel></MudTh>
                         <MudTh>Producto</MudTh>
-                        <MudTh>Vendedor</MudTh>
-                        <MudTh Style="text-align:right;">Total</MudTh>
-                        <MudTh Style="text-align:right;">Enganche</MudTh>
-                        <MudTh Style="text-align:right;">Saldo</MudTh>
-                        <MudTh>Estado</MudTh>
-                        <MudTh>Fecha</MudTh>
+                        <MudTh><MudTableSortLabel SortBy="new Func<ReporteVentaFila, object>(x => x.Vendedor ?? string.Empty)">Vendedor</MudTableSortLabel></MudTh>
+                        <MudTh Style="text-align:right;"><MudTableSortLabel SortBy="new Func<ReporteVentaFila, object>(x => x.TotalFinal)">Total</MudTableSortLabel></MudTh>
+                        <MudTh Style="text-align:right;"><MudTableSortLabel SortBy="new Func<ReporteVentaFila, object>(x => x.Enganche)">Enganche</MudTableSortLabel></MudTh>
+                        <MudTh Style="text-align:right;"><MudTableSortLabel SortBy="new Func<ReporteVentaFila, object>(x => x.Saldo)">Saldo</MudTableSortLabel></MudTh>
+                        <MudTh><MudTableSortLabel SortBy="new Func<ReporteVentaFila, object>(x => x.Estado ?? string.Empty)">Estado</MudTableSortLabel></MudTh>
+                        <MudTh><MudTableSortLabel InitialDirection="SortDirection.Descending" SortBy="new Func<ReporteVentaFila, object>(x => (object?)x.FechaCompra ?? DateTimeOffset.MinValue)">Fecha</MudTableSortLabel></MudTh>
                     </HeaderContent>
                     <RowTemplate>
                         <MudTd DataLabel="Venta">@context.IdVenta</MudTd>
@@ -395,12 +410,17 @@
                         Exportar a Excel
                     </MudButton>
                 </div>
+                <MudTextField T="string" @bind-Value="_recBusqueda" Immediate="true"
+                              Placeholder="Buscar por cobrador…" Variant="Variant.Outlined"
+                              Margin="Margin.Dense" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
+                              Clearable="true" Class="mb-3" />
                 <MudTable Items="_recuperacion.Filas" Hover="true" Dense="true" Breakpoint="Breakpoint.Sm"
-                          Elevation="0" RowsPerPage="15" T="ReporteRecuperacionFila">
+                          Elevation="0" RowsPerPage="20" T="ReporteRecuperacionFila" Class="tabla-seguimiento"
+                          Filter="new Func<ReporteRecuperacionFila, bool>(FiltrarRecuperacion)">
                     <HeaderContent>
-                        <MudTh>Cobrador</MudTh>
-                        <MudTh Style="text-align:right;">N.° de pagos</MudTh>
-                        <MudTh Style="text-align:right;">Monto cobrado</MudTh>
+                        <MudTh><MudTableSortLabel SortBy="new Func<ReporteRecuperacionFila, object>(x => x.Cobrador ?? string.Empty)">Cobrador</MudTableSortLabel></MudTh>
+                        <MudTh Style="text-align:right;"><MudTableSortLabel SortBy="new Func<ReporteRecuperacionFila, object>(x => x.NumeroPagos)">N.° de pagos</MudTableSortLabel></MudTh>
+                        <MudTh Style="text-align:right;"><MudTableSortLabel InitialDirection="SortDirection.Descending" SortBy="new Func<ReporteRecuperacionFila, object>(x => x.MontoCobrado)">Monto cobrado</MudTableSortLabel></MudTh>
                     </HeaderContent>
                     <RowTemplate>
                         <MudTd DataLabel="Cobrador"><b>@context.Cobrador</b></MudTd>
@@ -477,16 +497,21 @@
                         Exportar a Excel
                     </MudButton>
                 </div>
+                <MudTextField T="string" @bind-Value="_cliBusqueda" Immediate="true"
+                              Placeholder="Buscar por ID, nombre, ruta, zona o clasificación…" Variant="Variant.Outlined"
+                              Margin="Margin.Dense" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
+                              Clearable="true" Class="mb-3" />
                 <MudTable Items="_clientes.Filas" Hover="true" Dense="true" Breakpoint="Breakpoint.Sm"
-                          Elevation="0" RowsPerPage="15" T="ReporteClienteFila">
+                          Elevation="0" RowsPerPage="20" T="ReporteClienteFila" Class="tabla-seguimiento"
+                          Filter="new Func<ReporteClienteFila, bool>(FiltrarClientes)">
                     <HeaderContent>
-                        <MudTh>ID</MudTh>
-                        <MudTh>Cliente</MudTh>
-                        <MudTh>Ruta</MudTh>
-                        <MudTh>Zona</MudTh>
-                        <MudTh>Clasificación</MudTh>
-                        <MudTh Style="text-align:center;">Estatus</MudTh>
-                        <MudTh>Alta</MudTh>
+                        <MudTh><MudTableSortLabel SortBy="new Func<ReporteClienteFila, object>(x => x.IdCliente)">ID</MudTableSortLabel></MudTh>
+                        <MudTh><MudTableSortLabel SortBy="new Func<ReporteClienteFila, object>(x => x.Cliente ?? string.Empty)">Cliente</MudTableSortLabel></MudTh>
+                        <MudTh><MudTableSortLabel SortBy="new Func<ReporteClienteFila, object>(x => x.Ruta ?? string.Empty)">Ruta</MudTableSortLabel></MudTh>
+                        <MudTh><MudTableSortLabel SortBy="new Func<ReporteClienteFila, object>(x => x.Zona ?? string.Empty)">Zona</MudTableSortLabel></MudTh>
+                        <MudTh><MudTableSortLabel SortBy="new Func<ReporteClienteFila, object>(x => x.Clasificacion ?? string.Empty)">Clasificación</MudTableSortLabel></MudTh>
+                        <MudTh Style="text-align:center;"><MudTableSortLabel SortBy="new Func<ReporteClienteFila, object>(x => x.Activo)">Estatus</MudTableSortLabel></MudTh>
+                        <MudTh><MudTableSortLabel SortBy="new Func<ReporteClienteFila, object>(x => (object?)x.FechaAlta ?? DateTimeOffset.MinValue)">Alta</MudTableSortLabel></MudTh>
                     </HeaderContent>
                     <RowTemplate>
                         <MudTd DataLabel="ID">@context.IdCliente</MudTd>
@@ -847,6 +872,31 @@
         }
         finally { _cargando = false; }
     }
+
+    // Filtros en memoria (buscador de cada pestaña): no regeneran el reporte.
+    private string? _cartBusqueda, _pagBusqueda, _venBusqueda, _recBusqueda, _cliBusqueda;
+
+    private static bool Coincide(string? busqueda, params object?[] campos)
+    {
+        var texto = busqueda?.Trim();
+        if (string.IsNullOrWhiteSpace(texto)) return true;
+        return campos.Any(c => c?.ToString()?.Contains(texto, StringComparison.OrdinalIgnoreCase) == true);
+    }
+
+    private bool FiltrarCartera(ReporteCarteraFila f)
+        => Coincide(_cartBusqueda, f.IdVenta, f.CodigoVenta, f.Cliente, f.Productos, f.Ruta, f.Zona, f.Estado);
+
+    private bool FiltrarPagos(ReportePagoFila f)
+        => Coincide(_pagBusqueda, f.IdPago, f.FolioPago, f.IdVenta, f.Cliente, f.Productos, f.Cobrador, f.Movimiento);
+
+    private bool FiltrarVentas(ReporteVentaFila f)
+        => Coincide(_venBusqueda, f.IdVenta, f.CodigoVenta, f.Cliente, f.Productos, f.Vendedor, f.Condicion, f.Estado);
+
+    private bool FiltrarRecuperacion(ReporteRecuperacionFila f)
+        => Coincide(_recBusqueda, f.Cobrador);
+
+    private bool FiltrarClientes(ReporteClienteFila f)
+        => Coincide(_cliBusqueda, f.IdCliente, f.Cliente, f.Ruta, f.Zona, f.Clasificacion);
 
     // Filtro en memoria de la tabla de seguimiento por ID o nombre del cliente (sin regenerar el reporte).
     private bool FiltrarSeguimiento(ReporteSeguimientoFila f)

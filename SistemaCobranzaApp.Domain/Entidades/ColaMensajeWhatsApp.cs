@@ -47,6 +47,18 @@ public class ColaMensajeWhatsApp
     /// <summary>'VENTA' | 'PAGO' (informativo).</summary>
     public string? TipoOrigen { get; set; }
 
+    /// <summary>
+    /// Plantilla usada: 'VENTA_CREDITO' | 'VENTA_CONTADO' | 'PAGO'. Con la API oficial determina
+    /// qué plantilla aprobada de Meta se envía. Null en filas anteriores a la parametrización.
+    /// </summary>
+    public string? Plantilla { get; set; }
+
+    /// <summary>
+    /// Variables posicionales del mensaje en JSON (arreglo de textos: {{1}}, {{2}}, ...), usadas por la
+    /// API oficial. El proveedor se decide al enviar, por eso se guardan junto con el texto ya armado.
+    /// </summary>
+    public string? Variables { get; set; }
+
     /// <summary>Referencia informativa a la venta origen (sin FK dura).</summary>
     public long? IdVenta { get; set; }
 

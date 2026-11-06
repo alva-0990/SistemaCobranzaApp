@@ -172,30 +172,31 @@ VALUES
 ON CONFLICT (Clave) DO NOTHING;
 
 -- =====================================================================
--- Notificaciones WhatsApp (interruptores y plantillas editables en caliente)
+-- Notificaciones WhatsApp (interruptores y flujo de envío, editables en caliente)
 -- =====================================================================
 -- Interruptores 'SI' / 'NO' que se administran desde la pantalla de Parámetros.
--- Secretos de conexión (URL/instancia/apikey) NO van aquí: viven en variables de
--- entorno del contenedor por seguridad.
+-- Secretos de conexión (URL/instancia/apikey de Evolution y credenciales de Meta) NO van aquí:
+-- viven en variables de entorno del contenedor por seguridad.
 --
--- Plantillas: el texto del mensaje admite marcadores que el sistema sustituye:
---   {empresa}        nombre corto de la empresa (mayúsculas)
---   {cliente}        nombre del cliente
---   {folio}          código de la venta (venta) o folio del pago (pago)
---   {codigo_venta}   código de la venta a la que se abona (solo pago)
---   {fecha}          fecha/hora dd/MM/yyyy HH:mm (hora de México)
---   {saldo_anterior} saldo antes del abono (solo pago)
---   {monto}          monto del abono (solo pago)
---   {saldo}          saldo pendiente tras el abono (solo pago)
+-- Proveedor (flujo de envío):
+--   WHATSAPP_PROVEEDOR = 'EVOLUTION' -> API externa ya implementada (Evolution API): comprobante completo
+--                                       armado por el sistema (MensajesWhatsApp).
+--   WHATSAPP_PROVEEDOR = 'OFICIAL'   -> WhatsApp Cloud API de Meta, con MENSAJES CORTOS definidos en plantillas
+--                                       APROBADAS en Meta (WHATSAPP_OFICIAL_PLANTILLA_*). El sistema envía el
+--                                       nombre de la plantilla y las variables posicionales del cuerpo:
+--                                       VENTA_CREDITO {{1}} cliente, {{2}} folio, {{3}} total, {{4}} plan
+--                                       VENTA_CONTADO {{1}} cliente, {{2}} folio, {{3}} total
+--                                       PAGO          {{1}} cliente, {{2}} folio, {{3}} monto, {{4}} saldo actual
 INSERT INTO ParametrosSistema (Clave, Descripcion, ValorTexto)
 VALUES
     ('WHATSAPP_ENVIO_ACTIVO',    'Interruptor maestro de notificaciones WhatsApp (SI/NO)', 'SI'),
     ('WHATSAPP_NOTIFICAR_VENTA', 'Enviar WhatsApp al registrar una venta (SI/NO)',        'SI'),
     ('WHATSAPP_NOTIFICAR_PAGO',  'Enviar WhatsApp al registrar un pago (SI/NO)',          'SI'),
-    ('WHATSAPP_PLANTILLA_VENTA', 'Plantilla del mensaje de venta. Marcadores: {empresa}, {cliente}, {folio}, {fecha}',
-        E'*{empresa}*\n*COMPROBANTE DE VENTA*\n\nEstimado(a) *{cliente}*, confirmamos el registro de su compra.\n\n*Código de venta:* {folio}\n*Fecha/Hora:* {fecha}\n\nAgradecemos su preferencia.\n\n_Mensaje automático. Si desea dejar de recibir notificaciones, responda con la palabra BAJA._'),
-    ('WHATSAPP_PLANTILLA_PAGO',  'Plantilla del mensaje de pago. Marcadores: {empresa}, {cliente}, {folio}, {codigo_venta}, {fecha}, {saldo_anterior}, {monto}, {saldo}',
-        E'*{empresa}*\n*COMPROBANTE DE PAGO*\n\nEstimado(a) *{cliente}*, confirmamos el registro de su pago.\n\n*Folio:* {folio}\n*Fecha/Hora:* {fecha}\n*Saldo anterior:* {saldo_anterior}\n*Monto abonado:* {monto}\n*Saldo actual:* {saldo}\n\nAgradecemos su compromiso de mantener su cuenta al corriente.\n\n_Mensaje automático. Si desea dejar de recibir notificaciones, responda con la palabra BAJA._')
+    ('WHATSAPP_PROVEEDOR', 'Flujo de envío de WhatsApp: EVOLUTION (API externa) u OFICIAL (API oficial de Meta)', 'EVOLUTION'),
+    ('WHATSAPP_OFICIAL_PLANTILLA_VENTA_CREDITO', 'Nombre de la plantilla aprobada en Meta para venta a crédito (flujo OFICIAL). Variables: 1 cliente, 2 folio, 3 total, 4 plan', 'venta_credito'),
+    ('WHATSAPP_OFICIAL_PLANTILLA_VENTA_CONTADO', 'Nombre de la plantilla aprobada en Meta para venta de contado (flujo OFICIAL). Variables: 1 cliente, 2 folio, 3 total', 'venta_contado'),
+    ('WHATSAPP_OFICIAL_PLANTILLA_PAGO', 'Nombre de la plantilla aprobada en Meta para pago realizado (flujo OFICIAL). Variables: 1 cliente, 2 folio, 3 monto, 4 saldo actual', 'pago_registrado'),
+    ('WHATSAPP_OFICIAL_IDIOMA', 'Código de idioma de las plantillas aprobadas en Meta (flujo OFICIAL), ej. es_MX', 'es_MX')
 ON CONFLICT (Clave) DO NOTHING;
 
 -- Purga de la tabla de paso cola_mensajes_whatsapp (interruptor + retención).

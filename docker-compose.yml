@@ -90,6 +90,10 @@ services:
       Whatsapp__Instancia: ${WHATSAPP_INSTANCIA:-}
       Whatsapp__ApiKey: ${WHATSAPP_APIKEY:-}
       Whatsapp__WebhookSecret: ${WHATSAPP_WEBHOOK_SECRET:-}
+      # --- WhatsApp API oficial (Meta Cloud API). Solo se usa si WHATSAPP_PROVEEDOR = OFICIAL ---
+      WhatsappOficial__PhoneNumberId: ${WHATSAPP_OFICIAL_PHONE_NUMBER_ID:-}
+      WhatsappOficial__AccessToken: ${WHATSAPP_OFICIAL_ACCESS_TOKEN:-}
+      WhatsappOficial__VersionApi: ${WHATSAPP_OFICIAL_VERSION_API:-v21.0}
     networks:
       - cobranza_net
 

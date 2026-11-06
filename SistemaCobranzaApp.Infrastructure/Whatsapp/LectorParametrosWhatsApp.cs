@@ -65,8 +65,11 @@ public sealed class LectorParametrosWhatsApp
             ClavesParametrosWhatsApp.EnvioActivo,
             ClavesParametrosWhatsApp.NotificarVenta,
             ClavesParametrosWhatsApp.NotificarPago,
-            ClavesParametrosWhatsApp.PlantillaVenta,
-            ClavesParametrosWhatsApp.PlantillaPago,
+            ClavesParametrosWhatsApp.Proveedor,
+            ClavesParametrosWhatsApp.OficialPlantillaVentaCredito,
+            ClavesParametrosWhatsApp.OficialPlantillaVentaContado,
+            ClavesParametrosWhatsApp.OficialPlantillaPago,
+            ClavesParametrosWhatsApp.OficialIdioma,
             ClavesParametrosWhatsApp.PurgaActiva,
             ClavesParametrosWhatsApp.PurgaDias
         };
@@ -82,6 +85,12 @@ public sealed class LectorParametrosWhatsApp
         decimal? Numero(string clave) =>
             filas.FirstOrDefault(f => f.Clave == clave)?.ValorNumerico;
 
+        string TextoOPorDefecto(string clave, string porDefecto)
+        {
+            var valor = Texto(clave);
+            return string.IsNullOrWhiteSpace(valor) ? porDefecto : valor.Trim();
+        }
+
         // Interruptores: ausente o distinto de 'SI' => activo por defecto en los de envío
         // salvo que explícitamente digan 'NO'. Para ser predecibles: default true si la
         // clave no existe, y false solo cuando el valor es 'NO'.
@@ -91,13 +100,10 @@ public sealed class LectorParametrosWhatsApp
             return v.Trim().Equals("SI", StringComparison.OrdinalIgnoreCase);
         }
 
-        var plantillaVenta = Texto(ClavesParametrosWhatsApp.PlantillaVenta);
-        if (string.IsNullOrWhiteSpace(plantillaVenta))
-            plantillaVenta = PlantillasPorDefecto.Venta;
-
-        var plantillaPago = Texto(ClavesParametrosWhatsApp.PlantillaPago);
-        if (string.IsNullOrWhiteSpace(plantillaPago))
-            plantillaPago = PlantillasPorDefecto.Pago;
+        // Proveedor: cualquier valor distinto de 'OFICIAL' usa el flujo ya implementado (Evolution API).
+        var proveedor = Texto(ClavesParametrosWhatsApp.Proveedor)?.Trim().ToUpperInvariant() == ProveedorWhatsApp.Oficial
+            ? ProveedorWhatsApp.Oficial
+            : ProveedorWhatsApp.Evolution;
 
         var purgaDias = (int)(Numero(ClavesParametrosWhatsApp.PurgaDias) ?? 7m);
         if (purgaDias < 1) purgaDias = 1;
@@ -106,19 +112,13 @@ public sealed class LectorParametrosWhatsApp
             EnvioActivo: EsSi(Texto(ClavesParametrosWhatsApp.EnvioActivo), porDefecto: true),
             NotificarVenta: EsSi(Texto(ClavesParametrosWhatsApp.NotificarVenta), porDefecto: true),
             NotificarPago: EsSi(Texto(ClavesParametrosWhatsApp.NotificarPago), porDefecto: true),
-            PlantillaVenta: plantillaVenta!,
-            PlantillaPago: plantillaPago!,
+            Proveedor: proveedor,
+            OficialPlantillaVentaCredito: TextoOPorDefecto(ClavesParametrosWhatsApp.OficialPlantillaVentaCredito, "venta_credito"),
+            OficialPlantillaVentaContado: TextoOPorDefecto(ClavesParametrosWhatsApp.OficialPlantillaVentaContado, "venta_contado"),
+            OficialPlantillaPago: TextoOPorDefecto(ClavesParametrosWhatsApp.OficialPlantillaPago, "pago_registrado"),
+            OficialIdioma: TextoOPorDefecto(ClavesParametrosWhatsApp.OficialIdioma, "es_MX"),
             PurgaActiva: EsSi(Texto(ClavesParametrosWhatsApp.PurgaActiva), porDefecto: true),
             PurgaDias: purgaDias);
     }
 }
 
-/// <summary>Textos por defecto cuando la plantilla de la tabla está vacía.</summary>
-public static class PlantillasPorDefecto
-{
-    public const string Venta =
-        "*{empresa}*\n*COMPROBANTE DE VENTA*\n\nEstimado(a) *{cliente}*, confirmamos el registro de su compra.\n\n*Código de venta:* {folio}\n*Fecha/Hora:* {fecha}\n\nAgradecemos su preferencia.\n\n_Mensaje automático. Si desea dejar de recibir notificaciones, responda con la palabra BAJA._";
-
-    public const string Pago =
-        "*{empresa}*\n*COMPROBANTE DE PAGO*\n\nEstimado(a) *{cliente}*, confirmamos el registro de su pago.\n\n*Folio:* {folio}\n*Fecha/Hora:* {fecha}\n*Saldo anterior:* {saldo_anterior}\n*Monto abonado:* {monto}\n*Saldo actual:* {saldo}\n\nAgradecemos su compromiso de mantener su cuenta al corriente.\n\n_Mensaje automático. Si desea dejar de recibir notificaciones, responda con la palabra BAJA._";
-}
