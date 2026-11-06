@@ -90,6 +90,8 @@ public sealed class ServicioJornadaLocal : IDisposable
             if (_api.Sesion!.IdRol != 3 || d.Asignacion.IdVendedor is null)
                 throw new InvalidOperationException("El usuario no es vendedor de esta jornada.");
             if (!ClientesDisponibles().Any(c => c.IdCliente == venta.IdCliente)) throw new InvalidOperationException("El cliente no pertenece a esta zona.");
+            if (EsVentaContado(d, venta.IdCondicion) && venta.Enganche != 0)
+                throw new InvalidOperationException("Una venta de contado no admite enganche.");
             if (venta.Detalles.Count == 0 || venta.Detalles.Any(l => l.Cantidad <= 0 || l.PrecioCobrado < 0))
                 throw new InvalidOperationException("Revisa los artículos de la venta.");
             foreach (var g in venta.Detalles.GroupBy(l => l.IdProducto))
@@ -338,6 +340,8 @@ public sealed class ServicioJornadaLocal : IDisposable
             var d = Estado.Descarga!;
             var total = req.TotalFinal + o.SaldoArrastre;
             var financiado = total - req.Enganche;
+            // Venta de contado: queda PAGADA de inmediato (el servidor la registra como pago completo), sin saldo por cobrar.
+            var contado = EsVentaContado(d, req.IdCondicion);
             var cuota = o.IdVentaVieja.HasValue && req.NumeroCuotas is > 0
                 ? Math.Round(financiado / req.NumeroCuotas.Value, 2, MidpointRounding.AwayFromZero) : req.MontoCuotaFija ?? 0;
             resultado.Add(o.VentaCentral is { } confirmada ? confirmada with { IdCliente = req.IdCliente } :
@@ -347,7 +351,8 @@ public sealed class ServicioJornadaLocal : IDisposable
                     req.Subtotal, req.DescuentoGlobal, total, req.Enganche, financiado,
                     req.IdFrecuenciaPago, d.Frecuencias.FirstOrDefault(f => f.Id == req.IdFrecuenciaPago)?.Descripcion,
                     req.NumeroCuotas ?? 0, cuota, req.TasaInteres ?? 0, req.FechaPrimerVence,
-                    0, financiado, null, 1, "Guardada en dispositivo", req.Observaciones,
+                    contado ? total : 0, contado ? 0 : financiado, null, contado ? EstatusVentaIds.Pagada : 1,
+                    contado ? "PAGADA (guardada en dispositivo)" : "Guardada en dispositivo", req.Observaciones,
                     req.Detalles.Select(l => new DetalleVentaDto(0, id, l.IdProducto,
                         d.Productos.FirstOrDefault(p => p.Id == l.IdProducto)?.Descripcion ?? $"Producto #{l.IdProducto}",
                         l.Cantidad, l.PrecioCobrado, l.Cantidad * l.PrecioCobrado)).ToList(), new(),
@@ -355,6 +360,11 @@ public sealed class ServicioJornadaLocal : IDisposable
         }
         return resultado;
     }
+
+    // Una venta es de contado cuando su condición (catálogo descargado) contiene "CONTADO".
+    private static bool EsVentaContado(JornadaDescargaDto d, long idCondicion)
+        => d.Condiciones.FirstOrDefault(c => c.IdCondicion == idCondicion)?.Descripcion
+            .Contains("CONTADO", StringComparison.OrdinalIgnoreCase) == true;
 
     private ClienteTicketDto DatosTicket(ClienteDto c) => new(c.NombreCompleto, c.TelefonoPrincipal, c.Direccion, c.Ruta, _api.Sesion?.Zona);
 
@@ -382,13 +392,14 @@ public sealed class ServicioJornadaLocal : IDisposable
             DatosTicket(c), req.Detalles.Select(l => new TicketDetalleDto(
                 d.Productos.FirstOrDefault(p => p.Id == l.IdProducto)?.Descripcion ?? $"Producto #{l.IdProducto}",
                 l.Cantidad, l.PrecioCobrado, l.Cantidad * l.PrecioCobrado)).ToList(),
-            req.Subtotal, req.DescuentoGlobal, req.TotalFinal + o.SaldoArrastre, req.Enganche, req.TotalFinal + o.SaldoArrastre - req.Enganche,
+            req.Subtotal, req.DescuentoGlobal, req.TotalFinal + o.SaldoArrastre, req.Enganche,
+            EsVentaContado(d, req.IdCondicion) ? 0m : req.TotalFinal + o.SaldoArrastre - req.Enganche,
             d.Frecuencias.FirstOrDefault(f => f.Id == req.IdFrecuenciaPago)?.Descripcion,
             o.IdVentaVieja.HasValue && req.NumeroCuotas is > 0
                 ? Math.Round((req.TotalFinal + o.SaldoArrastre - req.Enganche) / req.NumeroCuotas.Value, 2, MidpointRounding.AwayFromZero)
                 : req.MontoCuotaFija ?? 0, req.NumeroCuotas ?? 0, req.FechaPrimerVence,
             (req.PlanesPromocionales ?? new()).Select(p => new TicketPlanDto(p.NumeroMeses, p.MontoLiquidacion)).ToList());
-        return ticket;
+        return ticket with { EsContado = EsVentaContado(d, req.IdCondicion) };
     }
 
     public TicketVentaDto TicketVenta(Guid uuid)
@@ -435,6 +446,25 @@ public sealed class ServicioJornadaLocal : IDisposable
         return ClientesDisponibles().Where(c => terminos.All(t =>
             $"{c.IdCliente} {c.NombreCompleto} {c.TelefonoPrincipal} {c.TelefonoSecundario} {c.Direccion} {c.Ruta} {_api.Sesion?.Zona}"
                 .Contains(t, StringComparison.OrdinalIgnoreCase))).ToList();
+    }
+
+    /// <summary>
+    /// Movimientos no monetarios de la venta ya registrados en central (pagos descargados con la jornada).
+    /// Los pendientes del dispositivo se reflejan en el saldo disponible como abonos locales.
+    /// </summary>
+    public IEnumerable<(long? IdMovimiento, decimal Monto)> MovimientosDescargados(long idVenta)
+        => (Estado.Descarga?.Pagos ?? new()).Where(p => p.IdVenta == idVenta).Select(p => (p.IdMovimiento, p.MontoAbona));
+
+    /// <summary>
+    /// Operaciones del dispositivo aún no aplicadas en central que afectan al cliente (alta del cliente,
+    /// ventas o pagos de sus cuentas). Un estado de cuenta emitido por la API todavía no las incluye.
+    /// </summary>
+    public int PendientesDeCliente(long idCliente)
+    {
+        var ventas = VentasDisponibles().Where(v => v.IdCliente == idCliente).Select(v => v.IdVenta).ToHashSet();
+        return Estado.Operaciones.Count(o => !o.Aplicada &&
+            (o.ClienteLocal?.IdCliente == idCliente || o.Venta?.IdCliente == idCliente
+             || (o.Pago is { } p && ventas.Contains(p.IdVenta))));
     }
 
     public decimal SaldoDisponible(VentaDto venta)

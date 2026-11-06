@@ -19,8 +19,8 @@ public class ReportesEndpoints: IEndpointModule
             .RequireAuthorization();
 
         app.MapGet("/api/reportes/ventas", async (DateTimeOffset? desde, DateTimeOffset? hasta, long? idVendedor,
-                    long? idZona, long? idRuta, ServicioReportes s, CancellationToken ct) =>
-                Results.Ok(await s.VentasAsync(new ReporteVentasFiltro(desde, hasta, idVendedor, idZona, idRuta), ct)))
+                    long? idZona, long? idRuta, long? idCondicion, ServicioReportes s, CancellationToken ct) =>
+                Results.Ok(await s.VentasAsync(new ReporteVentasFiltro(desde, hasta, idVendedor, idZona, idRuta, idCondicion), ct)))
             .RequireAuthorization();
 
         app.MapGet("/api/reportes/recuperacion",
@@ -45,6 +45,41 @@ public class ReportesEndpoints: IEndpointModule
                 async (long? idZona, DateTimeOffset? altaDesde, DateTimeOffset? altaHasta,
                     ServicioReportes s, CancellationToken ct) =>
                     Results.Ok(await s.SeguimientoAsync(new ReporteSeguimientoFiltro(idZona, altaDesde, altaHasta), ct)))
+            .RequireAuthorization();
+
+        // ---- Reportes ejecutivos (derivados de la consulta base de seguimiento) ----
+        app.MapGet("/api/reportes/dashboard-ejecutivo",
+                async (DateTimeOffset? desde, DateTimeOffset? hasta, long? idZona, int? diasGraciaAlerta,
+                    ServicioReportes s, CancellationToken ct) =>
+                    Results.Ok(await s.DashboardEjecutivoAsync(
+                        new ReporteDashboardEjecutivoFiltro(desde, hasta, idZona, diasGraciaAlerta ?? 3), ct)))
+            .RequireAuthorization();
+
+        app.MapGet("/api/reportes/antiguedad-saldos",
+                async (long? idZona, long? idRuta, long? idClasificacion, ServicioReportes s, CancellationToken ct) =>
+                    Results.Ok(await s.AntiguedadSaldosAsync(new ReporteDeudaFiltro(idZona, idRuta, idClasificacion), ct)))
+            .RequireAuthorization();
+
+        app.MapGet("/api/reportes/clientes-sin-pago",
+                async (long? idZona, long? idRuta, long? idClasificacion, int? diasSinPago,
+                    ServicioReportes s, CancellationToken ct) =>
+                    Results.Ok(await s.ClientesSinPagoAsync(
+                        new ReporteSinPagoFiltro(idZona, idRuta, idClasificacion, diasSinPago ?? 15), ct)))
+            .RequireAuthorization();
+
+        app.MapGet("/api/reportes/ranking-deudores",
+                async (long? idZona, long? idRuta, long? idClasificacion, ServicioReportes s, CancellationToken ct) =>
+                    Results.Ok(await s.RankingDeudoresAsync(new ReporteDeudaFiltro(idZona, idRuta, idClasificacion), ct)))
+            .RequireAuthorization();
+
+        app.MapGet("/api/reportes/cartera-clasificacion",
+                async (long? idZona, long? idRuta, ServicioReportes s, CancellationToken ct) =>
+                    Results.Ok(await s.CarteraPorClasificacionAsync(new ReporteDeudaFiltro(idZona, idRuta), ct)))
+            .RequireAuthorization();
+
+        app.MapGet("/api/reportes/concentracion-cartera",
+                async (long? idZona, long? idRuta, ServicioReportes s, CancellationToken ct) =>
+                    Results.Ok(await s.ConcentracionCarteraAsync(new ReporteDeudaFiltro(idZona, idRuta), ct)))
             .RequireAuthorization();
     }
 }

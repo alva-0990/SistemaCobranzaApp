@@ -52,6 +52,25 @@ public partial class ApiCliente
     public Task<(EstadoCuentaResponse? datos, string? error)> EstadoCuentaAsync(long idCliente, CancellationToken ct = default)
         => GetSobreIndividualAsync<EstadoCuentaResponse>($"/api/clientes/{idCliente}/estado-cuenta", ct);
 
+    /// <summary>Estado de cuenta integral del cliente en PDF (bytes del documento).</summary>
+    public async Task<(byte[]? pdf, string? error)> EstadoCuentaIntegralPdfAsync(long idCliente, CancellationToken ct = default)
+    {
+        try
+        {
+            using var request = CrearPeticionAutenticada(HttpMethod.Get, $"/api/clientes/{idCliente}/estado-cuenta-integral");
+            using var resp = await _http.SendAsync(request, ct);
+            if (resp.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+                return (null, "Tu sesión expiró. Inicia sesión de nuevo.");
+            if (resp.StatusCode == System.Net.HttpStatusCode.NotFound)
+                return (null, "No se encontró el cliente.");
+            if (!resp.IsSuccessStatusCode)
+                return (null, $"Error del servidor ({(int)resp.StatusCode}).");
+            return (await resp.Content.ReadAsByteArrayAsync(ct), null);
+        }
+        catch (HttpRequestException ex) { return (null, "No se pudo conectar.\n" + ex.Message); }
+        catch (TaskCanceledException) { return (null, "La conexión tardó demasiado."); }
+    }
+
     // ---- Administración (CRUD) ----
 
     /// <summary>Listado paginado con filtros.</summary>

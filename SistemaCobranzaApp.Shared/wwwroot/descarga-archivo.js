@@ -1,7 +1,7 @@
-export async function guardarExcel(nombre, referencia) {
+export async function guardarExcel(nombre, referencia, tipoMime) {
     const datos = await referencia.arrayBuffer();
     const url = URL.createObjectURL(new Blob([datos], {
-        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        type: tipoMime || 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
     }));
     const enlace = document.createElement('a');
     enlace.href = url;

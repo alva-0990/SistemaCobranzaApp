@@ -67,7 +67,8 @@ public record ReporteVentasFiltro(
     DateTimeOffset? Hasta = null,
     long? IdVendedor = null,
     long? IdZona = null,
-    long? IdRuta = null);
+    long? IdRuta = null,
+    long? IdCondicion = null);
 
 public record ReporteVentaFila(
     long IdVenta,
@@ -81,6 +82,7 @@ public record ReporteVentaFila(
     DateTimeOffset FechaCompra)
 {
     public string Productos { get; init; } = "";
+    public string? Condicion { get; init; }
 }
 
 public record ReporteVentasResponse(
@@ -153,7 +155,10 @@ public record ReporteSeguimientoFila(
     string? Zona,
     string? Observaciones = null,
     int DiasPeriodo = 0,
-    string? FrecuenciaPago = null);
+    string? FrecuenciaPago = null)
+{
+    public string? Ruta { get; init; }
+}
 
 public record ReporteSeguimientoResponse(
     IReadOnlyList<ReporteSeguimientoFila> Filas,

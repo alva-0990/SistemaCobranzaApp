@@ -195,11 +195,15 @@
                         @(BusquedaPorVenta ? "Pago de la venta" : "Pagos del cliente")
                     </MudText>
                 </div>
-                <MudButton Variant="Variant.Outlined" Color="Color.Default" Size="Size.Small"
-                           StartIcon="@Icons.Material.Filled.ArrowBack"
-                           OnClick="Regresar">
-                    Regresar
-                </MudButton>
+                <div class="acciones-encabezado">
+                    <BotonEstadoCuenta IdCliente="c.IdCliente" ConInternet="Jornada.ConInternet"
+                                       Pendientes="Jornada.PendientesDeCliente(c.IdCliente)" />
+                    <MudButton Variant="Variant.Outlined" Color="Color.Default" Size="Size.Small"
+                               StartIcon="@Icons.Material.Filled.ArrowBack"
+                               OnClick="Regresar">
+                        Regresar
+                    </MudButton>
+                </div>
             </div>
         </MudPaper>
 
@@ -254,8 +258,11 @@
                         <MudTh>Código</MudTh>
                         <MudTh>Fecha</MudTh>
                         <MudTh>Estado</MudTh>
+                        <MudTh Style="text-align:right;">Descuento</MudTh>
                         <MudTh Style="text-align:right;">Total</MudTh>
+                        <MudTh Style="text-align:right;">Enganche</MudTh>
                         <MudTh Style="text-align:right;">Abonos</MudTh>
+                        <MudTh Style="text-align:right;">Bonif./Ajustes</MudTh>
                         <MudTh Style="text-align:right;">Saldo</MudTh>
                         <MudTh>Último pago</MudTh>
                     </HeaderContent>
@@ -268,8 +275,11 @@
                                 @(context.Estado ?? "—")
                             </MudChip>
                         </MudTd>
+                        <MudTd DataLabel="Descuento" Style="text-align:right;">@context.DescuentoGlobal.ToString("C2")</MudTd>
                         <MudTd DataLabel="Total" Style="text-align:right;">@context.TotalFinal.ToString("C2")</MudTd>
+                        <MudTd DataLabel="Enganche" Style="text-align:right;">@context.Enganche.ToString("C2")</MudTd>
                         <MudTd DataLabel="Abonos" Style="text-align:right;">@context.TotalAbonos.ToString("C2")</MudTd>
+                        <MudTd DataLabel="Bonif./Ajustes" Style="text-align:right;">@((context.TotalBonificaciones + context.TraspasoRenovacion).ToString("C2"))</MudTd>
                         <MudTd DataLabel="Saldo" Style="text-align:right;">
                             <b class="saldo-pendiente">@context.Saldo.ToString("C2")</b>
                         </MudTd>

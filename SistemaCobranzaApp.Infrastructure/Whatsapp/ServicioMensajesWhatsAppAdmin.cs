@@ -27,7 +27,8 @@ public class ServicioMensajesWhatsAppAdmin
     /// Lista los mensajes más recientes primero.
     /// </summary>
     /// <param name="estado">Pendiente | Procesando | Enviado | Fallido. Null = todos.</param>
-    /// <param name="texto">Busca en teléfono, mensaje, error y nombre del cliente.</param>
+    /// <param name="texto">Busca en el teléfono enviado, mensaje, error, nombre del cliente
+    /// y los teléfonos principal/secundario registrados del cliente.</param>
     /// <param name="limite">Máximo de filas (1-1000).</param>
     public async Task<List<MensajeWhatsAppDto>> ListarAsync(
         string? estado, string? texto, int limite, CancellationToken ct = default)
@@ -48,7 +49,9 @@ public class ServicioMensajesWhatsAppAdmin
                     CodigoVenta = v != null ? v.CodigoVenta : null,
                     Cliente = c != null
                         ? (c.Nombre + " " + (c.ApPaterno ?? "") + " " + (c.ApMaterno ?? "")).Trim()
-                        : null
+                        : null,
+                    TelefonoPrincipal = c != null ? c.TelefonoPrincipal : null,
+                    TelefonoSecundario = c != null ? c.TelefonoSecundario : null
                 };
 
             if (!string.IsNullOrWhiteSpace(estado))
@@ -60,7 +63,9 @@ public class ServicioMensajesWhatsAppAdmin
                 q = q.Where(x => EF.Functions.ILike(x.m.Telefono, like)
                                  || EF.Functions.ILike(x.m.Mensaje, like)
                                  || (x.m.ErrorLog != null && EF.Functions.ILike(x.m.ErrorLog, like))
-                                 || (x.Cliente != null && EF.Functions.ILike(x.Cliente, like)));
+                                 || (x.Cliente != null && EF.Functions.ILike(x.Cliente, like))
+                                 || (x.TelefonoPrincipal != null && EF.Functions.ILike(x.TelefonoPrincipal, like))
+                                 || (x.TelefonoSecundario != null && EF.Functions.ILike(x.TelefonoSecundario, like)));
             }
 
             return await q

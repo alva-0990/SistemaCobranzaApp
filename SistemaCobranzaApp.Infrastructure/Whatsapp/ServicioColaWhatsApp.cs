@@ -63,7 +63,7 @@ public class ServicioColaWhatsApp
             .Select(v => new
             {
                 v.IdVenta, v.IdCliente, v.CodigoVenta, v.FechaCompra, v.Subtotal, v.DescuentoGlobal,
-                v.TotalFinal, v.Enganche, v.MontoCuotaFija, v.NumeroCuotas, v.FechaPrimerVence, v.IdFrecuenciaPago
+                v.TotalFinal, v.Enganche, v.MontoCuotaFija, v.NumeroCuotas, v.FechaPrimerVence, v.IdFrecuenciaPago, v.IdCondicion
             })
             .FirstOrDefaultAsync(ct);
         if (venta is null) return false;
@@ -88,7 +88,11 @@ public class ServicioColaWhatsApp
                 .Select(f => f.Descripcion)
                 .FirstOrDefaultAsync(ct);
 
-        var montoFinanciado = venta.TotalFinal - venta.Enganche;
+        // Venta de contado: se cobra completa al momento, no hay saldo financiado ni plan de pagos.
+        var esContado = await _db.Condiciones.AsNoTracking()
+            .Where(c => c.IdCondicion == venta.IdCondicion && c.Descripcion.ToUpper().Contains("CONTADO"))
+            .AnyAsync(ct);
+        var montoFinanciado = esContado ? 0m : venta.TotalFinal - venta.Enganche;
 
         var ticket = new TicketVentaDto(
             NombreNegocio: await ObtenerNombreNegocioAsync(ct),
@@ -106,7 +110,10 @@ public class ServicioColaWhatsApp
             // Sin saldo financiado no hay plan de pagos que mostrar.
             NumeroCuotas: montoFinanciado > 0 ? venta.NumeroCuotas : 0,
             FechaPrimerVence: venta.FechaPrimerVence,
-            PlanesPromocionales: Array.Empty<TicketPlanDto>());
+            PlanesPromocionales: Array.Empty<TicketPlanDto>())
+        {
+            EsContado = esContado
+        };
 
         _db.ColaMensajesWhatsApp.Add(new ColaMensajeWhatsApp
         {

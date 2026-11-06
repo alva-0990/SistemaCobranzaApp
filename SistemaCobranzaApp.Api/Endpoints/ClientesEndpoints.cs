@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using SistemaCobranzaApp.Api.Comun;
 using SistemaCobranzaApp.Infrastructure.Clientes;
 using SistemaCobranzaApp.Infrastructure.Cobranza;
@@ -18,6 +19,13 @@ public class ClientesEndpoints : IEndpointModule
     {
         // ===================== Operativos (consulta) =====================
         var operativas = app.MapGroup("/api/clientes").RequireAuthorization();
+
+        // IdUsuario autenticado (claims del JWT), para identificar al operador que emite documentos.
+        static long? ObtenerIdUsuario(ClaimsPrincipal user)
+        {
+            var raw = user.FindFirstValue(ClaimTypes.NameIdentifier) ?? user.FindFirstValue("sub");
+            return long.TryParse(raw, out var idu) ? idu : null;
+        }
 
         // Búsqueda de clientes por texto: nombre, apellidos, teléfono, email, dirección,
         // código postal, ruta y zona (todo por texto; ruta/zona por su descripción).
@@ -82,6 +90,33 @@ public class ClientesEndpoints : IEndpointModule
             log.Info(proceso, $"Estado de cuenta del cliente #{id} obtenido.", datos: ec);
             return Respuestas.Ok(ec, "Estado de cuenta obtenido.");
         }).WithName("EstadoCuentaCliente");
+
+        // Estado de cuenta integral (documento completo) en PDF. Pensado también para reutilizarse
+        // más adelante desde otros canales (p. ej. envío por WhatsApp).
+        operativas.MapGet("/{id:long}/estado-cuenta-integral", async (
+            long id, ClaimsPrincipal user, ServicioEstadoCuentaIntegral s, IServicioLog log, CancellationToken ct) =>
+        {
+            const string proceso = "Estado de Cuenta Integral (PDF)";
+            var datos = await s.ObtenerAsync(id, ObtenerIdUsuario(user), ct);
+            if (datos is null)
+            {
+                log.Warn(proceso, $"Cliente #{id} no encontrado.");
+                return Respuestas.NoEncontrado($"No se encontró el cliente #{id}.");
+            }
+            log.Info(proceso, $"Generando PDF del estado de cuenta integral del cliente #{id}.");
+            var pdf = GeneradorPdfEstadoCuenta.Generar(datos);
+            return Results.File(pdf, "application/pdf", $"EstadoCuenta-{id}-{datos.FechaEmision:yyyyMMdd}.pdf");
+        }).WithName("EstadoCuentaIntegralPdf");
+
+        // Mismos datos del documento en JSON (para integraciones o vistas previas).
+        operativas.MapGet("/{id:long}/estado-cuenta-integral/datos", async (
+            long id, ClaimsPrincipal user, ServicioEstadoCuentaIntegral s, CancellationToken ct) =>
+        {
+            var datos = await s.ObtenerAsync(id, ObtenerIdUsuario(user), ct);
+            return datos is null
+                ? Respuestas.NoEncontrado($"No se encontró el cliente #{id}.")
+                : Respuestas.Ok(datos, "Estado de cuenta integral obtenido.");
+        }).WithName("EstadoCuentaIntegralDatos");
 
         // ===================== Admin (CRUD) =====================
         var admin = app.MapGroup("/api/admin/clientes").RequireAuthorization();

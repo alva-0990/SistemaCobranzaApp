@@ -194,6 +194,11 @@ else if (EsEntornoMovil && ApiClienteService.Autenticado)
                 <span>Reglas de Venta y Crédito</span>
             </button>
             
+            <button type="button" class="mas-item" @onclick="@(() => IrA("estadisticas"))">
+                <MudIcon Icon="@Icons.Material.Filled.Insights" Size="Size.Medium" Class="mr-3" />
+                <span>Estadísticas</span>
+            </button>
+
             <!-- Reportes y Sistema -->
             <button type="button" class="mas-item" @onclick="@(() => IrA("gastos"))">
                 <MudIcon Icon="@Icons.Material.Filled.PriceChange" Size="Size.Medium" Class="mr-3" />

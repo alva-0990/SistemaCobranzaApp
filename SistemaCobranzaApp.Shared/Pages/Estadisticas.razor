@@ -1,0 +1,890 @@
+@page "/estadisticas"
+
+@using MudBlazor
+@using SistemaCobranzaApp.Shared.Dtos
+@using SistemaCobranzaApp.Shared.Services
+@inject IDescargaArchivo Descarga
+@inject ApiCliente Api
+@inject EstadoEmpresaGlobal EmpresaGlobal
+@inject ISnackbar Snackbar
+@inject NavigationManager Nav
+
+@* ============================================================================
+   ESTADÍSTICAS EJECUTIVAS
+   ----------------------------------------------------------------------------
+   Dashboard ejecutivo, antigüedad de saldos, clientes sin pago, ranking de deudores,
+   cartera por clasificación y concentración. Todos derivan de la consulta base de
+   seguimiento (GET /api/reportes/...), sin consultas redundantes.
+   ============================================================================ *@
+
+<MudTabs Elevation="2" Rounded="true" Color="Color.Primary" ApplyEffectsToContainer="true"
+         PanelClass="pa-0 pt-4" SliderColor="Color.Warning" Class="ma-2 tabs-remarcados">
+
+    <!-- ===================== DASHBOARD EJECUTIVO ===================== -->
+    <MudTabPanel Text="Dashboard ejecutivo" Icon="@Icons.Material.Filled.Dashboard">
+        <MudPaper Elevation="0" Class="pa-4">
+            <div class="seccion-titulo mb-3">
+                <MudIcon Icon="@Icons.Material.Filled.FilterAlt" Size="Size.Small" Class="mr-1" />
+                Filtros del dashboard ejecutivo
+            </div>
+            <MudGrid Spacing="2" Class="align-end">
+                <MudItem xs="12" sm="6" md="4">
+                    <MudDatePicker Label="Desde" @bind-Date="_dashDesde" Variant="Variant.Outlined" Clearable="true" />
+                </MudItem>
+                <MudItem xs="12" sm="6" md="4">
+                    <MudDatePicker Label="Hasta" @bind-Date="_dashHasta" Variant="Variant.Outlined" Clearable="true" />
+                </MudItem>
+                <MudItem xs="12" sm="6" md="4">
+                    <AutocompletarCatalogo TItem="ZonaDto" Label="Zona" Placeholder="Todas"
+                                           @bind-Value="_dashZona"
+                                           Items="_zonas"
+                                           ObtenerId="@(z => z.IdZona)"
+                                           ObtenerTexto="@(z => z.Descripcion)" />
+                </MudItem>
+            </MudGrid>
+
+            <div class="d-flex justify-end mt-3 contenedor-generar">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Assessment"
+                           OnClick="GenerarDashboardEjecutivoAsync" Disabled="_cargando" Class="boton-generar">
+                    Generar reporte
+                </MudButton>
+            </div>
+        </MudPaper>
+
+        @if (_cargando && _tabActivo == 0)
+        {
+            @CargandoFragment
+        }
+        else if (_dashboard is not null)
+        {
+            <MudPaper Elevation="0" Outlined="true" Class="pa-3 ma-2">
+                <div class="seccion-titulo mb-2">
+                    <MudIcon Icon="@Icons.Material.Filled.Dashboard" Size="Size.Small" Class="mr-1" />
+                    Indicadores ejecutivos
+                </div>
+                <div class="d-flex justify-end mb-3">
+                    <MudButton Variant="Variant.Outlined" Color="Color.Success" StartIcon="@Icons.Material.Filled.FileDownload"
+                               OnClick="ExportarDashboardEjecutivo" Disabled="@(_cargando || _exportando)">
+                        Exportar a Excel
+                    </MudButton>
+                </div>
+                <MudGrid Spacing="2" Class="mb-3">
+                    @Tarjeta("💰 Cartera total pendiente", _dashboard.CarteraPendiente.ToString("C2"), Icons.Material.Filled.AccountBalanceWallet, Color.Error, 3)
+                    @Tarjeta("💰 Total cobrado", _dashboard.TotalCobrado.ToString("C2"), Icons.Material.Filled.Paid, Color.Success, 3)
+                    @Tarjeta("📈 Ventas del periodo", _dashboard.VentasPeriodo.ToString("C2"), Icons.Material.Filled.TrendingUp, Color.Info, 3)
+                    @Tarjeta("👥 Clientes activos", _dashboard.ClientesActivos.ToString("N0"), Icons.Material.Filled.People, Color.Primary, 3)
+                    @Tarjeta("⚠️ Clientes con atraso", _dashboard.ClientesConAtraso.ToString("N0"), Icons.Material.Filled.Warning, Color.Warning, 3)
+                    @Tarjeta("🔴 Clientes críticos", _dashboard.ClientesCriticos.ToString("N0"), Icons.Material.Filled.ReportProblem, Color.Error, 3)
+                    @Tarjeta("🏆 Mayor deudor", Mostrar(_dashboard.MayorDeudor), Icons.Material.Filled.EmojiEvents, Color.Secondary, 3)
+                    @Tarjeta("📍 Zona con mayor riesgo", Mostrar(_dashboard.ZonaMayorRiesgo), Icons.Material.Filled.Place, Color.Error, 3)
+                </MudGrid>
+            </MudPaper>
+        }
+    </MudTabPanel>
+
+    <!-- ===================== ANTIGÜEDAD DE SALDOS ===================== -->
+    <MudTabPanel Text="Antigüedad de saldos" Icon="@Icons.Material.Filled.HourglassBottom">
+        <MudPaper Elevation="0" Class="pa-4">
+            <div class="seccion-titulo mb-3">
+                <MudIcon Icon="@Icons.Material.Filled.FilterAlt" Size="Size.Small" Class="mr-1" />
+                Filtros de antigüedad de saldos
+            </div>
+            <MudGrid Spacing="2" Class="align-end">
+                <MudItem xs="12" sm="6" md="4">
+                    <AutocompletarCatalogo TItem="ZonaDto" Label="Zona" Placeholder="Todas"
+                                           @bind-Value="_antZona"
+                                           Items="_zonas"
+                                           ObtenerId="@(z => z.IdZona)"
+                                           ObtenerTexto="@(z => z.Descripcion)" />
+                </MudItem>
+                <MudItem xs="12" sm="6" md="4">
+                    <AutocompletarCatalogo TItem="RutaAdminDto" Label="Ruta" Placeholder="Todas"
+                                           @bind-Value="_antRuta"
+                                           Items="_rutas"
+                                           ObtenerId="@(r => r.IdRuta)"
+                                           ObtenerTexto="@(r => r.Descripcion)" />
+                </MudItem>
+                <MudItem xs="12" sm="6" md="4">
+                    <AutocompletarCatalogo TItem="ClasificaionClienteDto" Label="Clasificación" Placeholder="Todas"
+                                           @bind-Value="_antClasificacion"
+                                           Items="_clasificaciones"
+                                           ObtenerId="@(c => c.IdClasificaionCliente)"
+                                           ObtenerTexto="@(c => c.Descripcion)" />
+                </MudItem>
+            </MudGrid>
+
+            <div class="d-flex justify-end mt-3 contenedor-generar">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Assessment"
+                           OnClick="GenerarAntiguedadAsync" Disabled="_cargando" Class="boton-generar">
+                    Generar reporte
+                </MudButton>
+            </div>
+        </MudPaper>
+
+        @if (_cargando && _tabActivo == 1)
+        {
+            @CargandoFragment
+        }
+        else if (_antiguedad is not null)
+        {
+            <MudPaper Elevation="0" Outlined="true" Class="pa-3 ma-2">
+                <div class="seccion-titulo mb-2">
+                    <MudIcon Icon="@Icons.Material.Filled.HourglassBottom" Size="Size.Small" Class="mr-1" />
+                    Antigüedad de saldos (@_antiguedad.Filas.Count clientes)
+                </div>
+                <MudGrid Spacing="2" Class="mb-3">
+                    @Tarjeta("Saldo total", _antiguedad.SaldoTotal.ToString("C2"), Icons.Material.Filled.AccountBalanceWallet, Color.Error, 3)
+                    @Tarjeta("Clientes vencidos", _antiguedad.ClientesVencidos.ToString("N0"), Icons.Material.Filled.Warning, Color.Warning, 3)
+                    @Tarjeta("Saldo crítico (+30 días)", _antiguedad.SaldoCritico.ToString("C2"), Icons.Material.Filled.ReportProblem, Color.Error, 3)
+                    @Tarjeta("Máximo atraso", _antiguedad.MaximoAtraso + " días", Icons.Material.Filled.HourglassBottom, Color.Secondary, 3)
+                </MudGrid>
+                <div class="d-flex flex-wrap gap-2 mb-3">
+                    @foreach (var rango in _antiguedad.Rangos)
+                    {
+                        <MudChip T="string" Size="Size.Small" Variant="Variant.Filled" Color="@ColorRango(rango.Rango)">
+                            @rango.Rango: @rango.Clientes cliente(s) · @rango.SaldoPendiente.ToString("C2") (@rango.Porcentaje.ToString("0.##")%)
+                        </MudChip>
+                    }
+                </div>
+                <div class="d-flex justify-end mb-3">
+                    <MudButton Variant="Variant.Outlined" Color="Color.Success" StartIcon="@Icons.Material.Filled.FileDownload"
+                               OnClick="ExportarAntiguedad" Disabled="@(_cargando || _exportando || _antiguedad.Filas.Count == 0)">
+                        Exportar a Excel
+                    </MudButton>
+                </div>
+                <MudTable Items="_antiguedad.Filas" Hover="true" Dense="true" Breakpoint="Breakpoint.Sm"
+                          Elevation="0" RowsPerPage="15" T="ReporteAntiguedadFila">
+                    <HeaderContent>
+                        <MudTh>Cliente</MudTh>
+                        <MudTh>Zona</MudTh>
+                        <MudTh>Ruta</MudTh>
+                        <MudTh>Clasificación</MudTh>
+                        <MudTh>Último pago</MudTh>
+                        <MudTh Style="text-align:right;">Días transcurridos</MudTh>
+                        <MudTh Style="text-align:right;">Saldo pendiente</MudTh>
+                        <MudTh>Rango</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd DataLabel="Cliente"><b>@context.Cliente</b></MudTd>
+                        <MudTd DataLabel="Zona">@Mostrar(context.Zona)</MudTd>
+                        <MudTd DataLabel="Ruta">@Mostrar(context.Ruta)</MudTd>
+                        <MudTd DataLabel="Clasificación">@Mostrar(context.Clasificacion)</MudTd>
+                        <MudTd DataLabel="Último pago">@FechaCorta(context.FechaUltimoPago)</MudTd>
+                        <MudTd DataLabel="Días transcurridos" Style="text-align:right;">@context.DiasTranscurridos</MudTd>
+                        <MudTd DataLabel="Saldo pendiente" Style="text-align:right;"><b>@context.SaldoPendiente.ToString("C2")</b></MudTd>
+                        <MudTd DataLabel="Rango"><MudChip T="string" Size="Size.Small" Variant="Variant.Text" Color="@ColorRango(context.Rango)">@context.Rango</MudChip></MudTd>
+                    </RowTemplate>
+                    <NoRecordsContent>@SinDatosFragment</NoRecordsContent>
+                    <PagerContent>
+                        <MudTablePager InfoFormat="{first_item}-{last_item} de {all_items}" RowsPerPageString="Filas:" />
+                    </PagerContent>
+                </MudTable>
+            </MudPaper>
+        }
+    </MudTabPanel>
+
+    <!-- ===================== SIN PAGO RECIENTE ===================== -->
+    <MudTabPanel Text="Sin pago reciente" Icon="@Icons.Material.Filled.MoneyOff">
+        <MudPaper Elevation="0" Class="pa-4">
+            <div class="seccion-titulo mb-3">
+                <MudIcon Icon="@Icons.Material.Filled.FilterAlt" Size="Size.Small" Class="mr-1" />
+                Filtros de clientes sin pago reciente
+            </div>
+            <MudGrid Spacing="2" Class="align-end">
+                <MudItem xs="12" sm="6" md="3">
+                    <AutocompletarCatalogo TItem="ZonaDto" Label="Zona" Placeholder="Todas"
+                                           @bind-Value="_spZona"
+                                           Items="_zonas"
+                                           ObtenerId="@(z => z.IdZona)"
+                                           ObtenerTexto="@(z => z.Descripcion)" />
+                </MudItem>
+                <MudItem xs="12" sm="6" md="3">
+                    <AutocompletarCatalogo TItem="RutaAdminDto" Label="Ruta" Placeholder="Todas"
+                                           @bind-Value="_spRuta"
+                                           Items="_rutas"
+                                           ObtenerId="@(r => r.IdRuta)"
+                                           ObtenerTexto="@(r => r.Descripcion)" />
+                </MudItem>
+                <MudItem xs="12" sm="6" md="3">
+                    <AutocompletarCatalogo TItem="ClasificaionClienteDto" Label="Clasificación" Placeholder="Todas"
+                                           @bind-Value="_spClasificacion"
+                                           Items="_clasificaciones"
+                                           ObtenerId="@(c => c.IdClasificaionCliente)"
+                                           ObtenerTexto="@(c => c.Descripcion)" />
+                </MudItem>
+                <MudItem xs="12" sm="6" md="3">
+                    <MudNumericField T="int" Label="Días sin pago (mínimo)" @bind-Value="_spDias" Min="0" Variant="Variant.Outlined" />
+                </MudItem>
+            </MudGrid>
+
+            <div class="d-flex justify-end mt-3 contenedor-generar">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Assessment"
+                           OnClick="GenerarSinPagoAsync" Disabled="_cargando" Class="boton-generar">
+                    Generar reporte
+                </MudButton>
+            </div>
+        </MudPaper>
+
+        @if (_cargando && _tabActivo == 2)
+        {
+            @CargandoFragment
+        }
+        else if (_sinPago is not null)
+        {
+            <MudPaper Elevation="0" Outlined="true" Class="pa-3 ma-2">
+                <div class="seccion-titulo mb-2">
+                    <MudIcon Icon="@Icons.Material.Filled.MoneyOff" Size="Size.Small" Class="mr-1" />
+                    Clientes sin pago reciente (@_sinPago.Total)
+                </div>
+                <MudGrid Spacing="2" Class="mb-3">
+                    @Tarjeta("Clientes encontrados", _sinPago.Total.ToString("N0"), Icons.Material.Filled.People, Color.Primary, 3)
+                    @Tarjeta("Saldo en riesgo", _sinPago.SaldoEnRiesgo.ToString("C2"), Icons.Material.Filled.AccountBalanceWallet, Color.Error, 3)
+                    @Tarjeta("Promedio de días", _sinPago.PromedioDias.ToString("0.#"), Icons.Material.Filled.HourglassBottom, Color.Warning, 3)
+                    @Tarjeta("Máximo atraso", _sinPago.MaximoAtraso + " días", Icons.Material.Filled.ReportProblem, Color.Secondary, 3)
+                </MudGrid>
+                <div class="d-flex justify-end mb-3">
+                    <MudButton Variant="Variant.Outlined" Color="Color.Success" StartIcon="@Icons.Material.Filled.FileDownload"
+                               OnClick="ExportarSinPago" Disabled="@(_cargando || _exportando || _sinPago.Filas.Count == 0)">
+                        Exportar a Excel
+                    </MudButton>
+                </div>
+                <MudTable Items="_sinPago.Filas" Hover="true" Dense="true" Breakpoint="Breakpoint.Sm"
+                          Elevation="0" RowsPerPage="15" T="ReporteSinPagoFila">
+                    <HeaderContent>
+                        <MudTh>ID cliente</MudTh>
+                        <MudTh>Cliente</MudTh>
+                        <MudTh>Zona</MudTh>
+                        <MudTh>Ruta</MudTh>
+                        <MudTh>Clasificación</MudTh>
+                        <MudTh>Último pago</MudTh>
+                        <MudTh Style="text-align:right;">Días sin pago</MudTh>
+                        <MudTh Style="text-align:right;">Saldo pendiente</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd DataLabel="ID cliente">@context.IdCliente</MudTd>
+                        <MudTd DataLabel="Cliente"><b>@context.Cliente</b></MudTd>
+                        <MudTd DataLabel="Zona">@Mostrar(context.Zona)</MudTd>
+                        <MudTd DataLabel="Ruta">@Mostrar(context.Ruta)</MudTd>
+                        <MudTd DataLabel="Clasificación">@Mostrar(context.Clasificacion)</MudTd>
+                        <MudTd DataLabel="Último pago">@FechaCorta(context.FechaUltimoPago)</MudTd>
+                        <MudTd DataLabel="Días sin pago" Style="text-align:right;"><MudChip T="string" Size="Size.Small" Variant="Variant.Text" Color="@ColorRango(RangoDias(context.DiasSinPago))">@context.DiasSinPago</MudChip></MudTd>
+                        <MudTd DataLabel="Saldo pendiente" Style="text-align:right;"><b>@context.SaldoPendiente.ToString("C2")</b></MudTd>
+                    </RowTemplate>
+                    <NoRecordsContent>@SinDatosFragment</NoRecordsContent>
+                    <PagerContent>
+                        <MudTablePager InfoFormat="{first_item}-{last_item} de {all_items}" RowsPerPageString="Filas:" />
+                    </PagerContent>
+                </MudTable>
+            </MudPaper>
+        }
+    </MudTabPanel>
+
+    <!-- ===================== RANKING DE DEUDORES ===================== -->
+    <MudTabPanel Text="Ranking de deudores" Icon="@Icons.Material.Filled.EmojiEvents">
+        <MudPaper Elevation="0" Class="pa-4">
+            <div class="seccion-titulo mb-3">
+                <MudIcon Icon="@Icons.Material.Filled.FilterAlt" Size="Size.Small" Class="mr-1" />
+                Filtros del ranking de deudores
+            </div>
+            <MudGrid Spacing="2" Class="align-end">
+                <MudItem xs="12" sm="6" md="4">
+                    <AutocompletarCatalogo TItem="ZonaDto" Label="Zona" Placeholder="Todas"
+                                           @bind-Value="_rkZona"
+                                           Items="_zonas"
+                                           ObtenerId="@(z => z.IdZona)"
+                                           ObtenerTexto="@(z => z.Descripcion)" />
+                </MudItem>
+                <MudItem xs="12" sm="6" md="4">
+                    <AutocompletarCatalogo TItem="RutaAdminDto" Label="Ruta" Placeholder="Todas"
+                                           @bind-Value="_rkRuta"
+                                           Items="_rutas"
+                                           ObtenerId="@(r => r.IdRuta)"
+                                           ObtenerTexto="@(r => r.Descripcion)" />
+                </MudItem>
+                <MudItem xs="12" sm="6" md="4">
+                    <AutocompletarCatalogo TItem="ClasificaionClienteDto" Label="Clasificación" Placeholder="Todas"
+                                           @bind-Value="_rkClasificacion"
+                                           Items="_clasificaciones"
+                                           ObtenerId="@(c => c.IdClasificaionCliente)"
+                                           ObtenerTexto="@(c => c.Descripcion)" />
+                </MudItem>
+            </MudGrid>
+
+            <div class="d-flex justify-end mt-3 contenedor-generar">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Assessment"
+                           OnClick="GenerarRankingAsync" Disabled="_cargando" Class="boton-generar">
+                    Generar reporte
+                </MudButton>
+            </div>
+        </MudPaper>
+
+        @if (_cargando && _tabActivo == 3)
+        {
+            @CargandoFragment
+        }
+        else if (_ranking is not null)
+        {
+            <MudPaper Elevation="0" Outlined="true" Class="pa-3 ma-2">
+                <div class="seccion-titulo mb-2">
+                    <MudIcon Icon="@Icons.Material.Filled.EmojiEvents" Size="Size.Small" Class="mr-1" />
+                    Ranking de deudores (@_ranking.Filas.Count)
+                </div>
+                <MudGrid Spacing="2" Class="mb-3">
+                    @Tarjeta("Mayor deudor", Mostrar(_ranking.MayorDeudor), Icons.Material.Filled.EmojiEvents, Color.Secondary, 3)
+                    @Tarjeta("Top 10 acumulado", _ranking.Top10Acumulado.ToString("C2"), Icons.Material.Filled.Leaderboard, Color.Error, 3)
+                    @Tarjeta("Saldo total", _ranking.SaldoTotal.ToString("C2"), Icons.Material.Filled.AccountBalanceWallet, Color.Warning, 3)
+                    @Tarjeta("Participación Top 10", _ranking.ParticipacionTop10.ToString("0.##") + " %", Icons.Material.Filled.PieChart, Color.Info, 3)
+                </MudGrid>
+                <div class="d-flex justify-end mb-3">
+                    <MudButton Variant="Variant.Outlined" Color="Color.Success" StartIcon="@Icons.Material.Filled.FileDownload"
+                               OnClick="ExportarRanking" Disabled="@(_cargando || _exportando || _ranking.Filas.Count == 0)">
+                        Exportar a Excel
+                    </MudButton>
+                </div>
+                <MudTable Items="_ranking.Filas" Hover="true" Dense="true" Breakpoint="Breakpoint.Sm"
+                          Elevation="0" RowsPerPage="15" T="ReporteRankingDeudoresFila">
+                    <HeaderContent>
+                        <MudTh>Posición</MudTh>
+                        <MudTh>Cliente</MudTh>
+                        <MudTh>Zona</MudTh>
+                        <MudTh>Ruta</MudTh>
+                        <MudTh>Clasificación</MudTh>
+                        <MudTh>Último pago</MudTh>
+                        <MudTh Style="text-align:right;">Días</MudTh>
+                        <MudTh Style="text-align:right;">Saldo pendiente</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd DataLabel="Posición"><b>@context.Posicion</b></MudTd>
+                        <MudTd DataLabel="Cliente"><b>@context.Cliente</b></MudTd>
+                        <MudTd DataLabel="Zona">@Mostrar(context.Zona)</MudTd>
+                        <MudTd DataLabel="Ruta">@Mostrar(context.Ruta)</MudTd>
+                        <MudTd DataLabel="Clasificación">@Mostrar(context.Clasificacion)</MudTd>
+                        <MudTd DataLabel="Último pago">@FechaCorta(context.FechaUltimoPago)</MudTd>
+                        <MudTd DataLabel="Días" Style="text-align:right;">@context.DiasTranscurridos</MudTd>
+                        <MudTd DataLabel="Saldo pendiente" Style="text-align:right;"><b>@context.SaldoPendiente.ToString("C2")</b></MudTd>
+                    </RowTemplate>
+                    <NoRecordsContent>@SinDatosFragment</NoRecordsContent>
+                    <PagerContent>
+                        <MudTablePager InfoFormat="{first_item}-{last_item} de {all_items}" RowsPerPageString="Filas:" />
+                    </PagerContent>
+                </MudTable>
+            </MudPaper>
+        }
+    </MudTabPanel>
+
+    <!-- ===================== CARTERA POR CLASIFICACIÓN ===================== -->
+    <MudTabPanel Text="Cartera por clasificación" Icon="@Icons.Material.Filled.PieChart">
+        <MudPaper Elevation="0" Class="pa-4">
+            <div class="seccion-titulo mb-3">
+                <MudIcon Icon="@Icons.Material.Filled.FilterAlt" Size="Size.Small" Class="mr-1" />
+                Filtros de cartera por clasificación
+            </div>
+            <MudGrid Spacing="2" Class="align-end">
+                <MudItem xs="12" sm="6" md="6">
+                    <AutocompletarCatalogo TItem="ZonaDto" Label="Zona" Placeholder="Todas"
+                                           @bind-Value="_ccZona"
+                                           Items="_zonas"
+                                           ObtenerId="@(z => z.IdZona)"
+                                           ObtenerTexto="@(z => z.Descripcion)" />
+                </MudItem>
+                <MudItem xs="12" sm="6" md="6">
+                    <AutocompletarCatalogo TItem="RutaAdminDto" Label="Ruta" Placeholder="Todas"
+                                           @bind-Value="_ccRuta"
+                                           Items="_rutas"
+                                           ObtenerId="@(r => r.IdRuta)"
+                                           ObtenerTexto="@(r => r.Descripcion)" />
+                </MudItem>
+            </MudGrid>
+
+            <div class="d-flex justify-end mt-3 contenedor-generar">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Assessment"
+                           OnClick="GenerarCarteraClasificacionAsync" Disabled="_cargando" Class="boton-generar">
+                    Generar reporte
+                </MudButton>
+            </div>
+        </MudPaper>
+
+        @if (_cargando && _tabActivo == 4)
+        {
+            @CargandoFragment
+        }
+        else if (_carteraClasif is not null)
+        {
+            <MudPaper Elevation="0" Outlined="true" Class="pa-3 ma-2">
+                <div class="seccion-titulo mb-2">
+                    <MudIcon Icon="@Icons.Material.Filled.PieChart" Size="Size.Small" Class="mr-1" />
+                    Cartera por clasificación (@_carteraClasif.Filas.Count)
+                </div>
+                <MudGrid Spacing="2" Class="mb-3">
+                    @Tarjeta("Total de clientes", _carteraClasif.TotalClientes.ToString("N0"), Icons.Material.Filled.People, Color.Primary, 3)
+                    @Tarjeta("Saldo total", _carteraClasif.SaldoTotal.ToString("C2"), Icons.Material.Filled.AccountBalanceWallet, Color.Error, 3)
+                    @Tarjeta("Mayor clasificación", Mostrar(_carteraClasif.MayorClasificacion), Icons.Material.Filled.PieChart, Color.Info, 3)
+                    @Tarjeta("Clasificación de riesgo", Mostrar(_carteraClasif.ClasificacionRiesgo), Icons.Material.Filled.ReportProblem, Color.Warning, 3)
+                </MudGrid>
+                <div class="d-flex justify-end mb-3">
+                    <MudButton Variant="Variant.Outlined" Color="Color.Success" StartIcon="@Icons.Material.Filled.FileDownload"
+                               OnClick="ExportarCarteraClasificacion" Disabled="@(_cargando || _exportando || _carteraClasif.Filas.Count == 0)">
+                        Exportar a Excel
+                    </MudButton>
+                </div>
+                <MudTable Items="_carteraClasif.Filas" Hover="true" Dense="true" Breakpoint="Breakpoint.Sm"
+                          Elevation="0" RowsPerPage="15" T="ReporteCarteraClasificacionFila">
+                    <HeaderContent>
+                        <MudTh>Clasificación</MudTh>
+                        <MudTh Style="text-align:right;">Clientes</MudTh>
+                        <MudTh Style="text-align:right;">Saldo pendiente</MudTh>
+                        <MudTh Style="text-align:right;">Porcentaje</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd DataLabel="Clasificación"><b>@context.Clasificacion</b></MudTd>
+                        <MudTd DataLabel="Clientes" Style="text-align:right;">@context.Clientes</MudTd>
+                        <MudTd DataLabel="Saldo pendiente" Style="text-align:right;"><b>@context.SaldoPendiente.ToString("C2")</b></MudTd>
+                        <MudTd DataLabel="Porcentaje" Style="text-align:right;">@context.Porcentaje.ToString("0.##") %</MudTd>
+                    </RowTemplate>
+                    <NoRecordsContent>@SinDatosFragment</NoRecordsContent>
+                    <PagerContent>
+                        <MudTablePager InfoFormat="{first_item}-{last_item} de {all_items}" RowsPerPageString="Filas:" />
+                    </PagerContent>
+                </MudTable>
+            </MudPaper>
+        }
+    </MudTabPanel>
+
+    <!-- ===================== CONCENTRACIÓN DE CARTERA ===================== -->
+    <MudTabPanel Text="Concentración de cartera" Icon="@Icons.Material.Filled.DonutLarge">
+        <MudPaper Elevation="0" Class="pa-4">
+            <div class="seccion-titulo mb-3">
+                <MudIcon Icon="@Icons.Material.Filled.FilterAlt" Size="Size.Small" Class="mr-1" />
+                Filtros de concentración de cartera
+            </div>
+            <MudGrid Spacing="2" Class="align-end">
+                <MudItem xs="12" sm="6" md="6">
+                    <AutocompletarCatalogo TItem="ZonaDto" Label="Zona" Placeholder="Todas"
+                                           @bind-Value="_conZona"
+                                           Items="_zonas"
+                                           ObtenerId="@(z => z.IdZona)"
+                                           ObtenerTexto="@(z => z.Descripcion)" />
+                </MudItem>
+                <MudItem xs="12" sm="6" md="6">
+                    <AutocompletarCatalogo TItem="RutaAdminDto" Label="Ruta" Placeholder="Todas"
+                                           @bind-Value="_conRuta"
+                                           Items="_rutas"
+                                           ObtenerId="@(r => r.IdRuta)"
+                                           ObtenerTexto="@(r => r.Descripcion)" />
+                </MudItem>
+            </MudGrid>
+
+            <div class="d-flex justify-end mt-3 contenedor-generar">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Assessment"
+                           OnClick="GenerarConcentracionAsync" Disabled="_cargando" Class="boton-generar">
+                    Generar reporte
+                </MudButton>
+            </div>
+        </MudPaper>
+
+        @if (_cargando && _tabActivo == 5)
+        {
+            @CargandoFragment
+        }
+        else if (_concentracion is not null)
+        {
+            <MudPaper Elevation="0" Outlined="true" Class="pa-3 ma-2">
+                <div class="seccion-titulo mb-2">
+                    <MudIcon Icon="@Icons.Material.Filled.DonutLarge" Size="Size.Small" Class="mr-1" />
+                    Concentración de cartera (Top 20)
+                </div>
+                <MudGrid Spacing="2" Class="mb-3">
+                    @Tarjeta("Top 5", _concentracion.Top5.ToString("C2"), Icons.Material.Filled.Leaderboard, Color.Error, 3)
+                    @Tarjeta("Top 10", _concentracion.Top10.ToString("C2"), Icons.Material.Filled.Leaderboard, Color.Warning, 3)
+                    @Tarjeta("Top 20", _concentracion.Top20.ToString("C2"), Icons.Material.Filled.Leaderboard, Color.Info, 3)
+                    @Tarjeta("% de concentración (Top 10)", _concentracion.PorcentajeConcentracion.ToString("0.##") + " %", Icons.Material.Filled.DonutLarge, Color.Secondary, 3)
+                </MudGrid>
+                <div class="d-flex justify-end mb-3">
+                    <MudButton Variant="Variant.Outlined" Color="Color.Success" StartIcon="@Icons.Material.Filled.FileDownload"
+                               OnClick="ExportarConcentracion" Disabled="@(_cargando || _exportando || _concentracion.Filas.Count == 0)">
+                        Exportar a Excel
+                    </MudButton>
+                </div>
+                <MudTable Items="_concentracion.Filas" Hover="true" Dense="true" Breakpoint="Breakpoint.Sm"
+                          Elevation="0" RowsPerPage="15" T="ReporteConcentracionFila">
+                    <HeaderContent>
+                        <MudTh>Cliente</MudTh>
+                        <MudTh Style="text-align:right;">Saldo pendiente</MudTh>
+                        <MudTh Style="text-align:right;">Participación</MudTh>
+                        <MudTh>Clasificación</MudTh>
+                        <MudTh>Zona</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd DataLabel="Cliente"><b>@context.Posicion. @context.Cliente</b></MudTd>
+                        <MudTd DataLabel="Saldo pendiente" Style="text-align:right;"><b>@context.SaldoPendiente.ToString("C2")</b></MudTd>
+                        <MudTd DataLabel="Participación" Style="text-align:right;">@context.Participacion.ToString("0.##") %</MudTd>
+                        <MudTd DataLabel="Clasificación">@Mostrar(context.Clasificacion)</MudTd>
+                        <MudTd DataLabel="Zona">@Mostrar(context.Zona)</MudTd>
+                    </RowTemplate>
+                    <NoRecordsContent>@SinDatosFragment</NoRecordsContent>
+                    <PagerContent>
+                        <MudTablePager InfoFormat="{first_item}-{last_item} de {all_items}" RowsPerPageString="Filas:" />
+                    </PagerContent>
+                </MudTable>
+            </MudPaper>
+        }
+    </MudTabPanel>
+</MudTabs>
+
+<style>
+    /* En pantallas chicas el botón "Generar reporte" ocupa todo el ancho (todas las pestañas). */
+    @@media (max-width: 599.98px) {
+        .contenedor-generar { justify-content: stretch; }
+        .contenedor-generar .boton-generar { width: 100%; }
+    }
+</style>
+
+@code {
+    // Catálogos para los combos de filtros.
+    private List<ZonaDto> _zonas = new();
+    private List<RutaAdminDto> _rutas = new();
+    private List<ClasificaionClienteDto> _clasificaciones = new();
+
+    private bool _cargando, _exportando;
+    private int _tabActivo; // Para mostrar el spinner solo en la pestaña que genera.
+
+    // Días de gracia del semáforo de seguimiento (Parámetros del Sistema); definen cuándo un cliente es crítico.
+    private const string ClaveGraciaAlerta = "SEGUIMIENTO_DIAS_GRACIA_ALERTA";
+    private int _diasGraciaAlerta = 3;
+
+    // ---- Dashboard ejecutivo ----
+    private DateTime? _dashDesde = FechaProyecto.Hoy.AddDays(-30);
+    private DateTime? _dashHasta = FechaProyecto.Hoy;
+    private long? _dashZona;
+    private ReporteDashboardEjecutivoResponse? _dashboard;
+
+    // ---- Antigüedad de saldos ----
+    private long? _antZona;
+    private long? _antRuta;
+    private long? _antClasificacion;
+    private ReporteAntiguedadResponse? _antiguedad;
+
+    // ---- Clientes sin pago reciente ----
+    private long? _spZona;
+    private long? _spRuta;
+    private long? _spClasificacion;
+    private int _spDias = 15;
+    private ReporteSinPagoResponse? _sinPago;
+
+    // ---- Ranking de deudores ----
+    private long? _rkZona;
+    private long? _rkRuta;
+    private long? _rkClasificacion;
+    private ReporteRankingDeudoresResponse? _ranking;
+
+    // ---- Cartera por clasificación ----
+    private long? _ccZona;
+    private long? _ccRuta;
+    private ReporteCarteraClasificacionResponse? _carteraClasif;
+
+    // ---- Concentración de cartera ----
+    private long? _conZona;
+    private long? _conRuta;
+    private ReporteConcentracionResponse? _concentracion;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Api.CargarSesionDesdeAlmacenamientoAsync();
+        if (!Api.Autenticado)
+        {
+            Nav.NavigateTo("/login");
+            return;
+        }
+
+        // Los errores de catálogo se ignoran de forma suave: el combo queda vacío y el reporte se genera sin filtro.
+        var tZonas = Api.ListarZonasOperativasAsync();
+        var tRutas = Api.ListarRutasOperativasAsync();
+        var tClasificaciones = Api.ListarClasificacionesClienteOperativasAsync();
+        var tParametros = Api.ListarParametrosAsync();
+        await Task.WhenAll(tZonas, tRutas, tClasificaciones, tParametros);
+
+        _zonas = (await tZonas).datos ?? new();
+        _rutas = (await tRutas).datos ?? new();
+        _clasificaciones = (await tClasificaciones).datos ?? new();
+
+        var (parametros, errorParametros) = await tParametros;
+        if (errorParametros is null && parametros is not null)
+        {
+            var p = parametros.FirstOrDefault(x => string.Equals(x.Clave, ClaveGraciaAlerta, StringComparison.OrdinalIgnoreCase));
+            if (p?.ValorNumerico is { } n) _diasGraciaAlerta = (int)Math.Max(0, Math.Round(n));
+            else if (int.TryParse(p?.ValorTexto?.Trim(), out var v)) _diasGraciaAlerta = Math.Max(0, v);
+        }
+    }
+
+    // ===================== Generadores de cada reporte =====================
+
+    private async Task GenerarDashboardEjecutivoAsync()
+    {
+        _tabActivo = 0;
+        _cargando = true;
+        try
+        {
+            var (datos, error) = await Api.ReporteDashboardEjecutivoAsync(ADesde(_dashDesde), AHasta(_dashHasta), _dashZona, _diasGraciaAlerta);
+            if (error is not null) { Snackbar.Add(error, Severity.Error); return; }
+            _dashboard = datos;
+        }
+        finally { _cargando = false; }
+    }
+
+    private async Task GenerarAntiguedadAsync()
+    {
+        _tabActivo = 1;
+        _cargando = true;
+        try
+        {
+            var (datos, error) = await Api.ReporteAntiguedadSaldosAsync(_antZona, _antRuta, _antClasificacion);
+            if (error is not null) { Snackbar.Add(error, Severity.Error); return; }
+            _antiguedad = datos;
+        }
+        finally { _cargando = false; }
+    }
+
+    private async Task GenerarSinPagoAsync()
+    {
+        _tabActivo = 2;
+        _cargando = true;
+        try
+        {
+            var (datos, error) = await Api.ReporteClientesSinPagoAsync(_spZona, _spRuta, _spClasificacion, _spDias);
+            if (error is not null) { Snackbar.Add(error, Severity.Error); return; }
+            _sinPago = datos;
+        }
+        finally { _cargando = false; }
+    }
+
+    private async Task GenerarRankingAsync()
+    {
+        _tabActivo = 3;
+        _cargando = true;
+        try
+        {
+            var (datos, error) = await Api.ReporteRankingDeudoresAsync(_rkZona, _rkRuta, _rkClasificacion);
+            if (error is not null) { Snackbar.Add(error, Severity.Error); return; }
+            _ranking = datos;
+        }
+        finally { _cargando = false; }
+    }
+
+    private async Task GenerarCarteraClasificacionAsync()
+    {
+        _tabActivo = 4;
+        _cargando = true;
+        try
+        {
+            var (datos, error) = await Api.ReporteCarteraClasificacionAsync(_ccZona, _ccRuta);
+            if (error is not null) { Snackbar.Add(error, Severity.Error); return; }
+            _carteraClasif = datos;
+        }
+        finally { _cargando = false; }
+    }
+
+    private async Task GenerarConcentracionAsync()
+    {
+        _tabActivo = 5;
+        _cargando = true;
+        try
+        {
+            var (datos, error) = await Api.ReporteConcentracionCarteraAsync(_conZona, _conRuta);
+            if (error is not null) { Snackbar.Add(error, Severity.Error); return; }
+            _concentracion = datos;
+        }
+        finally { _cargando = false; }
+    }
+
+    // ---- Exportación a Excel con formato (empresa, filtros, KPIs, tabla y totales) ----
+
+    private async Task ExportarReporteAsync(string archivo, string titulo, Dictionary<string, string> filtros,
+        List<ReporteExcelKpi> kpis, string[] columnas, IEnumerable<object?[]> filas, int[]? columnasMoneda = null)
+    {
+        if (_exportando) return;
+        _exportando = true;
+        try
+        {
+            var info = new ReporteExcelInfo
+            {
+                Empresa = EmpresaGlobal.Info?.NombreCorto
+                          ?? EmpresaGlobal.Identidad?.NombreCorto
+                          ?? "Sistema Cobranza",
+                Titulo = titulo,
+                FechaGeneracion = FechaProyecto.Ahora.DateTime,
+                Filtros = filtros,
+                Kpis = kpis
+            };
+            var bytes = ExportadorExcel.Crear(info, columnas, filas, columnasMoneda);
+            await Descarga.GuardarAsync($"{archivo}-{FechaProyecto.Ahora:yyyyMMdd-HHmmssfff}.xlsx", bytes);
+        }
+        catch (Exception ex) { Snackbar.Add($"No se pudo exportar el reporte: {ex.Message}", Severity.Error); }
+        finally { _exportando = false; }
+    }
+
+    private static ReporteExcelKpi Kpi(string nombre, string valor) => new() { Nombre = nombre, Valor = valor };
+
+    private static string Fecha(DateTime? d, string vacio = "Sin límite") => d is { } v ? v.ToString("dd/MM/yyyy") : vacio;
+
+
+    // ---- Reportes ejecutivos: se exportan con el mismo formato (empresa, filtros, KPIs, tabla y totales) ----
+
+    private Task ExportarDashboardEjecutivo() => _dashboard is not { } d ? Task.CompletedTask : ExportarReporteAsync(
+        "DashboardEjecutivo", "DASHBOARD EJECUTIVO",
+        new()
+        {
+            ["Desde"] = Fecha(_dashDesde),
+            ["Hasta"] = Fecha(_dashHasta),
+            ["Zona"] = _zonas.FirstOrDefault(x => x.IdZona == _dashZona)?.Descripcion ?? "Todas"
+        },
+        [
+            Kpi("Cartera pendiente", d.CarteraPendiente.ToString("C2")),
+            Kpi("Total cobrado", d.TotalCobrado.ToString("C2")),
+            Kpi("Ventas del periodo", d.VentasPeriodo.ToString("C2"))
+        ],
+        ["Indicador", "Valor", "Detalle"],
+        new object?[][]
+        {
+            ["Cartera total pendiente", d.CarteraPendiente.ToString("C2"), null],
+            ["Total cobrado", d.TotalCobrado.ToString("C2"), null],
+            ["Ventas del periodo", d.VentasPeriodo.ToString("C2"), null],
+            ["Clientes activos", d.ClientesActivos.ToString("N0"), null],
+            ["Clientes con atraso", d.ClientesConAtraso.ToString("N0"), null],
+            ["Clientes críticos", d.ClientesCriticos.ToString("N0"), null],
+            ["Mayor deudor", d.MayorDeudorSaldo.ToString("C2"), Mostrar(d.MayorDeudor)],
+            ["Zona con mayor riesgo", d.ZonaMayorRiesgoSaldo.ToString("C2"), Mostrar(d.ZonaMayorRiesgo)]
+        });
+
+    private Task ExportarAntiguedad() => _antiguedad is not { } a ? Task.CompletedTask : ExportarReporteAsync(
+        "AntiguedadSaldos", "ANTIGÜEDAD DE SALDOS",
+        new() { ["Zona"] = _zonas.FirstOrDefault(x => x.IdZona == _antZona)?.Descripcion ?? "Todas", ["Ruta"] = _rutas.FirstOrDefault(x => x.IdRuta == _antRuta)?.Descripcion ?? "Todas", ["Clasificación"] = _clasificaciones.FirstOrDefault(x => x.IdClasificaionCliente == _antClasificacion)?.Descripcion ?? "Todas" },
+        [
+            Kpi("Saldo total", a.SaldoTotal.ToString("C2")),
+            Kpi("Clientes vencidos", a.ClientesVencidos.ToString("N0")),
+            Kpi("Saldo crítico (+30 días)", a.SaldoCritico.ToString("C2")),
+            Kpi("Máximo atraso", $"{a.MaximoAtraso} días")
+        ],
+        ["Cliente", "Zona", "Ruta", "Clasificación", "Último pago", "Días transcurridos", "Saldo pendiente", "Rango"],
+        a.Filas.Select(f => new object?[] { f.Cliente, f.Zona, f.Ruta, f.Clasificacion, FechaCorta(f.FechaUltimoPago),
+            f.DiasTranscurridos, f.SaldoPendiente, f.Rango }),
+        [7]);
+
+    private Task ExportarSinPago() => _sinPago is not { } p ? Task.CompletedTask : ExportarReporteAsync(
+        "ClientesSinPago", "CLIENTES SIN PAGO RECIENTE",
+        new() { ["Zona"] = _zonas.FirstOrDefault(x => x.IdZona == _spZona)?.Descripcion ?? "Todas", ["Ruta"] = _rutas.FirstOrDefault(x => x.IdRuta == _spRuta)?.Descripcion ?? "Todas", ["Clasificación"] = _clasificaciones.FirstOrDefault(x => x.IdClasificaionCliente == _spClasificacion)?.Descripcion ?? "Todas", ["Días sin pago (mínimo)"] = _spDias.ToString() },
+        [
+            Kpi("Clientes encontrados", p.Total.ToString("N0")),
+            Kpi("Saldo en riesgo", p.SaldoEnRiesgo.ToString("C2")),
+            Kpi("Promedio de días", p.PromedioDias.ToString("0.#")),
+            Kpi("Máximo atraso", $"{p.MaximoAtraso} días")
+        ],
+        ["ID cliente", "Cliente", "Zona", "Ruta", "Clasificación", "Último pago", "Días sin pago", "Saldo pendiente"],
+        p.Filas.Select(f => new object?[] { f.IdCliente, f.Cliente, f.Zona, f.Ruta, f.Clasificacion,
+            FechaCorta(f.FechaUltimoPago), f.DiasSinPago, f.SaldoPendiente }),
+        [8]);
+
+    private Task ExportarRanking() => _ranking is not { } r ? Task.CompletedTask : ExportarReporteAsync(
+        "RankingDeudores", "RANKING DE DEUDORES",
+        new() { ["Zona"] = _zonas.FirstOrDefault(x => x.IdZona == _rkZona)?.Descripcion ?? "Todas", ["Ruta"] = _rutas.FirstOrDefault(x => x.IdRuta == _rkRuta)?.Descripcion ?? "Todas", ["Clasificación"] = _clasificaciones.FirstOrDefault(x => x.IdClasificaionCliente == _rkClasificacion)?.Descripcion ?? "Todas" },
+        [
+            Kpi("Mayor deudor", Mostrar(r.MayorDeudor)),
+            Kpi("Top 10 acumulado", r.Top10Acumulado.ToString("C2")),
+            Kpi("Saldo total", r.SaldoTotal.ToString("C2")),
+            Kpi("Participación Top 10", $"{r.ParticipacionTop10:0.##} %")
+        ],
+        ["Posición", "Cliente", "Zona", "Ruta", "Clasificación", "Último pago", "Días", "Saldo pendiente"],
+        r.Filas.Select(f => new object?[] { f.Posicion, f.Cliente, f.Zona, f.Ruta, f.Clasificacion,
+            FechaCorta(f.FechaUltimoPago), f.DiasTranscurridos, f.SaldoPendiente }),
+        [8]);
+
+    private Task ExportarCarteraClasificacion() => _carteraClasif is not { } c ? Task.CompletedTask : ExportarReporteAsync(
+        "CarteraPorClasificacion", "CARTERA POR CLASIFICACIÓN",
+        new() { ["Zona"] = _zonas.FirstOrDefault(x => x.IdZona == _ccZona)?.Descripcion ?? "Todas", ["Ruta"] = _rutas.FirstOrDefault(x => x.IdRuta == _ccRuta)?.Descripcion ?? "Todas" },
+        [
+            Kpi("Total de clientes", c.TotalClientes.ToString("N0")),
+            Kpi("Saldo total", c.SaldoTotal.ToString("C2")),
+            Kpi("Mayor clasificación", Mostrar(c.MayorClasificacion)),
+            Kpi("Clasificación de riesgo", Mostrar(c.ClasificacionRiesgo))
+        ],
+        ["Clasificación", "Clientes", "Saldo pendiente", "Porcentaje"],
+        c.Filas.Select(f => new object?[] { f.Clasificacion, f.Clientes, f.SaldoPendiente, $"{f.Porcentaje:0.##} %" }),
+        [3]);
+
+    private Task ExportarConcentracion() => _concentracion is not { } c ? Task.CompletedTask : ExportarReporteAsync(
+        "ConcentracionCartera", "CONCENTRACIÓN DE CARTERA",
+        new() { ["Zona"] = _zonas.FirstOrDefault(x => x.IdZona == _conZona)?.Descripcion ?? "Todas", ["Ruta"] = _rutas.FirstOrDefault(x => x.IdRuta == _conRuta)?.Descripcion ?? "Todas", ["Alcance"] = "Top 20 clientes" },
+        [
+            Kpi("Top 5", c.Top5.ToString("C2")),
+            Kpi("Top 10", c.Top10.ToString("C2")),
+            Kpi("Top 20", c.Top20.ToString("C2")),
+            Kpi("% de concentración (Top 10)", $"{c.PorcentajeConcentracion:0.##} %")
+        ],
+        ["Posición", "Cliente", "Saldo pendiente", "Participación", "Clasificación", "Zona"],
+        c.Filas.Select(f => new object?[] { f.Posicion, f.Cliente, f.SaldoPendiente, $"{f.Participacion:0.##} %", f.Clasificacion, f.Zona }),
+        [3]);
+
+
+    // ===================== Helpers =====================
+
+    private static DateTimeOffset? ADesde(DateTime? d) => d is { } v ? FechaProyecto.DesdeFechaLocal(v.Date) : null;
+
+    // Fin del día: el servidor normaliza el rango, así que basta con la fecha seleccionada.
+    private static DateTimeOffset? AHasta(DateTime? d) => d is { } v ? FechaProyecto.DesdeFechaLocal(v.Date) : null;
+
+    // Tarjeta de indicador (KPI) reutilizada por los reportes ejecutivos; usa los colores del tema del sistema.
+    private RenderFragment Tarjeta(string titulo, string valor, string icono, Color color, int md = 3) => @<MudItem xs="12" sm="6" md="@md">
+        <MudPaper Elevation="0" Outlined="true" Class="pa-3 d-flex align-center gap-3" Style="height:100%;">
+            <MudIcon Icon="@icono" Color="@color" Size="Size.Large" />
+            <div>
+                <MudText Typo="Typo.caption" Color="Color.Secondary">@titulo</MudText>
+                <MudText Typo="Typo.h6"><b>@valor</b></MudText>
+            </div>
+        </MudPaper>
+    </MudItem>;
+
+    // Color del chip según el rango de antigüedad (verde → rojo).
+    private static Color ColorRango(string rango) => rango switch
+    {
+        "0-7 días" => Color.Success,
+        "8-15 días" => Color.Info,
+        "16-30 días" => Color.Warning,
+        _ => Color.Error
+    };
+
+    private static string RangoDias(int dias) => dias switch
+    {
+        <= 7 => "0-7 días",
+        <= 15 => "8-15 días",
+        <= 30 => "16-30 días",
+        <= 60 => "31-60 días",
+        _ => "+60 días"
+    };
+
+    private static string Mostrar(string? v) => string.IsNullOrWhiteSpace(v) ? "—" : v!;
+
+    private static string FechaCorta(DateTimeOffset? d)
+        => d is { } v ? v.EnZonaProyecto().DateTime.ToString("dd/MM/yyyy") : "—";
+
+    private readonly RenderFragment CargandoFragment = builder =>
+    {
+        builder.OpenElement(0, "div");
+        builder.AddAttribute(1, "class", "d-flex justify-center pa-6");
+        builder.OpenComponent<MudProgressCircular>(2);
+        builder.AddAttribute(3, "Indeterminate", true);
+        builder.AddAttribute(4, "Color", Color.Primary);
+        builder.CloseComponent();
+        builder.CloseElement();
+    };
+
+    private readonly RenderFragment SinDatosFragment = builder =>
+    {
+        builder.OpenElement(0, "div");
+        builder.AddAttribute(1, "class", "pa-3 text-center");
+        builder.OpenComponent<MudText>(2);
+        builder.AddAttribute(3, "Color", Color.Secondary);
+        builder.AddAttribute(4, "Typo", Typo.body2);
+        builder.AddAttribute(5, "ChildContent", (RenderFragment)(b => b.AddContent(0, "No hay datos para los filtros seleccionados.")));
+        builder.CloseComponent();
+        builder.CloseElement();
+    };
+}

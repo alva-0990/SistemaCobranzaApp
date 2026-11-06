@@ -1,0 +1,73 @@
+@using MudBlazor
+@using SistemaCobranzaApp.Shared.Services
+@inject ApiCliente Api
+@inject IDescargaArchivo Descarga
+@inject ISnackbar Snackbar
+@inject IDialogService Dialogo
+
+@*
+    Botón "Estado de cuenta" (PDF). El documento SIEMPRE se genera en la API con la información central
+    (historial completo, bonificaciones automáticas y huella de integridad); en las pantallas offline
+    requiere conexión y advierte cuando hay movimientos del dispositivo sin sincronizar.
+*@
+<MudTooltip Text="@Ayuda">
+    <MudButton Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small"
+               StartIcon="@Icons.Material.Filled.PictureAsPdf"
+               OnClick="DescargarAsync"
+               Disabled="@(!Habilitado || _generando)">
+        @(_generando ? "Generando..." : "Estado de cuenta")
+    </MudButton>
+</MudTooltip>
+
+@code {
+    /// <summary>Cliente central. Un id ≤ 0 es un cliente capturado en el dispositivo (aún no existe en central).</summary>
+    [Parameter, EditorRequired] public long IdCliente { get; set; }
+
+    /// <summary>Hay conexión con la API (en pantallas online siempre true).</summary>
+    [Parameter] public bool ConInternet { get; set; } = true;
+
+    /// <summary>Movimientos del dispositivo sin sincronizar que afectan al cliente.</summary>
+    [Parameter] public int Pendientes { get; set; }
+
+    private bool _generando;
+
+    private bool Habilitado => IdCliente > 0 && ConInternet;
+
+    private string Ayuda => IdCliente <= 0
+        ? "Sincroniza el alta del cliente para emitir su estado de cuenta."
+        : !ConInternet
+            ? "Requiere conexión: el estado de cuenta se genera con la información central."
+            : Pendientes > 0
+                ? $"Hay {Pendientes} movimiento(s) sin sincronizar que aún no se reflejarán."
+                : "Descargar el estado de cuenta en PDF.";
+
+    private async Task DescargarAsync()
+    {
+        if (!Habilitado || _generando) return;
+
+        // Con pendientes, el documento central saldría desactualizado: se pide confirmación explícita.
+        if (Pendientes > 0)
+        {
+            var continuar = await Dialogo.ShowMessageBoxAsync(
+                "Movimientos sin sincronizar",
+                $"Este cliente tiene {Pendientes} movimiento(s) guardados en el dispositivo que aún no llegan a central. " +
+                "El estado de cuenta no los incluirá. Sincroniza primero para obtenerlo completo.",
+                yesText: "Generar de todos modos", cancelText: "Cancelar");
+            if (continuar != true) return;
+        }
+
+        _generando = true;
+        try
+        {
+            var (pdf, error) = await Api.EstadoCuentaIntegralPdfAsync(IdCliente);
+            if (error is not null || pdf is null)
+            {
+                Snackbar.Add(error ?? "No se pudo generar el estado de cuenta.", Severity.Error);
+                return;
+            }
+            await Descarga.GuardarAsync($"EstadoCuenta-{IdCliente}-{FechaProyecto.Ahora:yyyyMMdd-HHmm}.pdf", pdf, "application/pdf");
+        }
+        catch (Exception ex) { Snackbar.Add($"No se pudo exportar el estado de cuenta: {ex.Message}", Severity.Error); }
+        finally { _generando = false; }
+    }
+}

@@ -84,6 +84,7 @@ builder.Services.AddScoped<ServicioBusqueda>();
 builder.Services.AddScoped<ServicioBusquedaClientes>();
 builder.Services.AddScoped<ServicioClientesAdmin>();
 builder.Services.AddScoped<ServicioEstadoCuenta>();
+builder.Services.AddScoped<ServicioEstadoCuentaIntegral>();
 builder.Services.AddScoped<ServicioCancelaciones>();
 builder.Services.AddScoped<ServicioZonasAdmin>();
 builder.Services.AddScoped<ServicioRutasAdmin>();

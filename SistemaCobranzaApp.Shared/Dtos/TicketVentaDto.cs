@@ -15,7 +15,11 @@ public sealed record TicketVentaDto(
     decimal CuotaFija,
     int NumeroCuotas,
     DateTimeOffset? FechaPrimerVence,
-    IReadOnlyList<TicketPlanDto> PlanesPromocionales);
+    IReadOnlyList<TicketPlanDto> PlanesPromocionales)
+{
+    /// <summary>Venta de contado (pagada en efectivo al momento): el ticket no muestra plan de crédito.</summary>
+    public bool EsContado { get; init; }
+}
 
 public sealed record ClienteTicketDto(
     string NombreCompleto,

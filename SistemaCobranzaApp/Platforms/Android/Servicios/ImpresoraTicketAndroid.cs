@@ -182,9 +182,9 @@ private static byte[] ConstruirTicket(TicketVentaDto ticket)
     AgregarLinea(bytes, SeparadorFuerte(ancho));
 
     bytes.AddRange(new byte[] { 0x1B, 0x45, 0x01 });
-    AgregarLinea(bytes, "COMPROBANTE DE CREDITO");
+    AgregarLinea(bytes, ticket.EsContado ? "COMPROBANTE DE VENTA" : "COMPROBANTE DE CREDITO");
     bytes.AddRange(new byte[] { 0x1B, 0x45, 0x00 });
-    AgregarLinea(bytes, "OPERACION DE VENTA FINANCIADA");
+    AgregarLinea(bytes, ticket.EsContado ? "VENTA DE CONTADO (EFECTIVO)" : "OPERACION DE VENTA FINANCIADA");
     AgregarLinea(bytes, "CONSERVE ESTE TICKET PARA");
     AgregarLinea(bytes, "SU CONTROL Y ACLARACION");
     AgregarLinea(bytes, SeparadorFuerte(ancho));
@@ -280,11 +280,19 @@ private static byte[] ConstruirTicket(TicketVentaDto ticket)
     bytes.AddRange(new byte[] { 0x1B, 0x61, 0x00 });
     AgregarLinea(bytes, Separador(ancho));
     bytes.AddRange(new byte[] { 0x1B, 0x61, 0x01 });
-    AgregarLinea(bytes, "CONFORMIDAD DE PAGO");
+    AgregarLinea(bytes, ticket.EsContado ? "CONFORMIDAD DE COMPRA" : "CONFORMIDAD DE PAGO");
     bytes.AddRange(new byte[] { 0x1B, 0x61, 0x00 });
     AgregarLinea(bytes, Separador(ancho));
-    AgregarLinea(bytes, "Acepto los terminos del credito y me");
-    AgregarLinea(bytes, "comprometo a cumplir el plan de pagos.");
+    if (ticket.EsContado)
+    {
+        AgregarLinea(bytes, "Recibi mi compra de conformidad.");
+        AgregarLinea(bytes, "Pagada en su totalidad (contado).");
+    }
+    else
+    {
+        AgregarLinea(bytes, "Acepto los terminos del credito y me");
+        AgregarLinea(bytes, "comprometo a cumplir el plan de pagos.");
+    }
     AgregarLinea(bytes, "");
     AgregarLinea(bytes, "");
     AgregarLinea(bytes, Separador(ancho));
@@ -297,8 +305,11 @@ private static byte[] ConstruirTicket(TicketVentaDto ticket)
     bytes.AddRange(new byte[] { 0x1B, 0x45, 0x01 });
     AgregarLinea(bytes, "GRACIAS POR SU COMPRA!");
     bytes.AddRange(new byte[] { 0x1B, 0x45, 0x00 });
-    AgregarLinea(bytes, "Mantenga sus pagos al corriente para");
-    AgregarLinea(bytes, "evitar cargos por moratoriedad.");
+    if (!ticket.EsContado)
+    {
+        AgregarLinea(bytes, "Mantenga sus pagos al corriente para");
+        AgregarLinea(bytes, "evitar cargos por moratoriedad.");
+    }
     AgregarLinea(bytes, SeparadorFuerte(ancho));
 
     // Margen inferior (~1 cm) y corte físico.

@@ -186,12 +186,17 @@ public partial class PagosOffline : ComponentBase, IAsyncDisposable
     private void CargarEstadoLocal()
     {
         if (Cliente is null || Jornada.Estado.Descarga is not { } d) return;
-        var ventas = d.Ventas.Where(v => v.IdCliente == Cliente.IdCliente).Select(v =>
+        var ventas = d.Ventas.Where(v => v.IdCliente == Cliente.IdCliente).Select(v => CuadreEstadoCuenta.ConMovimientos(
             new EstadoCuentaVentaDto(v.IdVenta, v.CodigoVenta, v.TotalFinal, v.Enganche,
                 v.TotalAbonado + v.SaldoPendiente - Jornada.SaldoDisponible(v), Jornada.SaldoDisponible(v),
-                v.DescripcionEstatus, v.FechaCompra, v.FechaUltimoPago)).ToList();
-        EstadoCuenta = new(Cliente.IdCliente, Cliente.NombreCompleto, Cliente.Ruta, Api.Sesion?.Zona,
-            ventas.Sum(v => v.TotalFinal), ventas.Sum(v => v.TotalAbonos), ventas.Sum(v => v.Saldo), ventas, []);
+                v.DescripcionEstatus, v.FechaCompra, v.FechaUltimoPago)
+            { Subtotal = v.Subtotal, DescuentoGlobal = v.DescuentoGlobal }, Jornada.MovimientosDescargados(v.IdVenta))).ToList();
+        EstadoCuenta = CuadreEstadoCuenta.ConTotales(new(Cliente.IdCliente, Cliente.NombreCompleto, Cliente.Ruta, Api.Sesion?.Zona,
+            ventas.Sum(v => v.TotalFinal), ventas.Sum(v => v.TotalAbonos), ventas.Sum(v => v.Saldo), ventas, [])
+        {
+            TotalDescuentos = ventas.Sum(v => v.DescuentoGlobal),
+            TotalEnganches = ventas.Sum(v => v.Enganche)
+        });
         VentasConSaldo = ventas.Where(v => v.Saldo > 0).ToList();
     }
 

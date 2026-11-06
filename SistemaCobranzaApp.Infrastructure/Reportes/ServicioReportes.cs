@@ -13,7 +13,7 @@ namespace SistemaCobranzaApp.Infrastructure.Reportes;
 /// Reportes de solo lectura, portados de las vistas VistaReporte* (app WPF)
 /// y optimizados bajo el nuevo estándar financiero unificado.
 /// </summary>
-public class ServicioReportes
+public partial class ServicioReportes
 {
     private readonly CobranzaDbContext _db;
 
@@ -123,8 +123,11 @@ public class ServicioReportes
                 from ev in evj.DefaultIfEmpty()
                 join r in _db.Rutas.AsNoTracking() on c.IdRuta equals r.IdRuta into rj
                 from r in rj.DefaultIfEmpty()
-                select new { v, c, ven, ev, r };
+                join cond in _db.Condiciones.AsNoTracking() on v.IdCondicion equals cond.IdCondicion into condj
+                from cond in condj.DefaultIfEmpty()
+                select new { v, c, ven, ev, r, cond };
 
+        if (f.IdCondicion is { } idCond) q = q.Where(x => x.v.IdCondicion == idCond);
         if (f.IdVendedor is { } idv) q = q.Where(x => x.v.IdVendedor == idv);
         if (f.IdZona is { } zona) q = q.Where(x => x.r != null && x.r.IdZona == zona);
         if (f.IdRuta is { } ruta) q = q.Where(x => x.c.IdRuta == ruta);
@@ -139,7 +142,7 @@ public class ServicioReportes
                 x.v.IdVenta, x.v.CodigoVenta,
                 BusquedaHelper.NombreCompleto(x.c.Nombre, x.c.ApPaterno, x.c.ApMaterno),
                 x.ven?.Nombre, x.v.TotalFinal, x.v.Enganche, saldo, x.ev?.Descripcion, x.v.FechaCompra)
-            { Productos = productos.GetValueOrDefault(x.v.IdVenta, "") };
+            { Productos = productos.GetValueOrDefault(x.v.IdVenta, ""), Condicion = x.cond?.Descripcion };
         }).ToList();
 
         return new ReporteVentasResponse(filas, filas.Count, filas.Sum(x => x.TotalFinal));
@@ -153,7 +156,9 @@ public class ServicioReportes
 
         // Unimos con el cliente y su ruta para poder acotar por zona/ruta antes de agrupar por cobrador.
         var baseQuery = from p in _db.Pagos.AsNoTracking()
+                        // Las ventas de contado (PAGO COMPLETO) no son recuperación de cartera: se excluyen.
                         where p.FechaPago >= desde && p.FechaPago <= hasta
+                              && (p.IdMovimiento == null || p.IdMovimiento != MovimientoIds.PagoCompleto)
                         join c in _db.Clientes.AsNoTracking() on p.IdCliente equals c.IdCliente
                         join r in _db.Rutas.AsNoTracking() on c.IdRuta equals r.IdRuta into rj
                         from r in rj.DefaultIfEmpty()
@@ -221,6 +226,17 @@ public class ServicioReportes
     /// </summary>
     public async Task<ReporteSeguimientoResponse> SeguimientoAsync(ReporteSeguimientoFiltro f, CancellationToken ct = default)
     {
+        var filas = await FilasSeguimientoAsync(f.IdZona, null, null, f.AltaDesde, f.AltaHasta, ct);
+        return new ReporteSeguimientoResponse(filas, filas.Count, filas.Sum(x => x.TotalPendiente));
+    }
+
+    /// <summary>
+    /// Consulta base de seguimiento (una fila por venta con saldo pendiente). Es la fuente única que
+    /// reutilizan los reportes ejecutivos (antigüedad, ranking, concentración, etc.) para no repetir consultas.
+    /// </summary>
+    internal async Task<List<ReporteSeguimientoFila>> FilasSeguimientoAsync(long? idZona, long? idRuta, long? idClasificacion,
+        DateTimeOffset? altaDesde, DateTimeOffset? altaHasta, CancellationToken ct)
+    {
         var q = from v in _db.Ventas.AsNoTracking()
                 where v.IdEstatusVenta != EstatusVentaIds.Cancelada
                 join c in _db.Clientes.AsNoTracking() on v.IdCliente equals c.IdCliente
@@ -234,9 +250,15 @@ public class ServicioReportes
                 from fp in fpj.DefaultIfEmpty()
                 select new { v, c, r, z, cl, fp };
 
-        if (f.IdZona is { } zona) q = q.Where(x => x.r != null && x.r.IdZona == zona);
-        if (f.AltaDesde is { } desde) q = q.Where(x => x.c.FechaAlta >= desde);
-        if (f.AltaHasta is { } hasta) q = q.Where(x => x.c.FechaAlta <= hasta);
+        if (idZona is { } zona) q = q.Where(x => x.r != null && x.r.IdZona == zona);
+        if (idRuta is { } ruta) q = q.Where(x => x.c.IdRuta == ruta);
+        if (idClasificacion is { } cla) q = q.Where(x => x.c.IdClasificacion == cla);
+        // Npgsql solo acepta DateTimeOffset en UTC; además 'hasta' debe ser inclusivo (fin del día).
+        if (altaDesde is not null || altaHasta is not null)
+        {
+            var (desde, hasta) = CalculoReportes.NormalizarRango(altaDesde, altaHasta);
+            q = q.Where(x => x.c.FechaAlta >= desde && x.c.FechaAlta <= hasta);
+        }
 
         var productos = await ProductosPorVentaAsync(q.Select(x => x.v.IdVenta), ct);
         var hoy = FechaProyecto.Hoy;
@@ -269,13 +291,14 @@ public class ServicioReportes
                 x.z?.Descripcion,
                 x.c.Observaciones,
                 x.fp?.DiasPeriodo ?? 0,
-                x.fp?.Descripcion);
+                x.fp?.Descripcion)
+            { Ruta = x.r?.Descripcion };
         })
         .Where(x => x.TotalPendiente > 0)
         .OrderByDescending(x => x.DiasTranscurridos)
         .ToList();
 
-        return new ReporteSeguimientoResponse(filas, filas.Count, filas.Sum(x => x.TotalPendiente));
+        return filas;
     }
 
     /// <summary>

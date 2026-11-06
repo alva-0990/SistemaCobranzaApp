@@ -81,6 +81,23 @@
              $"{_kpis.PagosHoy} pagos registrados")
     </MudGrid>
 
+    <!-- ===================== Indicadores ejecutivos (riesgo de cartera) ===================== -->
+    @if (_ejecutivo is not null)
+    {
+        <MudGrid Spacing="3" Class="mb-1">
+            @Kpi("Clientes con atraso", _ejecutivo.ClientesConAtraso.ToString("N0"), Icons.Material.Filled.Warning, "kpi-ambar",
+                 $"{_ejecutivo.ClientesActivos:N0} clientes activos")
+            @Kpi("Clientes críticos", _ejecutivo.ClientesCriticos.ToString("N0"), Icons.Material.Filled.ReportProblem, "kpi-rojo",
+                 "Fuera del período de gracia")
+            @Kpi("Saldo crítico (+30 días)", (_antiguedad?.SaldoCritico ?? 0m).ToString("C2"), Icons.Material.Filled.HourglassBottom, "kpi-morado",
+                 _antiguedad is { SaldoTotal: > 0 } ant
+                     ? $"{(ant.SaldoCritico / ant.SaldoTotal * 100m):0.#}% de la cartera · máx. {ant.MaximoAtraso} días"
+                     : "Sin saldo pendiente")
+            @Kpi("Zona con mayor riesgo", string.IsNullOrWhiteSpace(_ejecutivo.ZonaMayorRiesgo) ? "—" : _ejecutivo.ZonaMayorRiesgo!, Icons.Material.Filled.Place, "kpi-rojo",
+                 _ejecutivo.ZonaMayorRiesgoSaldo.ToString("C2"))
+        </MudGrid>
+    }
+
     <!-- ===================== Gráficas ===================== -->
     <MudGrid Spacing="3" Class="mt-1 mb-1">
         <!-- Ventas por zona -->
@@ -121,6 +138,63 @@
             </MudPaper>
         </MudItem>
     </MudGrid>
+
+    <!-- ===================== Antigüedad de saldos y Top 10 deudores ===================== -->
+    @if (_antiguedad is not null || _ranking is not null)
+    {
+        <MudGrid Spacing="3" Class="mt-1 mb-1">
+            @if (_antiguedad is not null)
+            {
+                <MudItem xs="12" md="6">
+                    <MudPaper Elevation="0" Outlined="true" Class="pa-3 h-100">
+                        <div class="seccion-titulo mb-2">
+                            <MudIcon Icon="@Icons.Material.Filled.HourglassBottom" Size="Size.Small" Class="mr-1" />
+                            Antigüedad de saldos
+                        </div>
+                        <MudChart T="double" ChartType="ChartType.Bar" ChartSeries="_serieAntiguedad" XAxisLabels="_rangosArray"
+                                  Width="100%" Height="260px" ChartOptions="_opcionesAntiguedad" />
+                        @LeyendaZonas(_antiguedad.Rangos.Select(r => new DashboardSerieZona(r.Rango, r.SaldoPendiente)).ToList(), _paletaAntiguedad)
+                    </MudPaper>
+                </MudItem>
+            }
+            @if (_ranking is not null)
+            {
+                <MudItem xs="12" md="6">
+                    <MudPaper Elevation="0" Outlined="true" Class="pa-3 h-100">
+                        <div class="d-flex justify-space-between align-center mb-2">
+                            <div class="seccion-titulo">
+                                <MudIcon Icon="@Icons.Material.Filled.EmojiEvents" Size="Size.Small" Class="mr-1" />
+                                Top 10 deudores
+                            </div>
+                            <MudButton Variant="Variant.Text" Size="Size.Small" OnClick="@(() => NavigationManagerService.NavigateTo("estadisticas"))">
+                                Ver estadísticas
+                            </MudButton>
+                        </div>
+                        <MudTable Items="_ranking.Filas.Take(10)" Hover="true" Dense="true" Breakpoint="Breakpoint.Sm" Elevation="0"
+                                  T="ReporteRankingDeudoresFila">
+                            <HeaderContent>
+                                <MudTh>#</MudTh>
+                                <MudTh>Cliente</MudTh>
+                                <MudTh>Zona</MudTh>
+                                <MudTh Style="text-align:right;">Días</MudTh>
+                                <MudTh Style="text-align:right;">Saldo</MudTh>
+                            </HeaderContent>
+                            <RowTemplate>
+                                <MudTd DataLabel="#"><b>@context.Posicion</b></MudTd>
+                                <MudTd DataLabel="Cliente">@context.Cliente</MudTd>
+                                <MudTd DataLabel="Zona">@(string.IsNullOrWhiteSpace(context.Zona) ? "—" : context.Zona)</MudTd>
+                                <MudTd DataLabel="Días" Style="text-align:right;">@context.DiasTranscurridos</MudTd>
+                                <MudTd DataLabel="Saldo" Style="text-align:right;"><b class="txt-rojo">@context.SaldoPendiente.ToString("C2")</b></MudTd>
+                            </RowTemplate>
+                            <NoRecordsContent>
+                                <div class="pa-3 text-center">Sin deudores para los filtros seleccionados.</div>
+                            </NoRecordsContent>
+                        </MudTable>
+                    </MudPaper>
+                </MudItem>
+            }
+        </MudGrid>
+    }
 
     <!-- ===================== Tabla de resumen ===================== -->
     <MudPaper Elevation="0" Outlined="true" Class="pa-3 mt-1">
@@ -188,7 +262,7 @@
     // Leyenda de zonas bajo cada gráfica de barras: muestra el color (igual al de la barra),
     // el nombre de la zona y su monto, para que cada barra quede identificada aunque el eje
     // recorte las etiquetas largas.
-    RenderFragment LeyendaZonas(IReadOnlyList<DashboardSerieZona>? series) => __builder =>
+    RenderFragment LeyendaZonas(IReadOnlyList<DashboardSerieZona>? series, string[]? paleta = null) => __builder =>
     {
         if (series is null || series.Count == 0) return;
 
@@ -196,7 +270,8 @@
             @for (var i = 0; i < series.Count; i++)
             {
                 var s = series[i];
-                var color = _paletaZonas[i % _paletaZonas.Length];
+                var colores = paleta ?? _paletaZonas;
+                var color = colores[i % colores.Length];
                 <div class="leyenda-item">
                     <span class="leyenda-color" style="@($"background:{color};")"></span>
                     <span class="leyenda-nombre">@s.Zona</span>
@@ -265,9 +340,11 @@
     .kpi-valor { font-size: 1.5rem; font-weight: 800; }
     .kpi-sub { font-size: 0.72rem; opacity: 0.85; margin-top: 2px; }
 
-    .kpi-azul   { background: linear-gradient(135deg, #2F7D5C 0%, #256A4D 100%); }
-    .kpi-verde  { background: linear-gradient(135deg, #3BA776 0%, #2F7D5C 100%); }
-    .kpi-ambar  { background: linear-gradient(135deg, #C99A3E 0%, #B5862F 100%); }
+    /* Degradados tomados de la paleta del tema: si cambia el color del sistema, las tarjetas lo siguen. */
+    .kpi-azul   { background: linear-gradient(135deg, var(--mud-palette-primary) 0%, var(--mud-palette-primary-darken) 100%); }
+    .kpi-verde  { background: linear-gradient(135deg, var(--mud-palette-success) 0%, var(--mud-palette-success-darken) 100%); }
+    .kpi-ambar  { background: linear-gradient(135deg, var(--mud-palette-secondary) 0%, var(--mud-palette-secondary-darken) 100%); }
+    .kpi-rojo   { background: linear-gradient(135deg, var(--mud-palette-error) 0%, var(--mud-palette-error-darken) 100%); }
     .kpi-morado { background: linear-gradient(135deg, #5B6ABF 0%, #434F97 100%); }
 
     /* ---------- Tabla ---------- */
@@ -366,6 +443,30 @@
         ChartPalette = new[] { "#2F7D5C", "#C99A3E" }
     };
 
+    // ===================== Indicadores ejecutivos (derivados de seguimiento) =====================
+    private ReporteDashboardEjecutivoResponse? _ejecutivo;
+    private ReporteAntiguedadResponse? _antiguedad;
+    private ReporteRankingDeudoresResponse? _ranking;
+    private int _diasGraciaAlerta = 3;
+    private const string ClaveGraciaAlerta = "SEGUIMIENTO_DIAS_GRACIA_ALERTA";
+
+    private List<ChartSeries<double>> _serieAntiguedad = new()
+    {
+        new ChartSeries<double> { Name = "Saldo", Data = Array.Empty<double>() }
+    };
+    private string[] _rangosArray = Array.Empty<string>();
+
+    // De verde (al corriente) a rojo (más de 60 días); se comparte entre las barras y la leyenda.
+    private static readonly string[] _paletaAntiguedad =
+        { "#3BA776", "#5B6ABF", "#C99A3E", "#D9534F", "#A52A2A" };
+
+    private readonly ChartOptions _opcionesAntiguedad = new()
+    {
+        ShowLegend = false,
+        ShowToolTips = true,
+        ChartPalette = _paletaAntiguedad
+    };
+
     // Tabla resumen (proyección de DashboardResumenFila para la vista).
     private sealed record FilaResumen(string Zona, string Vendedor, string Cobrador,
         decimal TotalVendido, decimal TotalCobrado, decimal Saldo, decimal Recuperacion);
@@ -390,6 +491,7 @@
         }
 
         await CargarZonasAsync();
+        await CargarDiasGraciaAsync();
         await GenerarAsync();
     }
 
@@ -400,6 +502,16 @@
         _zonas = datos ?? new();
     }
 
+    // Lee los días de gracia del semáforo de seguimiento (Parámetros del Sistema) para definir clientes críticos.
+    private async Task CargarDiasGraciaAsync()
+    {
+        var (lista, error) = await ApiClienteService.ListarParametrosAsync();
+        if (error is not null || lista is null) return;
+        var p = lista.FirstOrDefault(x => string.Equals(x.Clave, ClaveGraciaAlerta, StringComparison.OrdinalIgnoreCase));
+        if (p?.ValorNumerico is { } n) _diasGraciaAlerta = (int)Math.Max(0, Math.Round(n));
+        else if (int.TryParse(p?.ValorTexto?.Trim(), out var v)) _diasGraciaAlerta = Math.Max(0, v);
+    }
+
     // ===================== Generación =====================
 
     private async Task GenerarAsync()
@@ -408,6 +520,11 @@
         _cargando = true;
         try
         {
+            // Los reportes ejecutivos se piden en paralelo; si alguno falla, solo se oculta su sección.
+            var tEjecutivo = ApiClienteService.ReporteDashboardEjecutivoAsync(ADesde(_desde), AHasta(_hasta), _idZona, _diasGraciaAlerta);
+            var tAntiguedad = ApiClienteService.ReporteAntiguedadSaldosAsync(_idZona);
+            var tRanking = ApiClienteService.ReporteRankingDeudoresAsync(_idZona);
+
             var (datos, error) = await ApiClienteService.DashboardAsync(ADesde(_desde), AHasta(_hasta), _idZona);
             if (error is not null)
             {
@@ -417,6 +534,12 @@
 
             _datos = datos;
             Mapear();
+
+            await Task.WhenAll(tEjecutivo, tAntiguedad, tRanking);
+            _ejecutivo = (await tEjecutivo).datos;
+            _antiguedad = (await tAntiguedad).datos;
+            _ranking = (await tRanking).datos;
+            MapearEjecutivos();
         }
         finally
         {
@@ -486,6 +609,21 @@
             r.TotalCobrado,
             r.SaldoPendiente,
             r.PorcentajeRecuperacion)).ToList();
+    }
+
+    // Gráfica de antigüedad de saldos (saldo por rango de días).
+    private void MapearEjecutivos()
+    {
+        if (_antiguedad is null) return;
+        _rangosArray = _antiguedad.Rangos.Select(r => r.Rango).ToArray();
+        _serieAntiguedad = new()
+        {
+            new ChartSeries<double>
+            {
+                Name = "Saldo",
+                Data = _antiguedad.Rangos.Select(r => (double)r.SaldoPendiente).ToArray()
+            }
+        };
     }
 
     // ===================== Helpers =====================

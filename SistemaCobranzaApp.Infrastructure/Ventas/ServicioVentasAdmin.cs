@@ -63,8 +63,17 @@ public class ServicioVentasAdmin
         if (clienteZona.IdZona is not { } idZonaCliente)
             return ResultadoVenta.Fallo("El cliente no tiene una zona asignada en su ruta. No es posible tomar inventario.");
 
-        if (!await _db.Condiciones.AnyAsync(c => c.IdCondicion == req.IdCondicion, ct))
+        var descripcionCondicion = await _db.Condiciones.AsNoTracking()
+            .Where(c => c.IdCondicion == req.IdCondicion)
+            .Select(c => c.Descripcion)
+            .FirstOrDefaultAsync(ct);
+        if (descripcionCondicion is null)
             return ResultadoVenta.Fallo($"La condición #{req.IdCondicion} no existe.");
+
+        // Venta de contado: se liquida al momento, sin enganche (solo admite descuento global).
+        bool esContado = descripcionCondicion.Contains("CONTADO", StringComparison.OrdinalIgnoreCase);
+        if (esContado && req.Enganche != 0)
+            return ResultadoVenta.Fallo("Una venta de contado no admite enganche; solo puede llevar descuento global.");
 
         // 👈 CORREGIDO: Alineado a tu Enum 'Estatus.Activo'
         if (req.IdVendedor is { } vend && !await _db.Vendedores.AnyAsync(
@@ -100,14 +109,15 @@ public class ServicioVentasAdmin
         }
 
         // Pasa la ejecución al bloque de la transacción (Parte 2), propagando el usuario autenticado.
-        return await EjecutarTransaccionVentaAsync(req, lineas, idZonaCliente, idUsuario, ct);
+        return await EjecutarTransaccionVentaAsync(req, lineas, idZonaCliente, idUsuario, ct, esContado);
     }
     private async Task<ResultadoVenta> EjecutarTransaccionVentaAsync(
         CrearVentaRequest req, 
         List<CalculoVenta.LineaCalculo> lineas, 
         long idZonaCliente, 
         long? idUsuario,
-        CancellationToken ct)
+        CancellationToken ct,
+        bool esContado = false)
     {
         var subtotal = CalculoVenta.CalcularSubtotal(lineas);
         var totalFinal = subtotal - req.DescuentoGlobal;
@@ -138,10 +148,11 @@ public class ServicioVentasAdmin
                 TotalFinal = totalFinal,
                 Enganche = req.Enganche,
                 
-                IdFrecuenciaPago = req.IdFrecuenciaPago,
-                MontoCuotaFija = req.MontoCuotaFija ?? 0.00m,
-                TasaInteres = req.TasaInteres ?? 0.00m,
-                FechaPrimerVence = req.FechaPrimerVence,
+                // Contado: sin frecuencia, cuota ni vencimientos (se liquida al instante).
+                IdFrecuenciaPago = esContado ? null : req.IdFrecuenciaPago,
+                MontoCuotaFija = esContado ? 0.00m : req.MontoCuotaFija ?? 0.00m,
+                TasaInteres = esContado ? 0.00m : req.TasaInteres ?? 0.00m,
+                FechaPrimerVence = esContado ? null : req.FechaPrimerVence,
                 NumeroCuotas = 1, 
 
                 TotalAbonado = 0.00m,
@@ -228,7 +239,32 @@ public class ServicioVentasAdmin
 
             // D. Disminución física del stock en la ruta
             await _db.SaveChangesAsync(ct);
-            
+
+            // D.1 Venta de contado: se registra el cobro total como PAGO COMPLETO (movimiento 3), NO como abono (1),
+            // de modo que los reportes de cobranza (que solo cuentan abonos) no lo sumen como recuperación.
+            // El trigger BEFORE INSERT de Pagos baja el saldo a 0 y marca la venta como PAGADA; como solo los
+            // abonos incrementan TotalAbonado, se fija aquí para que el saldo calculado (Total − Enganche − Abonado) sea 0.
+            if (esContado && totalFinal > 0)
+            {
+                _db.Pagos.Add(new Pago
+                {
+                    IdVenta = venta.IdVenta,
+                    IdCliente = venta.IdCliente,
+                    MontoAbona = totalFinal,
+                    FechaPago = ahora,
+                    IdMovimiento = MovimientoIds.PagoCompleto,
+                    Observaciones = "VENTA DE CONTADO",
+                    IdUsuarioRegistro = idUsuario,
+                    FolioPago = CalculoCobranza.FormatearFolio(MovimientoIds.PagoCompleto, 1),
+                    ConsecutivoPago = 1,
+                    FechaModificacion = ahora
+                });
+                await _db.SaveChangesAsync(ct);
+
+                await _db.Ventas.Where(v => v.IdVenta == venta.IdVenta)
+                    .ExecuteUpdateAsync(u => u.SetProperty(v => v.TotalAbonado, totalFinal), ct);
+            }
+
             // 👈 CORREGIDO: Se tipó explícitamente el Select para evitar problemas de inferencia en colecciones anónimas
             var stockDescuento = req.Detalles.GroupBy(d => d.IdProducto)
                 .Select(g => (IdProducto: g.Key, Cantidad: g.Sum(x => x.Cantidad))).ToList();
@@ -298,8 +334,14 @@ public class ServicioVentasAdmin
             return ResultadoVenta.Fallo("El cliente no tiene una zona asignada en su ruta. No es posible ajustar inventario.");
 
         // 3. Validaciones de llaves foráneas.
-        if (!await _db.Condiciones.AnyAsync(c => c.IdCondicion == req.IdCondicion, ct))
+        var descripcionCondicion = await _db.Condiciones.AsNoTracking()
+            .Where(c => c.IdCondicion == req.IdCondicion).Select(c => c.Descripcion).FirstOrDefaultAsync(ct);
+        if (descripcionCondicion is null)
             return ResultadoVenta.Fallo($"La condición #{req.IdCondicion} no existe.");
+
+        // Las ventas de contado se liquidan al registrarse (pago completo); no se pueden crear por edición.
+        if (descripcionCondicion.Contains("CONTADO", StringComparison.OrdinalIgnoreCase))
+            return ResultadoVenta.Fallo("Una venta de contado no puede editarse: cancélela y regístrela de nuevo.");
 
         if (req.IdVendedor is { } vend && !await _db.Vendedores.AnyAsync(
                 v => v.IdVendedor == vend && v.Estatus == Estatus.Activo && v.IdZona == idZonaCliente, ct))

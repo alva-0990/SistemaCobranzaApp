@@ -470,9 +470,10 @@ public partial class ApiCliente
 
     public Task<(ReporteVentasResponse? datos, string? error)> ReporteVentasAsync(
         DateTimeOffset? desde, DateTimeOffset? hasta, long? idVendedor = null,
-        long? idZona = null, long? idRuta = null, CancellationToken ct = default)
+        long? idZona = null, long? idRuta = null, long? idCondicion = null, CancellationToken ct = default)
     {
         var url = $"/api/reportes/ventas?desde={Fecha(desde)}&hasta={Fecha(hasta)}";
+        if (idCondicion is { } cc) url += $"&idCondicion={cc}";
         if (idVendedor is { } v) url += $"&idVendedor={v}";
         if (idZona is { } z) url += $"&idZona={z}";
         if (idRuta is { } r) url += $"&idRuta={r}";
@@ -499,6 +500,47 @@ public partial class ApiCliente
         if (idZona is { } z) url += $"&idZona={z}";
         return GetReporteAsync<ReporteClientesResponse>(url, ct);
     }
+
+    // ---- Reportes ejecutivos ----
+    private static string FiltroDeuda(string url, long? idZona, long? idRuta, long? idClasificacion = null)
+    {
+        if (idZona is { } z) url += $"&idZona={z}";
+        if (idRuta is { } r) url += $"&idRuta={r}";
+        if (idClasificacion is { } c) url += $"&idClasificacion={c}";
+        return url;
+    }
+
+    public Task<(ReporteDashboardEjecutivoResponse? datos, string? error)> ReporteDashboardEjecutivoAsync(
+        DateTimeOffset? desde, DateTimeOffset? hasta, long? idZona = null, int diasGraciaAlerta = 3, CancellationToken ct = default)
+    {
+        var url = $"/api/reportes/dashboard-ejecutivo?desde={Fecha(desde)}&hasta={Fecha(hasta)}&diasGraciaAlerta={diasGraciaAlerta}";
+        return GetReporteAsync<ReporteDashboardEjecutivoResponse>(FiltroDeuda(url, idZona, null), ct);
+    }
+
+    public Task<(ReporteAntiguedadResponse? datos, string? error)> ReporteAntiguedadSaldosAsync(
+        long? idZona = null, long? idRuta = null, long? idClasificacion = null, CancellationToken ct = default)
+        => GetReporteAsync<ReporteAntiguedadResponse>(
+            FiltroDeuda("/api/reportes/antiguedad-saldos?_=1", idZona, idRuta, idClasificacion), ct);
+
+    public Task<(ReporteSinPagoResponse? datos, string? error)> ReporteClientesSinPagoAsync(
+        long? idZona = null, long? idRuta = null, long? idClasificacion = null, int diasSinPago = 15, CancellationToken ct = default)
+        => GetReporteAsync<ReporteSinPagoResponse>(
+            FiltroDeuda($"/api/reportes/clientes-sin-pago?diasSinPago={diasSinPago}", idZona, idRuta, idClasificacion), ct);
+
+    public Task<(ReporteRankingDeudoresResponse? datos, string? error)> ReporteRankingDeudoresAsync(
+        long? idZona = null, long? idRuta = null, long? idClasificacion = null, CancellationToken ct = default)
+        => GetReporteAsync<ReporteRankingDeudoresResponse>(
+            FiltroDeuda("/api/reportes/ranking-deudores?_=1", idZona, idRuta, idClasificacion), ct);
+
+    public Task<(ReporteCarteraClasificacionResponse? datos, string? error)> ReporteCarteraClasificacionAsync(
+        long? idZona = null, long? idRuta = null, CancellationToken ct = default)
+        => GetReporteAsync<ReporteCarteraClasificacionResponse>(
+            FiltroDeuda("/api/reportes/cartera-clasificacion?_=1", idZona, idRuta), ct);
+
+    public Task<(ReporteConcentracionResponse? datos, string? error)> ReporteConcentracionCarteraAsync(
+        long? idZona = null, long? idRuta = null, CancellationToken ct = default)
+        => GetReporteAsync<ReporteConcentracionResponse>(
+            FiltroDeuda("/api/reportes/concentracion-cartera?_=1", idZona, idRuta), ct);
 
     public Task<(ReporteSeguimientoResponse? datos, string? error)> ReporteSeguimientoAsync(
         long? idZona = null, DateTimeOffset? altaDesde = null, DateTimeOffset? altaHasta = null, CancellationToken ct = default)

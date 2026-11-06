@@ -22,12 +22,16 @@
                 <MudIcon Icon="@Icons.Material.Filled.CreditCard" Color="Color.Primary" />
                 <MudText Typo="Typo.h6" Class="titulo-detalle">Información del Cliente</MudText>
             </div>
-            <div class="d-flex align-center gap-2 flex-wrap">
+            <div class="acciones-encabezado">
                 <MudButton Variant="Variant.Outlined" Color="Color.Default" Size="Size.Small"
                            StartIcon="@Icons.Material.Filled.ArrowBack"
                            OnClick="Regresar">
                     Regresar
                 </MudButton>
+                @if (_cliente is not null)
+                {
+                    <BotonEstadoCuenta IdCliente="_cliente.IdCliente" />
+                }
                 <MudButton Variant="Variant.Filled" Color="Color.Success" Size="Size.Small"
                            StartIcon="@Icons.Material.Filled.PointOfSale"
                            OnClick="AsignarVenta"
@@ -124,7 +128,17 @@
             {
                 <div class="credito-banda">
                     @Metrica("Total vendido", _estadoCuenta.TotalVendido, Color.Default)
-                    @Metrica("Total pagado", _estadoCuenta.TotalPagado, Color.Success)
+                    @Metrica("Descuentos", _estadoCuenta.TotalDescuentos, Color.Warning)
+                    @Metrica("Enganches", _estadoCuenta.TotalEnganches, Color.Info)
+                    @Metrica("Abonos", _estadoCuenta.TotalPagado, Color.Success)
+                    @* Total pagado = enganches + abonos (todo lo que el cliente ha entregado). *@
+                    @Metrica("Total pagado", _estadoCuenta.TotalEnganches + _estadoCuenta.TotalPagado, Color.Success)
+                    @* Racha de pagos, liquidación por plan y condonación por acuerdo: reducen saldo sin ser cobro. *@
+                    @Metrica("Bonificaciones", _estadoCuenta.TotalBonificaciones, Color.Warning)
+                    @if (_estadoCuenta.TotalTraspasos > 0)
+                    {
+                        @Metrica("Traspaso por renovación", _estadoCuenta.TotalTraspasos, Color.Info)
+                    }
                     @Metrica("Saldo total", _estadoCuenta.SaldoTotal, _estadoCuenta.SaldoTotal > 0 ? Color.Error : Color.Success)
                     <div class="credito-item">
                         <span class="credito-etiqueta">Pedidos</span>
@@ -144,15 +158,18 @@
             <MudTable Items="@(_estadoCuenta?.Ventas ?? (IReadOnlyList<EstadoCuentaVentaDto>)Array.Empty<EstadoCuentaVentaDto>())"
                       Hover="true" Dense="true" Breakpoint="Breakpoint.Sm" Elevation="0"
                       RowsPerPage="10" T="EstadoCuentaVentaDto" Class="tabla-historial-pedidos"
+                      RowClassFunc="@((v, _) => v.EsCancelada ? "fila-cancelada" : string.Empty)"
                       HorizontalScrollbar="true">
                 <HeaderContent>
                     <MudTh Style="width:9%;">Pedido</MudTh>
                     <MudTh>Código</MudTh>
                     <MudTh>Fecha</MudTh>
                     <MudTh>Estado</MudTh>
+                    <MudTh Style="text-align:right;">Descuento</MudTh>
                     <MudTh Style="text-align:right;">Total</MudTh>
                     <MudTh Style="text-align:right;">Enganche</MudTh>
                     <MudTh Style="text-align:right;">Abonos</MudTh>
+                    <MudTh Style="text-align:right;">Bonif./Ajustes</MudTh>
                     <MudTh Style="text-align:right;">Saldo</MudTh>
                     <MudTh>Último pago</MudTh>
                     <MudTh Style="text-align:center; min-width:120px;">Acciones</MudTh>
@@ -166,9 +183,15 @@
                             @(context.Estado ?? "—")
                         </MudChip>
                     </MudTd>
+                    <MudTd DataLabel="Descuento" Style="text-align:right;">@context.DescuentoGlobal.ToString("C2")</MudTd>
                     <MudTd DataLabel="Total" Style="text-align:right;">@context.TotalFinal.ToString("C2")</MudTd>
                     <MudTd DataLabel="Enganche" Style="text-align:right;">@context.Enganche.ToString("C2")</MudTd>
                     <MudTd DataLabel="Abonos" Style="text-align:right;">@context.TotalAbonos.ToString("C2")</MudTd>
+                    <MudTd DataLabel="Bonif./Ajustes" Style="text-align:right;">
+                        <MudTooltip Text="@DesgloseBonificaciones(context)">
+                            @((context.TotalBonificaciones + context.TraspasoRenovacion).ToString("C2"))
+                        </MudTooltip>
+                    </MudTd>
                     <MudTd DataLabel="Saldo" Style="text-align:right;">
                         <b class="@(context.Saldo > 0 ? "saldo-pendiente" : "saldo-liquidado")">@context.Saldo.ToString("C2")</b>
                     </MudTd>
@@ -182,7 +205,8 @@
                                                Size="Size.Small" Variant="Variant.Outlined"
                                                OnClick="@(() => VerDetalleVenta(context))" />
                             </MudTooltip>
-                            @if (context.Saldo > 0)
+                            @* Venta cancelada: solo consulta de detalle (sin renovar, editar ni cancelar). *@
+                            @if (context.Saldo > 0 && !context.EsCancelada)
                             {
                                 <MudTooltip Text="Renovar cuenta">
                                     <MudIconButton Icon="@Icons.Material.Filled.Autorenew"
@@ -193,7 +217,13 @@
                             }
                         </div>
 
-                        @if (context.TotalAbonos == 0)
+                        @if (context.EsCancelada)
+                        {
+                            <MudChip T="string" Size="Size.Small" Variant="Variant.Text" Color="Color.Error" Class="chip-compacto">
+                                Cancelada
+                            </MudChip>
+                        }
+                        else if (context.TotalAbonos == 0)
                         {
                             <div class="d-flex justify-center gap-1">
                                 <MudTooltip Text="Editar venta">
@@ -241,6 +271,11 @@
             <span class="campo-valor">@valor</span>
         </div>
     };
+
+    // Desglose de los movimientos no monetarios de una venta (tooltip de la columna Bonif./Ajustes).
+    string DesgloseBonificaciones(EstadoCuentaVentaDto v)
+        => $"Racha: {v.BonificacionRacha:C2} · Plan a meses: {v.LiquidacionPlan:C2} · " +
+           $"Acuerdo/ajuste: {v.Condonacion:C2} · Renovación: {v.TraspasoRenovacion:C2}";
 
     // Métrica monetaria compacta para la banda de crédito.
     RenderFragment Metrica(string etiqueta, decimal monto, Color color) => __builder =>
@@ -317,6 +352,14 @@
     .saldo-pendiente { color: var(--mud-palette-error); }
     .saldo-liquidado { color: var(--mud-palette-success); }
 
+    /* Ventas canceladas: fila en gris (montos y textos atenuados); solo se consulta su detalle. */
+    .fila-cancelada td,
+    .fila-cancelada td .saldo-pendiente,
+    .fila-cancelada td .saldo-liquidado {
+        color: var(--mud-palette-text-disabled) !important;
+    }
+    .fila-cancelada td { background-color: var(--mud-palette-background-grey); }
+
     .h-100 { height: 100%; }
 </style>
 
@@ -326,7 +369,6 @@
     private ClienteDto? _cliente;
     private EstadoCuentaResponse? _estadoCuenta;
     private bool _cargando;
-
     // Riesgo por clasificación del cliente actual.
     private NivelRiesgoCliente _riesgo = NivelRiesgoCliente.Ninguno;
     private bool _ventaBloqueada;          // MALO/MOROSO: bloquea asignar/editar/cancelar/renovar.
@@ -418,7 +460,7 @@
 
     private async Task RenovarCuenta(EstadoCuentaVentaDto fila)
     {
-        if (_cliente is null || fila.Saldo <= 0 || _renovando) return;
+        if (_cliente is null || fila.Saldo <= 0 || fila.EsCancelada || _renovando) return;
         _renovando = true;
         try
         {
@@ -466,6 +508,7 @@
     // Cancela de forma lógica una venta que todavía no tiene abonos registrados.
     private async Task CancelarVenta(EstadoCuentaVentaDto venta)
     {
+        if (venta.EsCancelada) return; // Ya cancelada: solo consulta.
         // Guardamos solo las ventas sin abonos: pedimos confirmación explícita antes de cancelar.
         var codigo = venta.CodigoVenta ?? $"#{venta.IdVenta}";
 
@@ -513,7 +556,7 @@
     // Edita una venta sin abonos: carga su detalle, abre el diálogo precargado y persiste los cambios.
     private async Task EditarVenta(EstadoCuentaVentaDto venta)
     {
-        if (_cliente is null)
+        if (_cliente is null || venta.EsCancelada)
             return;
 
         var codigo = venta.CodigoVenta ?? $"#{venta.IdVenta}";
@@ -812,6 +855,11 @@ private async Task<TicketVentaDto> ConstruirTicketAsync(
         frecuencia = frecuencias?.FirstOrDefault(f => f.Id == idFrecuencia)?.Descripcion;
     }
 
+    // Tipo de venta (CRÉDITO / CONTADO) para titular el ticket según corresponda.
+    var (condiciones, _) = await Api.ListarCondicionesCreditoOperativasAsync();
+    var esContado = condiciones?.FirstOrDefault(c => c.IdCondicion == req.IdCondicion)?.Descripcion
+        .Contains("CONTADO", StringComparison.OrdinalIgnoreCase) == true;
+
     // Nombre comercial corto de la empresa (con fallback a la identidad del login y, por último, genérico).
     var nombreCorto = EmpresaGlobal.Info?.NombreCorto ?? EmpresaGlobal.Identidad?.NombreCorto;
     var negocio = string.IsNullOrWhiteSpace(nombreCorto) ? "Sistema de Cobranza" : nombreCorto;
@@ -834,13 +882,16 @@ private async Task<TicketVentaDto> ConstruirTicketAsync(
         Descuento: req.DescuentoGlobal,
         Total: req.TotalFinal,
         Enganche: req.Enganche,
-        MontoFinanciado: req.TotalFinal - req.Enganche,
+        MontoFinanciado: esContado ? 0m : req.TotalFinal - req.Enganche,
 
         FrecuenciaPago: frecuencia,
         CuotaFija: req.MontoCuotaFija ?? 0m,
         NumeroCuotas: req.NumeroCuotas ?? 0,
         FechaPrimerVence: req.FechaPrimerVence,
 
-        PlanesPromocionales: planes);
+        PlanesPromocionales: planes)
+    {
+        EsContado = esContado
+    };
 }
 }

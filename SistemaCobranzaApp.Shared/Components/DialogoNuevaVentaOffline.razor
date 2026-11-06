@@ -409,69 +409,87 @@
                     <MudText Typo="Typo.h6"><b>@_totalFinal.ToString("C2")</b></MudText>
                 </div>
 
-                <MudNumericField T="decimal"
-                                 Label="Enganche (Pronto Pago)"
-                                 @bind-Value="_enganche"
-                                 Min="0"
-                                 Format="C2"
-                                 Variant="Variant.Outlined"
-                                 Dense="true"
-                                 Class="mt-3 mb-2"
-                                 Immediate="true"
-                                 FullWidth="true" 
-                                 InputAttributes="@(new Dictionary<string, object>
-                                                  {
-                                                      ["onfocus"] = "this.select()"
-                                                  })"/>
+                @if (EsContado)
+                {
+                    <MudAlert Severity="Severity.Success" Dense="true" Class="mt-3 mb-2">
+                        Venta de contado: sin enganche. Se registrará como pago completo y la venta quedará PAGADA.
+                    </MudAlert>
+                }
+                else
+                {
+                    <MudNumericField T="decimal"
+                                     Label="Enganche (Pronto Pago)"
+                                     @bind-Value="_enganche"
+                                     Min="0"
+                                     Format="C2"
+                                     Variant="Variant.Outlined"
+                                     Dense="true"
+                                     Class="mt-3 mb-2"
+                                     Immediate="true"
+                                     FullWidth="true" 
+                                     InputAttributes="@(new Dictionary<string, object>
+                                                      {
+                                                          ["onfocus"] = "this.select()"
+                                                      })"/>
 
-                <div class="fila-resumen monto-financiado">
-                    <MudText>Monto Neto a Financiar:</MudText>
-                    <MudText><b>@_montoFinanciado.ToString("C2")</b></MudText>
-                </div>
+                    <div class="fila-resumen monto-financiado">
+                        <MudText>Monto Neto a Financiar:</MudText>
+                        <MudText><b>@_montoFinanciado.ToString("C2")</b></MudText>
+                    </div>
+                }
 
                 <MudDivider Class="my-3" />
 
-                <MudSelect T="CatalogoFrecuenciaPagoDto"
-                           Label="📅 Frecuencia de Cobro"
-                           @bind-Value="_frecuenciaSeleccionada"
-                           Variant="Variant.Outlined"
-                           Dense="true"
-                           Class="mb-3"
-                           FullWidth="true">
-                    @foreach (var f in _catalogoFrecuencias)
-                    {
-                        <MudSelectItem Value="@f">@f.Descripcion (@f.DiasPeriodo días)</MudSelectItem>
-                    }
-                </MudSelect>
-
-                <MudNumericField T="decimal"
-                                 Label="@(ModoRenovacion ? "Cuota base para calcular plazo" : "Cuota Fija Exigida/Pactada")"
-                                 @bind-Value="_cuotaFijaExigida"
-                                 Min="1"
-                                 Format="C2"
-                                 Variant="Variant.Outlined"
-                                 Dense="true"
-                                 Class="mb-3"
-                                 Immediate="true"
-                                 FullWidth="true" 
-                                 InputAttributes="@(new Dictionary<string, object>
-                                                  {
-                                                      ["onfocus"] = "this.select()"
-                                                  })"/>
-
-                @if (_montoFinanciado > 0 && _cuotaFijaExigida > 0)
+                @if (EsContado)
                 {
-                    <div class="proyeccion-cuotas">
-                        <MudText Typo="Typo.caption">Plazo Proyectado:</MudText>
-                        <MudText Typo="Typo.subtitle2"><b>@_cuotasProyectadas cuotas fijas</b></MudText>
-                    </div>
-                    @if (ModoRenovacion)
-                    {
-                        <MudText Typo="Typo.body2" Class="mt-1">Cuota con liquidación: @CuotaRenovada.ToString("C2")</MudText>
-                    }
-                    <MudText Typo="Typo.caption" Color="Color.Secondary" Class="d-block mt-1">
-                        La última cuota será de @_ultimaCuotaAjuste.ToString("C2").
+                    <MudText Typo="Typo.caption" Color="Color.Secondary" Class="d-block">
+                        Venta de contado: no requiere frecuencia de cobro ni cuota.
                     </MudText>
+                }
+                else
+                {
+                    <MudSelect T="CatalogoFrecuenciaPagoDto"
+                               Label="📅 Frecuencia de Cobro"
+                               @bind-Value="_frecuenciaSeleccionada"
+                               Variant="Variant.Outlined"
+                               Dense="true"
+                               Class="mb-3"
+                               FullWidth="true">
+                        @foreach (var f in _catalogoFrecuencias)
+                        {
+                            <MudSelectItem Value="@f">@f.Descripcion (@f.DiasPeriodo días)</MudSelectItem>
+                        }
+                    </MudSelect>
+
+                    <MudNumericField T="decimal"
+                                     Label="@(ModoRenovacion ? "Cuota base para calcular plazo" : "Cuota Fija Exigida/Pactada")"
+                                     @bind-Value="_cuotaFijaExigida"
+                                     Min="1"
+                                     Format="C2"
+                                     Variant="Variant.Outlined"
+                                     Dense="true"
+                                     Class="mb-3"
+                                     Immediate="true"
+                                     FullWidth="true" 
+                                     InputAttributes="@(new Dictionary<string, object>
+                                                      {
+                                                          ["onfocus"] = "this.select()"
+                                                      })"/>
+
+                    @if (_montoFinanciado > 0 && _cuotaFijaExigida > 0)
+                    {
+                        <div class="proyeccion-cuotas">
+                            <MudText Typo="Typo.caption">Plazo Proyectado:</MudText>
+                            <MudText Typo="Typo.subtitle2"><b>@_cuotasProyectadas cuotas fijas</b></MudText>
+                        </div>
+                        @if (ModoRenovacion)
+                        {
+                            <MudText Typo="Typo.body2" Class="mt-1">Cuota con liquidación: @CuotaRenovada.ToString("C2")</MudText>
+                        }
+                        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="d-block mt-1">
+                            La última cuota será de @_ultimaCuotaAjuste.ToString("C2").
+                        </MudText>
+                    }
                 }
 
             </MudItem>
@@ -968,6 +986,13 @@
 
     private decimal _descuentoGlobal;
     private decimal _enganche;
+
+    // Venta de contado: no exige frecuencia de cobro ni cuota (se envían en cero/nulos). Aplica solo fuera de renovación.
+    private bool EsContado => !ModoRenovacion
+        && _condicionSeleccionada?.Descripcion.Contains("CONTADO", StringComparison.OrdinalIgnoreCase) == true;
+
+    // Solo las ventas a crédito con saldo por financiar necesitan frecuencia y cuota.
+    private bool FinanciaACredito => _montoFinanciado > 0 && !EsContado;
     private CatalogoFrecuenciaPagoDto? _frecuenciaSeleccionada;
     private decimal _cuotaFijaExigida;
 
@@ -1092,6 +1117,8 @@
     private void OnCondicionSeleccionada(CondicionCreditoDto? condicion)
     {
         _condicionSeleccionada = condicion;
+        // Contado no admite enganche: se limpia cualquier valor capturado antes.
+        if (EsContado) _enganche = 0;
     }
 
     private void OnVendedorSeleccionado(VendedorDto? vendedor)
@@ -1255,13 +1282,13 @@
         }
 
 
-        if (_montoFinanciado > 0 && _frecuenciaSeleccionada is null)
+        if (FinanciaACredito && _frecuenciaSeleccionada is null)
         {
             _snackbar.Add("Debe seleccionar una frecuencia de pago para ventas a crédito.", Severity.Warning);
             return;
         }
 
-        if (_montoFinanciado > 0 && _cuotaFijaExigida <= 0)
+        if (FinanciaACredito && _cuotaFijaExigida <= 0)
         {
             _snackbar.Add("Debe fijar la cuota que el cliente entregará periódicamente.", Severity.Warning);
             return;
@@ -1283,12 +1310,12 @@
             DescuentoGlobal: _descuentoGlobal,
             // El procedimiento de renovación agrega el arrastre una sola vez en el servidor.
             TotalFinal: TotalBase,
-            Enganche: _enganche,
-            IdFrecuenciaPago: _montoFinanciado > 0 ? _frecuenciaSeleccionada?.Id : null,
-            NumeroCuotas: _montoFinanciado > 0 ? _cuotasProyectadas : 1,
-            MontoCuotaFija: _montoFinanciado > 0 ? _cuotaFijaExigida : 0.00m,
+            Enganche: EsContado ? 0.00m : _enganche,
+            IdFrecuenciaPago: FinanciaACredito ? _frecuenciaSeleccionada?.Id : null,
+            NumeroCuotas: FinanciaACredito ? _cuotasProyectadas : 1,
+            MontoCuotaFija: FinanciaACredito ? _cuotaFijaExigida : 0.00m,
             TasaInteres: 0.00m,
-            FechaPrimerVence: _montoFinanciado > 0
+            FechaPrimerVence: FinanciaACredito
                 ? DateTimeOffset.UtcNow.AddDays(_frecuenciaSeleccionada!.DiasPeriodo)
                 : null,
             Observaciones: null,

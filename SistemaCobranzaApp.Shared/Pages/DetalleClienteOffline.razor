@@ -24,12 +24,17 @@
                 <MudIcon Icon="@Icons.Material.Filled.CreditCard" Color="Color.Primary" />
                 <MudText Typo="Typo.h6" Class="titulo-detalle">Información del Cliente</MudText>
             </div>
-            <div class="d-flex align-center gap-2 flex-wrap">
+            <div class="acciones-encabezado">
                 <MudButton Variant="Variant.Outlined" Color="Color.Default" Size="Size.Small"
                            StartIcon="@Icons.Material.Filled.ArrowBack"
                            OnClick="Regresar">
                     Regresar
                 </MudButton>
+                @if (_cliente is not null)
+                {
+                    <BotonEstadoCuenta IdCliente="_cliente.IdCliente" ConInternet="Local.ConInternet"
+                                       Pendientes="Local.PendientesDeCliente(_cliente.IdCliente)" />
+                }
                 <MudButton Variant="Variant.Filled" Color="Color.Success" Size="Size.Small"
                            StartIcon="@Icons.Material.Filled.PointOfSale"
                            OnClick="AsignarVenta"
@@ -126,7 +131,17 @@
             {
                 <div class="credito-banda">
                     @Metrica("Total vendido", _estadoCuenta.TotalVendido, Color.Default)
-                    @Metrica("Total pagado", _estadoCuenta.TotalPagado, Color.Success)
+                    @Metrica("Descuentos", _estadoCuenta.TotalDescuentos, Color.Warning)
+                    @Metrica("Enganches", _estadoCuenta.TotalEnganches, Color.Info)
+                    @Metrica("Abonos", _estadoCuenta.TotalPagado, Color.Success)
+                    @* Total pagado = enganches + abonos (todo lo que el cliente ha entregado). *@
+                    @Metrica("Total pagado", _estadoCuenta.TotalEnganches + _estadoCuenta.TotalPagado, Color.Success)
+                    @* Racha de pagos, liquidación por plan y condonación por acuerdo: reducen saldo sin ser cobro. *@
+                    @Metrica("Bonificaciones", _estadoCuenta.TotalBonificaciones, Color.Warning)
+                    @if (_estadoCuenta.TotalTraspasos > 0)
+                    {
+                        @Metrica("Traspaso por renovación", _estadoCuenta.TotalTraspasos, Color.Info)
+                    }
                     @Metrica("Saldo total", _estadoCuenta.SaldoTotal, _estadoCuenta.SaldoTotal > 0 ? Color.Error : Color.Success)
                     <div class="credito-item">
                         <span class="credito-etiqueta">Pedidos</span>
@@ -151,9 +166,11 @@
                     <MudTh>Código</MudTh>
                     <MudTh>Fecha</MudTh>
                     <MudTh>Estado</MudTh>
+                    <MudTh Style="text-align:right;">Descuento</MudTh>
                     <MudTh Style="text-align:right;">Total</MudTh>
                     <MudTh Style="text-align:right;">Enganche</MudTh>
                     <MudTh Style="text-align:right;">Abonos</MudTh>
+                    <MudTh Style="text-align:right;">Bonif./Ajustes</MudTh>
                     <MudTh Style="text-align:right;">Saldo</MudTh>
                     <MudTh>Último pago</MudTh>
                     <MudTh Style="text-align:center;">Acciones</MudTh>
@@ -167,9 +184,15 @@
                             @(context.Estado ?? "—")
                         </MudChip>
                     </MudTd>
+                    <MudTd DataLabel="Descuento" Style="text-align:right;">@context.DescuentoGlobal.ToString("C2")</MudTd>
                     <MudTd DataLabel="Total" Style="text-align:right;">@context.TotalFinal.ToString("C2")</MudTd>
                     <MudTd DataLabel="Enganche" Style="text-align:right;">@context.Enganche.ToString("C2")</MudTd>
                     <MudTd DataLabel="Abonos" Style="text-align:right;">@context.TotalAbonos.ToString("C2")</MudTd>
+                    <MudTd DataLabel="Bonif./Ajustes" Style="text-align:right;">
+                        <MudTooltip Text="@DesgloseBonificaciones(context)">
+                            @((context.TotalBonificaciones + context.TraspasoRenovacion).ToString("C2"))
+                        </MudTooltip>
+                    </MudTd>
                     <MudTd DataLabel="Saldo" Style="text-align:right;">
                         <b class="@(context.Saldo > 0 ? "saldo-pendiente" : "saldo-liquidado")">@context.Saldo.ToString("C2")</b>
                     </MudTd>
@@ -226,6 +249,11 @@
             <span class="campo-valor">@valor</span>
         </div>
     };
+
+    // Desglose de los movimientos no monetarios de una venta (tooltip de la columna Bonif./Ajustes).
+    string DesgloseBonificaciones(EstadoCuentaVentaDto v)
+        => $"Racha: {v.BonificacionRacha:C2} · Plan a meses: {v.LiquidacionPlan:C2} · " +
+           $"Acuerdo/ajuste: {v.Condonacion:C2} · Renovación: {v.TraspasoRenovacion:C2}";
 
     // Métrica monetaria compacta para la banda de crédito.
     RenderFragment Metrica(string etiqueta, decimal monto, Color color) => __builder =>
@@ -329,11 +357,19 @@
         _cargando = false;
         _cliente = Local.ClientesDisponibles().FirstOrDefault(c => c.IdCliente == IdCliente);
         if (_cliente is null) return;
-        var ventas = Local.VentasDisponibles().Where(v => v.IdCliente == IdCliente).Select(v =>
-            new EstadoCuentaVentaDto(v.IdVenta, v.CodigoVenta, v.TotalFinal, v.Enganche, v.TotalAbonado,
-                Local.SaldoDisponible(v), v.DescripcionEstatus, v.FechaCompra, v.FechaUltimoPago)).ToList();
-        _estadoCuenta = new(IdCliente, _cliente.NombreCompleto, _cliente.Ruta, Api.Sesion?.Zona,
-            ventas.Sum(v => v.TotalFinal), ventas.Sum(v => v.TotalAbonos), ventas.Sum(v => v.Saldo), ventas, []);
+        // Abonos = abonos centrales + pendientes del dispositivo (igual que PagosOffline), para que el cuadre
+        // Total − Enganche − Abonos − Bonificaciones − Traspaso coincida con el saldo disponible.
+        var ventas = Local.VentasDisponibles().Where(v => v.IdCliente == IdCliente).Select(v => CuadreEstadoCuenta.ConMovimientos(
+            new EstadoCuentaVentaDto(v.IdVenta, v.CodigoVenta, v.TotalFinal, v.Enganche,
+                v.TotalAbonado + Math.Max(0, v.SaldoPendiente - Local.SaldoDisponible(v)),
+                Local.SaldoDisponible(v), v.DescripcionEstatus, v.FechaCompra, v.FechaUltimoPago)
+            { Subtotal = v.Subtotal, DescuentoGlobal = v.DescuentoGlobal }, Local.MovimientosDescargados(v.IdVenta))).ToList();
+        _estadoCuenta = CuadreEstadoCuenta.ConTotales(new(IdCliente, _cliente.NombreCompleto, _cliente.Ruta, Api.Sesion?.Zona,
+            ventas.Sum(v => v.TotalFinal), ventas.Sum(v => v.TotalAbonos), ventas.Sum(v => v.Saldo), ventas, [])
+        {
+            TotalDescuentos = ventas.Sum(v => v.DescuentoGlobal),
+            TotalEnganches = ventas.Sum(v => v.Enganche)
+        });
 
         // Evaluamos el riesgo y marcamos si debe mostrarse el modal informativo al abrir.
         _riesgo = RiesgoClienteRegla.Evaluar(_cliente.IdClasificacion);

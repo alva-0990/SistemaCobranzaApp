@@ -5,6 +5,7 @@
 @using SistemaCobranzaApp.Shared.Services
 @inject IDescargaArchivo Descarga
 @inject ApiCliente Api
+@inject EstadoEmpresaGlobal EmpresaGlobal
 @inject ISnackbar Snackbar
 @inject NavigationManager Nav
 @inject IDialogService Dialogo
@@ -259,6 +260,13 @@
                                            Items="_rutas"
                                            ObtenerId="@(r => r.IdRuta)"
                                            ObtenerTexto="@(r => r.Descripcion)" />
+                </MudItem>
+                <MudItem xs="12" sm="6" md="3">
+                    <AutocompletarCatalogo TItem="CondicionCreditoDto" Label="Condición de crédito" Placeholder="Todas"
+                                           @bind-Value="_venCondicion"
+                                           Items="_condiciones"
+                                           ObtenerId="@(c => c.IdCondicion)"
+                                           ObtenerTexto="@(c => c.Descripcion)" />
                 </MudItem>
             </MudGrid>
 
@@ -638,6 +646,7 @@
     private List<VendedorDto> _vendedores = new();
     private List<ClasificaionClienteDto> _clasificaciones = new();
     private List<MovimientoDto> _movimientos = new();
+    private List<CondicionCreditoDto> _condiciones = new();
 
     private bool _cargando, _exportando;
     private int _tabActivo; // Para mostrar el spinner solo en la pestaña que genera.
@@ -663,6 +672,7 @@
     private long? _venVendedor;
     private long? _venZona;
     private long? _venRuta;
+    private long? _venCondicion;
     private ReporteVentasResponse? _ventas;
 
     // ---- Recuperación ----
@@ -719,8 +729,9 @@
         var tVendedores = Api.ListarVendedoresOperativosAsync();
         var tClasificaciones = Api.ListarClasificacionesClienteOperativasAsync();
         var tMovimientos = Api.ListarMovimientosOperativosAsync();
+        var tCondiciones = Api.ListarCondicionesCreditoOperativasAsync();
 
-        await Task.WhenAll(tZonas, tRutas, tEstatus, tCobradores, tVendedores, tClasificaciones, tMovimientos);
+        await Task.WhenAll(tZonas, tRutas, tEstatus, tCobradores, tVendedores, tClasificaciones, tMovimientos, tCondiciones);
 
         _zonas = (await tZonas).datos ?? new();
         _rutas = (await tRutas).datos ?? new();
@@ -729,6 +740,7 @@
         _vendedores = (await tVendedores).datos ?? new();
         _clasificaciones = (await tClasificaciones).datos ?? new();
         _movimientos = (await tMovimientos).datos ?? new();
+        _condiciones = (await tCondiciones).datos ?? new();
 
         await CargarDiasGraciaSeguimientoAsync();
     }
@@ -790,7 +802,7 @@
         _cargando = true;
         try
         {
-            var (datos, error) = await Api.ReporteVentasAsync(ADesde(_venDesde), AHasta(_venHasta), _venVendedor, _venZona, _venRuta);
+            var (datos, error) = await Api.ReporteVentasAsync(ADesde(_venDesde), AHasta(_venHasta), _venVendedor, _venZona, _venRuta, _venCondicion);
             if (error is not null) { Snackbar.Add(error, Severity.Error); return; }
             _ventas = datos;
         }
@@ -899,49 +911,151 @@
         return Color.Error;
     }
 
-    private async Task ExportarAsync(string nombre, string[] columnas, IEnumerable<object?[]> filas)
+    // ---- Exportación a Excel con formato (empresa, filtros, KPIs, tabla y totales) ----
+
+    private async Task ExportarReporteAsync(string archivo, string titulo, Dictionary<string, string> filtros,
+        List<ReporteExcelKpi> kpis, string[] columnas, IEnumerable<object?[]> filas, int[]? columnasMoneda = null)
     {
         if (_exportando) return;
         _exportando = true;
         try
         {
-            var archivo = ExportadorExcel.Crear(columnas, filas);
-            await Descarga.GuardarAsync($"{nombre}-{FechaProyecto.Ahora:yyyyMMdd-HHmmssfff}.xlsx", archivo);
+            var info = new ReporteExcelInfo
+            {
+                Empresa = EmpresaGlobal.Info?.NombreCorto
+                          ?? EmpresaGlobal.Identidad?.NombreCorto
+                          ?? "Sistema Cobranza",
+                Titulo = titulo,
+                FechaGeneracion = FechaProyecto.Ahora.DateTime,
+                Filtros = filtros,
+                Kpis = kpis
+            };
+            var bytes = ExportadorExcel.Crear(info, columnas, filas, columnasMoneda);
+            await Descarga.GuardarAsync($"{archivo}-{FechaProyecto.Ahora:yyyyMMdd-HHmmssfff}.xlsx", bytes);
         }
         catch (Exception ex) { Snackbar.Add($"No se pudo exportar el reporte: {ex.Message}", Severity.Error); }
         finally { _exportando = false; }
     }
 
-    private Task ExportarCartera() => _cartera is null ? Task.CompletedTask : ExportarAsync("Cartera",
+    private static ReporteExcelKpi Kpi(string nombre, string valor) => new() { Nombre = nombre, Valor = valor };
+
+    private static string Fecha(DateTime? d, string vacio = "Sin límite") => d is { } v ? v.ToString("dd/MM/yyyy") : vacio;
+
+    private Task ExportarCartera() => _cartera is not { } c ? Task.CompletedTask : ExportarReporteAsync(
+        "Cartera", "REPORTE DE CARTERA",
+        new()
+        {
+            ["Zona"] = _zonas.FirstOrDefault(x => x.IdZona == _cartZona)?.Descripcion ?? "Todas",
+            ["Ruta"] = _rutas.FirstOrDefault(x => x.IdRuta == _cartRuta)?.Descripcion ?? "Todas",
+            ["Estatus"] = _estatusVenta.FirstOrDefault(x => x.Id == _cartEstatus)?.Descripcion ?? "Todos"
+        },
+        [
+            Kpi("Registros", c.Total.ToString()),
+            Kpi("Saldo total", c.SaldoTotal.ToString("C2")),
+            Kpi("Saldo promedio", c.Total > 0 ? (c.SaldoTotal / c.Total).ToString("C2") : "$0.00")
+        ],
         ["Venta", "Código", "Cliente", "Producto", "Ruta", "Zona", "Total", "Abonado", "Saldo", "Estado", "Último pago"],
-        _cartera.Filas.Select(f => new object?[] { f.IdVenta, f.CodigoVenta, f.Cliente, f.Productos, f.Ruta, f.Zona,
-            f.TotalFinal, f.TotalAbonos, f.Saldo, f.Estado, FechaCorta(f.FechaUltimoPago) }));
+        c.Filas.Select(f => new object?[] { f.IdVenta, f.CodigoVenta, f.Cliente, f.Productos, f.Ruta, f.Zona,
+            f.TotalFinal, f.TotalAbonos, f.Saldo, f.Estado, FechaCorta(f.FechaUltimoPago) }),
+        [7, 8, 9]);
 
-    private Task ExportarPagos() => _pagos is null ? Task.CompletedTask : ExportarAsync("Pagos",
+    private Task ExportarPagos() => _pagos is not { } p ? Task.CompletedTask : ExportarReporteAsync(
+        "Pagos", "REPORTE DE PAGOS",
+        new()
+        {
+            ["Desde"] = Fecha(_pagDesde),
+            ["Hasta"] = Fecha(_pagHasta),
+            ["Cobrador"] = _cobradores.FirstOrDefault(x => x.IdCobrador == _pagCobrador)?.Nombre ?? "Todos",
+            ["Zona"] = _zonas.FirstOrDefault(x => x.IdZona == _pagZona)?.Descripcion ?? "Todas",
+            ["Ruta"] = _rutas.FirstOrDefault(x => x.IdRuta == _pagRuta)?.Descripcion ?? "Todas",
+            ["Movimiento"] = _movimientos.FirstOrDefault(x => x.Id == _pagMovimiento)?.Descripcion ?? "Todos"
+        },
+        [
+            Kpi("Pagos", p.Total.ToString()),
+            Kpi("Monto total", p.MontoTotal.ToString("C2")),
+            Kpi("Pago promedio", p.Total > 0 ? (p.MontoTotal / p.Total).ToString("C2") : "$0.00")
+        ],
         ["Pago", "Folio", "Venta", "Cliente", "Producto", "Cobrador", "Movimiento", "Total de venta", "Abono", "Saldo actual", "Fecha"],
-        _pagos.Filas.Select(f => new object?[] { f.IdPago, f.FolioPago, f.IdVenta, f.Cliente, f.Productos, f.Cobrador,
-            f.Movimiento, f.TotalVenta, f.MontoAbona, f.SaldoActual, FechaHora(f.FechaPago) }));
+        p.Filas.Select(f => new object?[] { f.IdPago, f.FolioPago, f.IdVenta, f.Cliente, f.Productos, f.Cobrador,
+            f.Movimiento, f.TotalVenta, f.MontoAbona, f.SaldoActual, FechaHora(f.FechaPago) }),
+        [9]); // Solo se suma el abono; sumar totales/saldos de venta por pago no tiene sentido.
 
-    private Task ExportarVentas() => _ventas is null ? Task.CompletedTask : ExportarAsync("Ventas",
-        ["Venta", "Código", "Cliente", "Producto", "Vendedor", "Total", "Enganche", "Saldo", "Estado", "Fecha"],
-        _ventas.Filas.Select(f => new object?[] { f.IdVenta, f.CodigoVenta, f.Cliente, f.Productos, f.Vendedor,
-            f.TotalFinal, f.Enganche, f.Saldo, f.Estado, FechaCorta(f.FechaCompra) }));
+    private Task ExportarVentas() => _ventas is not { } v ? Task.CompletedTask : ExportarReporteAsync(
+        "Ventas", "REPORTE DE VENTAS",
+        new()
+        {
+            ["Desde"] = Fecha(_venDesde),
+            ["Hasta"] = Fecha(_venHasta),
+            ["Vendedor"] = _vendedores.FirstOrDefault(x => x.IdVendedor == _venVendedor)?.Nombre ?? "Todos",
+            ["Zona"] = _zonas.FirstOrDefault(x => x.IdZona == _venZona)?.Descripcion ?? "Todas",
+            ["Ruta"] = _rutas.FirstOrDefault(x => x.IdRuta == _venRuta)?.Descripcion ?? "Todas",
+            ["Condición"] = _condiciones.FirstOrDefault(x => x.IdCondicion == _venCondicion)?.Descripcion ?? "Todas"
+        },
+        [
+            Kpi("Ventas", v.Total.ToString()),
+            Kpi("Monto total", v.MontoTotal.ToString("C2")),
+            Kpi("Venta promedio", v.Total > 0 ? (v.MontoTotal / v.Total).ToString("C2") : "$0.00")
+        ],
+        ["Venta", "Código", "Cliente", "Producto", "Vendedor", "Condición", "Total", "Enganche", "Saldo", "Estado", "Fecha"],
+        v.Filas.Select(f => new object?[] { f.IdVenta, f.CodigoVenta, f.Cliente, f.Productos, f.Vendedor, f.Condicion,
+            f.TotalFinal, f.Enganche, f.Saldo, f.Estado, FechaCorta(f.FechaCompra) }),
+        [7, 8, 9]);
 
-    private Task ExportarRecuperacion() => _recuperacion is null ? Task.CompletedTask : ExportarAsync("Recuperacion",
+    private Task ExportarRecuperacion() => _recuperacion is not { } r ? Task.CompletedTask : ExportarReporteAsync(
+        "Recuperacion", "REPORTE DE RECUPERACIÓN",
+        new()
+        {
+            ["Desde"] = Fecha(_recDesde),
+            ["Hasta"] = Fecha(_recHasta),
+            ["Zona"] = _zonas.FirstOrDefault(x => x.IdZona == _recZona)?.Descripcion ?? "Todas",
+            ["Ruta"] = _rutas.FirstOrDefault(x => x.IdRuta == _recRuta)?.Descripcion ?? "Todas"
+        },
+        [
+            Kpi("Cobradores", r.Filas.Count.ToString()),
+            Kpi("Pagos", r.Filas.Sum(f => f.NumeroPagos).ToString()),
+            Kpi("Monto cobrado", r.MontoTotal.ToString("C2"))
+        ],
         ["Cobrador", "Número de pagos", "Monto cobrado"],
-        _recuperacion.Filas.Select(f => new object?[] { f.Cobrador, f.NumeroPagos, f.MontoCobrado }));
+        r.Filas.Select(f => new object?[] { f.Cobrador, f.NumeroPagos, f.MontoCobrado }),
+        [3]);
 
-    private Task ExportarClientes() => _clientes is null ? Task.CompletedTask : ExportarAsync("Clientes",
+    private Task ExportarClientes() => _clientes is not { } c ? Task.CompletedTask : ExportarReporteAsync(
+        "Clientes", "REPORTE DE CLIENTES",
+        new()
+        {
+            ["Zona"] = _zonas.FirstOrDefault(x => x.IdZona == _cliZona)?.Descripcion ?? "Todas",
+            ["Ruta"] = _rutas.FirstOrDefault(x => x.IdRuta == _cliRuta)?.Descripcion ?? "Todas",
+            ["Clasificación"] = _clasificaciones.FirstOrDefault(x => x.IdClasificaionCliente == _cliClasificacion)?.Descripcion ?? "Todas",
+            ["Incluir inactivos"] = _cliIncluirInactivos ? "Sí" : "No"
+        },
+        [
+            Kpi("Clientes", c.Total.ToString()),
+            Kpi("Activos", c.Filas.Count(f => f.Activo).ToString()),
+            Kpi("Inactivos", c.Filas.Count(f => !f.Activo).ToString())
+        ],
         ["ID", "Cliente", "Ruta", "Zona", "Clasificación", "Estatus", "Alta"],
-        _clientes.Filas.Select(f => new object?[] { f.IdCliente, f.Cliente, f.Ruta, f.Zona, f.Clasificacion,
+        c.Filas.Select(f => new object?[] { f.IdCliente, f.Cliente, f.Ruta, f.Zona, f.Clasificacion,
             f.Activo ? "Activo" : "Inactivo", FechaCorta(f.FechaAlta) }));
 
-    private Task ExportarSeguimiento() => _seguimiento is null ? Task.CompletedTask : ExportarAsync("Seguimiento",
+    private Task ExportarSeguimiento() => _seguimiento is not { } s ? Task.CompletedTask : ExportarReporteAsync(
+        "Seguimiento", "REPORTE DE SEGUIMIENTO",
+        new()
+        {
+            ["Zona"] = _zonas.FirstOrDefault(x => x.IdZona == _segZona)?.Descripcion ?? "Todas",
+            ["Alta desde"] = Fecha(_segAltaDesde),
+            ["Alta hasta"] = Fecha(_segAltaHasta)
+        },
+        [
+            Kpi("Registros", s.Total.ToString()),
+            Kpi("Total pendiente", s.TotalPendienteGlobal.ToString("C2")),
+            Kpi("Total cobrado", s.Filas.Sum(f => f.TotalCobrado).ToString("C2"))
+        ],
         ["ID cliente", "Cliente", "Folio venta", "Producto", "Total venta", "Total cobrado", "Total pendiente",
-         "Fecha venta", "Último pago", "Días transcurridos", "Frecuencia", "Clasificación", "Zona", "Fecha alta"],
-        _seguimiento.Filas.Select(f => new object?[] { f.IdCliente, f.Cliente, f.FolioVenta, f.Productos,
+         "Fecha venta", "Último pago", "Días transcurridos", "Frecuencia", "Clasificación", "Ruta", "Zona", "Fecha alta"],
+        s.Filas.Select(f => new object?[] { f.IdCliente, f.Cliente, f.FolioVenta, f.Productos,
             f.TotalVenta, f.TotalCobrado, f.TotalPendiente, FechaCorta(f.FechaVenta), FechaCorta(f.FechaUltimoPago),
-            f.DiasTranscurridos, f.FrecuenciaPago, f.Clasificacion, f.Zona, FechaCorta(f.FechaAlta) }));
+            f.DiasTranscurridos, f.FrecuenciaPago, f.Clasificacion, f.Ruta, f.Zona, FechaCorta(f.FechaAlta) }),
+        [5, 6, 7]);
 
     // ===================== Helpers =====================
 

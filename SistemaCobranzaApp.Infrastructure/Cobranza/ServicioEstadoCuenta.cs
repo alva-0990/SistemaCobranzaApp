@@ -36,6 +36,21 @@ public class ServicioEstadoCuenta
                                  orderby v.FechaCompra descending
                                  select new { v, ev }).ToListAsync(ct);
 
+        // Movimientos no monetarios (bonificación por racha, pronto pago/plan, condonación, renovación):
+        // reducen el saldo sin sumar a TotalAbonado, por eso se consultan aparte para que el estado cuadre.
+        var idsVentas = ventasFilas.Select(x => x.v.IdVenta).ToList();
+        var movimientosNoMonetarios = new long?[]
+        {
+            MovimientoIds.BonificacionProntoPago, MovimientoIds.Ajuste,
+            MovimientoIds.BonificacionPromocion, MovimientoIds.LiquidacionRenovacion
+        };
+        var bonificaciones = (await _db.Pagos.AsNoTracking()
+                .Where(p => idsVentas.Contains(p.IdVenta) && movimientosNoMonetarios.Contains(p.IdMovimiento))
+                .GroupBy(p => new { p.IdVenta, p.IdMovimiento })
+                .Select(g => new { g.Key.IdVenta, g.Key.IdMovimiento, Monto = g.Sum(p => p.MontoAbona) })
+                .ToListAsync(ct))
+            .ToLookup(x => x.IdVenta, x => (x.IdMovimiento, x.Monto));
+
         var ventas = ventasFilas.Select(x =>
         {
             // El saldo autoritativo es SaldoPendiente (lo mantiene el trigger de cobranza e incluye
@@ -43,9 +58,14 @@ public class ServicioEstadoCuenta
             // y haría que ventas ya liquidadas aparezcan con saldo.
             var saldo = x.v.SaldoPendiente;
 
-            return new EstadoCuentaVentaDto(
+            return CuadreEstadoCuenta.ConMovimientos(new EstadoCuentaVentaDto(
                 x.v.IdVenta, x.v.CodigoVenta, x.v.TotalFinal, x.v.Enganche, x.v.TotalAbonado,
-                saldo, x.ev?.Descripcion, x.v.FechaCompra, x.v.FechaUltimoPago);
+                saldo, x.ev?.Descripcion, x.v.FechaCompra, x.v.FechaUltimoPago)
+            {
+                IdEstatusVenta = x.v.IdEstatusVenta,
+                Subtotal = x.v.Subtotal,
+                DescuentoGlobal = x.v.DescuentoGlobal
+            }, bonificaciones[x.v.IdVenta]);
         }).ToList();
 
         // Pagos del cliente.
@@ -67,8 +87,12 @@ public class ServicioEstadoCuenta
         var nombre = BusquedaHelper.NombreCompleto(
             clienteFila.c.Nombre, clienteFila.c.ApPaterno, clienteFila.c.ApMaterno);
 
-        return new EstadoCuentaResponse(
+        return CuadreEstadoCuenta.ConTotales(new EstadoCuentaResponse(
             clienteFila.c.IdCliente, nombre, clienteFila.r?.Descripcion, clienteFila.z?.Descripcion,
-            totalVendido, totalPagado, saldoTotal, ventas, pagos);
+            totalVendido, totalPagado, saldoTotal, ventas, pagos)
+        {
+            TotalDescuentos = ventasFilas.Sum(x => x.v.DescuentoGlobal),
+            TotalEnganches = ventasFilas.Sum(x => x.v.Enganche)
+        });
     }
 }

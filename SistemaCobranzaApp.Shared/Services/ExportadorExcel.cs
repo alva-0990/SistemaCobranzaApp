@@ -5,7 +5,7 @@ using System.Xml;
 namespace SistemaCobranzaApp.Shared.Services;
 
 /// <summary>Libro XLSX con valores de texto y numéricos, sin ejecutar fórmulas provenientes de los datos.</summary>
-public static class ExportadorExcel
+public static partial class ExportadorExcel
 {
     private const string Ns = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
     public static byte[] Crear(string[] columnas, IEnumerable<object?[]> filas, string? nombreHoja = null,

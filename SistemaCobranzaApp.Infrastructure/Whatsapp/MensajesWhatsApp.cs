@@ -74,7 +74,7 @@ public static class MensajesWhatsApp
 
         var sb = new StringBuilder();
         sb.AppendLine($"*{ticket.NombreNegocio.ToUpper()}*");
-        sb.AppendLine("*COMPROBANTE OFICIAL DE VENTA Y CRÉDITO*");
+        sb.AppendLine(ticket.EsContado ? "*COMPROBANTE OFICIAL DE VENTA DE CONTADO*" : "*COMPROBANTE OFICIAL DE VENTA Y CRÉDITO*");
         sb.AppendLine();
         sb.AppendLine($"Estimado(a) *{ticket.Cliente.NombreCompleto}*, confirmamos el registro exitoso de su compra en nuestro sistema. A continuación se detallan los datos de su nota:");
         sb.AppendLine();
@@ -92,8 +92,15 @@ public static class MensajesWhatsApp
         }
         sb.AppendLine("----------------------------------------");
         sb.AppendLine($"*TOTAL DE LA VENTA:* {total}");
-        sb.AppendLine($"*Enganche Recibido:* {enganche}");
-        sb.AppendLine($"*Monto Financiado:* {financiado}");
+        if (ticket.EsContado)
+        {
+            sb.AppendLine("*Forma de pago:* CONTADO (pagado en efectivo)");
+        }
+        else
+        {
+            sb.AppendLine($"*Enganche Recibido:* {enganche}");
+            sb.AppendLine($"*Monto Financiado:* {financiado}");
+        }
         sb.AppendLine();
 
         // PLAN DE PAGOS (Si aplica financiamiento)
@@ -110,7 +117,9 @@ public static class MensajesWhatsApp
             sb.AppendLine("----------------------------------------");
         }
 
-        sb.AppendLine("Agradecemos su preferencia y le invitamos a mantener sus compromisos de pago al corriente.");
+        sb.AppendLine(ticket.EsContado
+            ? "Agradecemos su preferencia. Su compra quedó pagada en su totalidad."
+            : "Agradecemos su preferencia y le invitamos a mantener sus compromisos de pago al corriente.");
         sb.AppendLine();
         sb.AppendLine("_Este es un mensaje automático de control emitido por el sistema de cobranza. Si desea revocar las notificaciones por este medio, responda con la palabra BAJA._");
 
