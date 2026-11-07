@@ -5,6 +5,7 @@
 
 @inject ISnackbar _snackbar
 @inject ApiCliente Api
+@inject IServicioUbicacion Ubicacion
 
 <MudDialog Class="dialogo-adaptativo">
 
@@ -1290,7 +1291,7 @@
     // PROCESAR VENTA
     // ================================================================
 
-    private void ProcesarEstructuraVenta()
+    private async Task ProcesarEstructuraVenta()
     {
         if (!_detallesCapturados.Any()) return;
         if (ModoRenovacion && (CargoRenovacion <= 0 || VentaExistente is not null))
@@ -1328,6 +1329,9 @@
             return;
         }
 
+        // Ubicación del dispositivo (best-effort): si no hay permiso/señal, queda null y la venta se registra igual.
+        var ubicacion = await Ubicacion.ObtenerActualAsync();
+
         var request = new CrearVentaRequest(
             IdCliente: Cliente.IdCliente,
             IdVendedor: _vendedorSeleccionado.IdVendedor,
@@ -1351,7 +1355,11 @@
                 .Select(d => new CrearDetalleVentaRequest(d.IdProducto, d.Cantidad, d.PrecioCobrado))
                 .ToList(),
             // Condiciones de liquidación negociadas (null cuando no se capturó ninguna).
-            PlanesPromocionales: _planesCapturados.Any() ? _planesCapturados.ToList() : null);
+            PlanesPromocionales: _planesCapturados.Any() ? _planesCapturados.ToList() : null)
+        {
+            Latitud = ubicacion?.Latitud,
+            Longitud = ubicacion?.Longitud
+        };
 
         var resultado = new ResultadoDialogoVenta(
             Request: request,

@@ -2,6 +2,7 @@
 @using SistemaCobranzaApp.Shared.Dtos
 @using SistemaCobranzaApp.Shared.Services
 @inject IFormFactor _formFactor
+@inject IServicioUbicacion _ubicacion
 
 <MudDialog>
     <TitleContent>
@@ -250,6 +251,9 @@
         if (_monto <= 0)
             return;
 
+        // Ubicación del dispositivo (best-effort): si no hay permiso/señal, queda null y el pago se registra igual.
+        var ubicacion = await _ubicacion.ObtenerActualAsync();
+
         // El diálogo solo captura la intención; la vista decide qué llamadas a la API ejecutar
         // según el modo (abono simple, liquidación por plan vía trigger, o condonación por acuerdo).
         var resultado = new ResultadoDialogoPago(
@@ -257,7 +261,11 @@
             Monto: _monto,
             IdCobrador: _idCobrador,
             Observaciones: _observaciones?.Trim(),
-            SaldoPendiente: SaldoPendiente);
+            SaldoPendiente: SaldoPendiente)
+        {
+            Latitud = ubicacion?.Latitud,
+            Longitud = ubicacion?.Longitud
+        };
 
         MudDialog.Close(DialogResult.Ok(resultado));
     }

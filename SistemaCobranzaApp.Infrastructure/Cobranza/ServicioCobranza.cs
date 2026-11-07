@@ -111,7 +111,9 @@ public class ServicioCobranza
                 IdUsuarioRegistro = req.IdUsuarioRegistro,
                 FolioPago = folio,
                 ConsecutivoPago = consecutivo,
-                FechaModificacion = ahora
+                FechaModificacion = ahora,
+                Latitud = req.Latitud,   // Geolocalización del dispositivo al registrar el cobro (puede ser null).
+                Longitud = req.Longitud
                 
                 // Nota: Las columnas 'SaldoAnterior' y 'SaldoActual' no se mapean manualmente aquí.
                 // El Trigger 'BEFORE INSERT' en PostgreSQL las interceptará, inyectará sus valores 
@@ -147,7 +149,9 @@ public class ServicioCobranza
                     IdUsuarioRegistro = req.IdUsuarioRegistro,
                     FolioPago = CalculoCobranza.FormatearFolio(MovimientoIds.Ajuste, consecutivo + 1),
                     ConsecutivoPago = consecutivo + 1,
-                    FechaModificacion = ahora
+                    FechaModificacion = ahora,
+                    Latitud = req.Latitud,   // Hereda la ubicación del abono que originó la condonación.
+                    Longitud = req.Longitud
                 });
                 await _db.SaveChangesAsync(ct);
                 await _db.Entry(venta).ReloadAsync(ct);

@@ -161,7 +161,9 @@ public class ServicioVentasAdmin
                 IdEstatusVenta = idEstatus,
                 Observaciones = string.IsNullOrWhiteSpace(req.Observaciones) ? null : req.Observaciones,
                 IdUsuarioRegistro = idUsuario, // Usuario autenticado que registra la venta (null si no viene en el token).
-                FechaModificacion = ahora
+                FechaModificacion = ahora,
+                Latitud = req.Latitud,   // Geolocalización del dispositivo al registrar la venta (puede ser null).
+                Longitud = req.Longitud
             };
 
             _db.Ventas.Add(venta);

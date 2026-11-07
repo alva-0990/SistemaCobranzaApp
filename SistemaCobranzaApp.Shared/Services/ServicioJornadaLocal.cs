@@ -127,7 +127,8 @@ public sealed class ServicioJornadaLocal : IDisposable
         return uuid;
     }
 
-    public async Task<Guid> GuardarPagoAsync(long venta, decimal monto, string? observaciones)
+    public async Task<Guid> GuardarPagoAsync(long venta, decimal monto, string? observaciones,
+        decimal? latitud = null, decimal? longitud = null)
     {
         return await RegistrarCobroAsync(venta, monto, (v, saldo, m) =>
         {
@@ -140,7 +141,7 @@ public sealed class ServicioJornadaLocal : IDisposable
                     EsPrincipal: true, Concepto: "ABONO LOCAL · PENDIENTE DE CONFIRMACIÓN",
                     SaldoResultante: saldo - m)
             };
-        });
+        }, latitud, longitud);
     }
 
     // Marca que el trigger central detecta para condonar la diferencia por plan de pronto pago.
@@ -151,7 +152,8 @@ public sealed class ServicioJornadaLocal : IDisposable
     /// con la marca "LIQUIDACION PRONTO PAGO" en las observaciones: al sincronizar, el trigger
     /// central condona la diferencia. Localmente la cuenta queda liquidada (saldo 0).
     /// </summary>
-    public async Task<Guid> GuardarLiquidacionPlanAsync(long venta, decimal montoLiquidacion, string? observaciones)
+    public async Task<Guid> GuardarLiquidacionPlanAsync(long venta, decimal montoLiquidacion, string? observaciones,
+        decimal? latitud = null, decimal? longitud = null)
     {
         return await RegistrarCobroAsync(venta, montoLiquidacion, (v, saldo, m) =>
         {
@@ -173,7 +175,7 @@ public sealed class ServicioJornadaLocal : IDisposable
                 new OperacionCobro(m, MovimientoIds.Abono, obs,
                     EsPrincipal: true, Concepto: concepto, SaldoResultante: saldoResultante)
             };
-        });
+        }, latitud, longitud);
     }
 
     /// <summary>
@@ -182,7 +184,8 @@ public sealed class ServicioJornadaLocal : IDisposable
     /// automáticas y condona el saldo restante en la misma transacción. Localmente la cuenta queda
     /// liquidada (saldo 0) y el ticket muestra el monto condonado estimado con el saldo local.
     /// </summary>
-    public async Task<Guid> GuardarLiquidacionAcuerdoAsync(long venta, decimal montoAcordado, string? observaciones)
+    public async Task<Guid> GuardarLiquidacionAcuerdoAsync(long venta, decimal montoAcordado, string? observaciones,
+        decimal? latitud = null, decimal? longitud = null)
     {
         return await RegistrarCobroAsync(venta, montoAcordado, (v, saldo, m) =>
         {
@@ -195,7 +198,7 @@ public sealed class ServicioJornadaLocal : IDisposable
                     EsPrincipal: true, Concepto: "LIQUIDACION POR ACUERDO · PENDIENTE DE CONFIRMACIÓN",
                     SaldoResultante: 0m, MontoCondonado: saldo - m)
             };
-        });
+        }, latitud, longitud);
     }
 
     /// <summary>
@@ -236,7 +239,8 @@ public sealed class ServicioJornadaLocal : IDisposable
     // de forma atómica. 'construir' recibe (venta, saldoDisponible, monto) y devuelve las
     // operaciones a guardar; la primera marcada EsPrincipal lleva el ticket imprimible.
     private async Task<Guid> RegistrarCobroAsync(long venta, decimal monto,
-        Func<VentaDto, decimal, decimal, IEnumerable<OperacionCobro>> construir)
+        Func<VentaDto, decimal, decimal, IEnumerable<OperacionCobro>> construir,
+        decimal? latitud = null, decimal? longitud = null)
     {
         await _mutex.WaitAsync();
         Guid uuidPrincipal = Guid.Empty;
@@ -263,7 +267,8 @@ public sealed class ServicioJornadaLocal : IDisposable
                     Uuid = uuid,
                     IdLocal = -(Estado.Operaciones.Count + 1L),
                     Pago = new RegistrarPagoRequest(uuid, venta, op.Monto, d.Asignacion.IdCobrador,
-                        op.IdMovimiento, _usuario, op.Observaciones, DateTimeOffset.UtcNow)
+                        op.IdMovimiento, _usuario, op.Observaciones, DateTimeOffset.UtcNow,
+                        Latitud: latitud, Longitud: longitud)
                 };
                 // Solo la operación principal lleva ticket imprimible (abono visible al cliente).
                 if (op.EsPrincipal)

@@ -290,6 +290,8 @@ public class CobranzaDbContext : DbContext
             e.Property(x => x.FechaModificacion).HasColumnName("fechamodificacion");
             e.Property(x => x.PagosConsecutivosPuntuales).HasColumnName("pagosconsecutivospuntuales");
             e.Property(x => x.VentasUnificadas).HasColumnName("ventasunificadas");
+            e.Property(x => x.Latitud).HasColumnName("latitud").HasColumnType("numeric(10,8)");
+            e.Property(x => x.Longitud).HasColumnName("longitud").HasColumnType("numeric(11,8)");
 
             // ===========================================================================
             // 🎯 RELACIONES BIDIRECCIONALES COMPLETAS (Cierran el circuito con las hijas)
@@ -413,6 +415,8 @@ public class CobranzaDbContext : DbContext
             e.Property(x => x.FolioPago).HasColumnName("foliopago");
             e.Property(x => x.ConsecutivoPago).HasColumnName("consecutivopago");
             e.Property(x => x.FechaModificacion).HasColumnName("fechamodificacion");
+            e.Property(x => x.Latitud).HasColumnName("latitud").HasColumnType("numeric(10,8)");
+            e.Property(x => x.Longitud).HasColumnName("longitud").HasColumnType("numeric(11,8)");
 
             e.HasOne(x => x.Venta)
                 .WithMany(v => v.Pagos)

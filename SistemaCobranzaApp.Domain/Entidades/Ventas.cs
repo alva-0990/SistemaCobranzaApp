@@ -43,6 +43,10 @@ public class Venta
     public long? IdUsuarioRegistro { get; set; }
     public DateTimeOffset FechaModificacion { get; set; }
 
+    // --- GEOLOCALIZACIÓN (auditoría de venta a domicilio) ---
+    public decimal? Latitud { get; set; }
+    public decimal? Longitud { get; set; }
+
     // --- PROPIEDADES DE NAVEGACIÓN ---
     public Cliente? Cliente { get; set; }
     public Vendedor? Vendedor { get; set; }

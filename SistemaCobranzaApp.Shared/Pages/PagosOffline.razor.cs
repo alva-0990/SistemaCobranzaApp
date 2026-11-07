@@ -375,11 +375,11 @@ public partial class PagosOffline : ComponentBase, IAsyncDisposable
             var uuid = i.Modo switch
             {
                 ModoPagoDialogo.LiquidacionPlan =>
-                    await Jornada.GuardarLiquidacionPlanAsync(Venta.IdVenta, i.Monto, i.Observaciones),
+                    await Jornada.GuardarLiquidacionPlanAsync(Venta.IdVenta, i.Monto, i.Observaciones, i.Latitud, i.Longitud),
                 ModoPagoDialogo.LiquidacionAcuerdo =>
-                    await Jornada.GuardarLiquidacionAcuerdoAsync(Venta.IdVenta, i.Monto, i.Observaciones),
+                    await Jornada.GuardarLiquidacionAcuerdoAsync(Venta.IdVenta, i.Monto, i.Observaciones, i.Latitud, i.Longitud),
                 _ =>
-                    await Jornada.GuardarPagoAsync(Venta.IdVenta, i.Monto, i.Observaciones)
+                    await Jornada.GuardarPagoAsync(Venta.IdVenta, i.Monto, i.Observaciones, i.Latitud, i.Longitud)
             };
             Snackbar.Add(i.Modo == ModoPagoDialogo.Abono
                 ? "Pago guardado en dispositivo."

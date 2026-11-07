@@ -66,6 +66,9 @@ public record CrearVentaRequest(
     public decimal? SaldoRenovacionEsperado { get; init; }
     public Guid? VentaUuid { get; init; }
     public DateTimeOffset? FechaCaptura { get; init; }
+    // Geolocalización del dispositivo al registrar la venta (auditoría de venta a domicilio).
+    public decimal? Latitud { get; init; }
+    public decimal? Longitud { get; init; }
 }
 
 // ---- Edición de una venta existente (sin abonos aplicados) ----

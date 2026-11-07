@@ -72,6 +72,9 @@ public static class MauiProgram
         // 3. CORREGIDO: El servicio global se registra para todas las plataformas fuera del #if anterior
         builder.Services.AddSingleton<ServicioImpresionTicket>();
 
+        // Ubicación GPS (auditoría de venta a domicilio y cobranza en campo). API multiplataforma de MAUI.
+        builder.Services.AddSingleton<IServicioUbicacion, SistemaCobranzaApp.Services.ServicioUbicacionMaui>();
+
         // 4. Inyección de HttpClient
         //
         // URL base de la API según dónde se ejecute la app:

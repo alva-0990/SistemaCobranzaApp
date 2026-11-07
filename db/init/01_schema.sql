@@ -299,6 +299,8 @@ CREATE TABLE Venta
     -- TIMESTAMPTZ conserva el instante; la zona horaria se aplica al consultar o mostrar.
     FechaModificacion          TIMESTAMPTZ    NOT NULL DEFAULT now(),
     ventauuid UUID,
+    Latitud                    NUMERIC(10, 8),        -- Geolocalización del dispositivo al registrar la venta (a domicilio)
+    Longitud                   NUMERIC(11, 8),        -- Geolocalización del dispositivo al registrar la venta (a domicilio)
     -- --- RESTRICCIONES DE LLAVES FORÁNEAS ---
     CONSTRAINT fk_usuario FOREIGN KEY (IdUsuarioRegistro) REFERENCES Usuarios (IdUsuario) ON DELETE RESTRICT,
     CONSTRAINT fk_cliente FOREIGN KEY (IdCliente) REFERENCES Clientes (IdCliente) ON DELETE RESTRICT,
@@ -390,6 +392,8 @@ CREATE TABLE Pagos
     IdUsuarioRegistro BIGINT REFERENCES Usuarios (IdUsuario) ON DELETE RESTRICT,
     FolioPago         TEXT,
     ConsecutivoPago   INTEGER,
+    Latitud             NUMERIC(10, 8),        -- Para geolocalización del cobrador en mapa
+    Longitud            NUMERIC(11, 8),        -- Para geolocalización del cobrador en mapa
     FechaModificacion TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 

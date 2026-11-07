@@ -18,6 +18,10 @@ public class Pago
     public int? ConsecutivoPago { get; set; }
     public DateTimeOffset FechaModificacion { get; set; } = DateTimeOffset.UtcNow;
 
+    // --- GEOLOCALIZACIÓN (auditoría del cobro en campo) ---
+    public decimal? Latitud { get; set; }
+    public decimal? Longitud { get; set; }
+
     // --- PROPIEDADES DE NAVEGACIÓN ---
     public Venta? Venta { get; set; }
     public Cliente? Cliente { get; set; }

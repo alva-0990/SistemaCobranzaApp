@@ -12,7 +12,11 @@ public record RegistrarPagoRequest(
     long? IdMovimiento,
     long IdUsuarioRegistro,
     string? Observaciones,
-    DateTimeOffset? FechaPago);
+    DateTimeOffset? FechaPago,
+    // Geolocalización del dispositivo al registrar el cobro (auditoría de cobranza en campo).
+    // Opcionales al final para no romper los call-sites existentes.
+    decimal? Latitud = null,
+    decimal? Longitud = null);
 
 public record RegistrarPagoResponse(
     long IdPago,

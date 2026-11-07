@@ -494,7 +494,8 @@ public partial class Pagos : ComponentBase, IAsyncDisposable
                 // Abono normal: el trigger aplica cascada y promociones (racha).
                 var req = new RegistrarPagoRequest(
                     Guid.NewGuid(), Venta.IdVenta, i.Monto, i.IdCobrador,
-                    MovimientoAbono, idUsuario, i.Observaciones, DateTimeOffset.UtcNow);
+                    MovimientoAbono, idUsuario, i.Observaciones, DateTimeOffset.UtcNow,
+                    Latitud: i.Latitud, Longitud: i.Longitud);
                 await EnviarPagoAsync(req);
                 break;
             }
@@ -507,7 +508,8 @@ public partial class Pagos : ComponentBase, IAsyncDisposable
                     : $"{MarcaProntoPago} — {i.Observaciones}";
                 var req = new RegistrarPagoRequest(
                     Guid.NewGuid(), Venta.IdVenta, i.Monto, i.IdCobrador,
-                    MovimientoAbono, idUsuario, obs, DateTimeOffset.UtcNow);
+                    MovimientoAbono, idUsuario, obs, DateTimeOffset.UtcNow,
+                    Latitud: i.Latitud, Longitud: i.Longitud);
                 await EnviarPagoAsync(req);
                 break;
             }
@@ -521,7 +523,8 @@ public partial class Pagos : ComponentBase, IAsyncDisposable
                     Guid.NewGuid(), Venta.IdVenta, i.Monto, i.IdCobrador,
                     MovimientoAbono, idUsuario,
                     MarcasPago.ConMarca(MarcasPago.LiquidacionAcuerdo, i.Observaciones),
-                    DateTimeOffset.UtcNow);
+                    DateTimeOffset.UtcNow,
+                    Latitud: i.Latitud, Longitud: i.Longitud);
                 var (respAbono, errorAbono) = await Api.RegistrarPagoAdminAsync(abono);
                 if (errorAbono is not null)
                 {

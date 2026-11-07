@@ -28,4 +28,9 @@ public record ResultadoDialogoPago(
     decimal Monto,
     long? IdCobrador,
     string? Observaciones,
-    decimal SaldoPendiente);
+    decimal SaldoPendiente)
+{
+    // Geolocalización del dispositivo capturada al confirmar el pago (best-effort; puede ser null).
+    public decimal? Latitud { get; init; }
+    public decimal? Longitud { get; init; }
+}
