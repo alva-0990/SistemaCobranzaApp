@@ -5,6 +5,9 @@
 @using SistemaCobranzaApp.Shared.Dtos
 @using SistemaCobranzaApp.Shared.Services
 @inject ApiCliente Api
+@inject IDescargaArchivo Descarga
+@inject EstadoEmpresaGlobal EmpresaGlobal
+@inject IFormFactor _formFactor
 @inject IDialogService _dialogo
 @inject ISnackbar _snackbar
 
@@ -140,31 +143,36 @@
                     }
                     else
                     {
-                        <MudTable Items="_gastos" Hover="true" Dense="true" Bordered="true" Striped="true"
-                                  SortLabel="Ordenar" FixedHeader="true" Height="520px">
+                        <MudTextField T="string" @bind-Value="_busquedaGastos" Immediate="true"
+                                      Placeholder="Buscar por folio, categoría, concepto, clasificación o estatus…"
+                                      Variant="Variant.Outlined" Margin="Margin.Dense" Adornment="Adornment.Start"
+                                      AdornmentIcon="@Icons.Material.Filled.Search" Clearable="true" Class="mb-3" />
+                        <MudTable Items="_gastos" Hover="true" Dense="true" Breakpoint="Breakpoint.Sm"
+                                  Elevation="0" RowsPerPage="20" T="GastoDto" Class="tabla-seguimiento"
+                                  Filter="new Func<GastoDto, bool>(FiltrarGastos)">
                             <HeaderContent>
-                                <MudTh>Folio</MudTh>
-                                <MudTh>Fecha</MudTh>
-                                <MudTh>Categoría</MudTh>
-                                <MudTh>Concepto</MudTh>
-                                <MudTh Style="text-align:right">Importe</MudTh>
-                                <MudTh Style="text-align:right">Pagado</MudTh>
-                                <MudTh Style="text-align:right">Saldo</MudTh>
+                                <MudTh><MudTableSortLabel SortBy="new Func<GastoDto, object>(x => x.FolioGasto ?? string.Empty)">Folio</MudTableSortLabel></MudTh>
+                                <MudTh><MudTableSortLabel InitialDirection="SortDirection.Descending" SortBy="new Func<GastoDto, object>(x => x.FechaGasto)">Fecha</MudTableSortLabel></MudTh>
+                                <MudTh><MudTableSortLabel SortBy="new Func<GastoDto, object>(x => x.NombreCategoria ?? string.Empty)">Categoría</MudTableSortLabel></MudTh>
+                                <MudTh><MudTableSortLabel SortBy="new Func<GastoDto, object>(x => x.Concepto ?? string.Empty)">Concepto</MudTableSortLabel></MudTh>
+                                <MudTh Style="text-align:right;"><MudTableSortLabel SortBy="new Func<GastoDto, object>(x => x.Importe)">Importe</MudTableSortLabel></MudTh>
+                                <MudTh Style="text-align:right;"><MudTableSortLabel SortBy="new Func<GastoDto, object>(x => x.TotalPagado)">Pagado</MudTableSortLabel></MudTh>
+                                <MudTh Style="text-align:right;"><MudTableSortLabel SortBy="new Func<GastoDto, object>(x => x.SaldoPendiente)">Saldo</MudTableSortLabel></MudTh>
                                 <MudTh>Clasificación</MudTh>
-                                <MudTh>Cuenta prevista</MudTh>
-                                <MudTh>Estatus</MudTh>
+                                <MudTh><MudTableSortLabel SortBy="new Func<GastoDto, object>(x => x.NombreCuentaPrevista ?? string.Empty)">Cuenta prevista</MudTableSortLabel></MudTh>
+                                <MudTh><MudTableSortLabel SortBy="new Func<GastoDto, object>(x => x.Estatus ?? string.Empty)">Estatus</MudTableSortLabel></MudTh>
                                 <MudTh>Acciones</MudTh>
                             </HeaderContent>
                             <RowTemplate>
-                                <MudTd DataLabel="Folio">@context.FolioGasto</MudTd>
+                                <MudTd DataLabel="Folio"><b>@Mostrar(context.FolioGasto)</b></MudTd>
                                 <MudTd DataLabel="Fecha">@context.FechaGasto.EnZonaProyecto().DateTime.ToString("dd/MM/yyyy")</MudTd>
-                                <MudTd DataLabel="Categoría">@context.NombreCategoria</MudTd>
-                                <MudTd DataLabel="Concepto">@context.Concepto</MudTd>
-                                <MudTd DataLabel="Importe" Style="text-align:right">@context.Importe.ToString("C2")</MudTd>
-                                <MudTd DataLabel="Pagado" Style="text-align:right">@context.TotalPagado.ToString("C2")</MudTd>
-                                <MudTd DataLabel="Saldo" Style="text-align:right">@context.SaldoPendiente.ToString("C2")</MudTd>
+                                <MudTd DataLabel="Categoría">@Mostrar(context.NombreCategoria)</MudTd>
+                                <MudTd DataLabel="Concepto">@Mostrar(context.Concepto)</MudTd>
+                                <MudTd DataLabel="Importe" Style="text-align:right;">@context.Importe.ToString("C2")</MudTd>
+                                <MudTd DataLabel="Pagado" Style="text-align:right;">@context.TotalPagado.ToString("C2")</MudTd>
+                                <MudTd DataLabel="Saldo" Style="text-align:right;"><b class="saldo-pendiente">@context.SaldoPendiente.ToString("C2")</b></MudTd>
                                 <MudTd DataLabel="Clasificación">@Clasificacion(context)</MudTd>
-                                <MudTd DataLabel="Cuenta prevista">@(context.NombreCuentaPrevista ?? "—")</MudTd>
+                                <MudTd DataLabel="Cuenta prevista">@Mostrar(context.NombreCuentaPrevista)</MudTd>
                                 <MudTd DataLabel="Estatus">
                                     <MudChip T="string" Size="Size.Small" Color="@ColorEstatus(context.Estatus)" Variant="Variant.Text">
                                         @context.Estatus
@@ -185,6 +193,10 @@
                                                    OnClick="@(() => CancelarGasto(context))" />
                                 </MudTd>
                             </RowTemplate>
+                            <NoRecordsContent>@SinDatosFragment</NoRecordsContent>
+                            <PagerContent>
+                                <MudTablePager InfoFormat="{first_item}-{last_item} de {all_items}" RowsPerPageString="Filas:" />
+                            </PagerContent>
                         </MudTable>
                         <MudText Typo="Typo.body2" Class="mt-2">
                             <b>Total:</b> @_gastos.Sum(x => x.Importe).ToString("C2") &nbsp;•&nbsp;
@@ -225,22 +237,28 @@
             }
             else
             {
-                <MudTable Items="_cuentas" Hover="true" Dense="true" Bordered="true" Striped="true">
+                <MudTextField T="string" @bind-Value="_busquedaCuentas" Immediate="true"
+                              Placeholder="Buscar por nombre, tipo o moneda…"
+                              Variant="Variant.Outlined" Margin="Margin.Dense" Adornment="Adornment.Start"
+                              AdornmentIcon="@Icons.Material.Filled.Search" Clearable="true" Class="mb-3" />
+                <MudTable Items="_cuentas" Hover="true" Dense="true" Breakpoint="Breakpoint.Sm"
+                          Elevation="0" RowsPerPage="20" T="CuentaGastoDto" Class="tabla-seguimiento"
+                          Filter="new Func<CuentaGastoDto, bool>(FiltrarCuentas)">
                     <HeaderContent>
-                        <MudTh>Nombre</MudTh>
-                        <MudTh>Tipo</MudTh>
-                        <MudTh>Moneda</MudTh>
-                        <MudTh Style="text-align:right">Saldo inicial</MudTh>
-                        <MudTh Style="text-align:right">Saldo actual</MudTh>
-                        <MudTh>Estatus</MudTh>
+                        <MudTh><MudTableSortLabel SortBy="new Func<CuentaGastoDto, object>(x => x.Nombre ?? string.Empty)">Nombre</MudTableSortLabel></MudTh>
+                        <MudTh><MudTableSortLabel SortBy="new Func<CuentaGastoDto, object>(x => x.TipoCuenta ?? string.Empty)">Tipo</MudTableSortLabel></MudTh>
+                        <MudTh><MudTableSortLabel SortBy="new Func<CuentaGastoDto, object>(x => x.Moneda ?? string.Empty)">Moneda</MudTableSortLabel></MudTh>
+                        <MudTh Style="text-align:right;"><MudTableSortLabel SortBy="new Func<CuentaGastoDto, object>(x => x.SaldoInicial)">Saldo inicial</MudTableSortLabel></MudTh>
+                        <MudTh Style="text-align:right;"><MudTableSortLabel SortBy="new Func<CuentaGastoDto, object>(x => x.SaldoActual)">Saldo actual</MudTableSortLabel></MudTh>
+                        <MudTh><MudTableSortLabel SortBy="new Func<CuentaGastoDto, object>(x => x.Activo)">Estatus</MudTableSortLabel></MudTh>
                         <MudTh>Acciones</MudTh>
                     </HeaderContent>
                     <RowTemplate>
-                        <MudTd DataLabel="Nombre">@context.Nombre</MudTd>
-                        <MudTd DataLabel="Tipo">@context.TipoCuenta</MudTd>
-                        <MudTd DataLabel="Moneda">@context.Moneda</MudTd>
-                        <MudTd DataLabel="Saldo inicial" Style="text-align:right">@context.SaldoInicial.ToString("C2")</MudTd>
-                        <MudTd DataLabel="Saldo actual" Style="text-align:right">@context.SaldoActual.ToString("C2")</MudTd>
+                        <MudTd DataLabel="Nombre"><b>@Mostrar(context.Nombre)</b></MudTd>
+                        <MudTd DataLabel="Tipo">@Mostrar(context.TipoCuenta)</MudTd>
+                        <MudTd DataLabel="Moneda">@Mostrar(context.Moneda)</MudTd>
+                        <MudTd DataLabel="Saldo inicial" Style="text-align:right;">@context.SaldoInicial.ToString("C2")</MudTd>
+                        <MudTd DataLabel="Saldo actual" Style="text-align:right;"><b class="saldo-pendiente">@context.SaldoActual.ToString("C2")</b></MudTd>
                         <MudTd DataLabel="Estatus">
                             <MudChip T="string" Size="Size.Small" Color="@(context.Activo ? Color.Success : Color.Default)" Variant="Variant.Text">
                                 @(context.Activo ? "Activa" : "Inactiva")
@@ -258,6 +276,10 @@
                                            title="Activar/Desactivar" OnClick="@(() => CambiarEstatusCuenta(context))" />
                         </MudTd>
                     </RowTemplate>
+                    <NoRecordsContent>@SinDatosFragment</NoRecordsContent>
+                    <PagerContent>
+                        <MudTablePager InfoFormat="{first_item}-{last_item} de {all_items}" RowsPerPageString="Filas:" />
+                    </PagerContent>
                 </MudTable>
             }
 
@@ -267,7 +289,8 @@
                     <MudText Typo="Typo.subtitle1" Class="mb-2">
                         <b>Movimientos de @_cuentaMovimientos.Nombre</b>
                     </MudText>
-                    <MudTable Items="_movimientos" Dense="true" Bordered="true" Striped="true" Height="320px" FixedHeader="true">
+                    <MudTable Items="_movimientos" Hover="true" Dense="true" Breakpoint="Breakpoint.Sm"
+                              Elevation="0" RowsPerPage="20" Class="tabla-seguimiento">
                         <HeaderContent>
                             <MudTh>Fecha</MudTh>
                             <MudTh>Tipo</MudTh>
@@ -275,15 +298,18 @@
                             <MudTh Style="text-align:right">Importe</MudTh>
                         </HeaderContent>
                         <RowTemplate>
-                            <MudTd>@context.FechaMovimiento.EnZonaProyecto().DateTime.ToString("dd/MM/yyyy HH:mm")</MudTd>
-                            <MudTd>
+                            <MudTd DataLabel="Fecha">@context.FechaMovimiento.EnZonaProyecto().DateTime.ToString("dd/MM/yyyy HH:mm")</MudTd>
+                            <MudTd DataLabel="Tipo">
                                 <MudChip T="string" Size="Size.Small"
                                          Color="@(context.TipoMovimiento == "ENTRADA" ? Color.Success : Color.Error)"
                                          Variant="Variant.Text">@context.TipoMovimiento</MudChip>
                             </MudTd>
-                            <MudTd>@context.Concepto</MudTd>
-                            <MudTd Style="text-align:right">@context.Importe.ToString("C2")</MudTd>
+                            <MudTd DataLabel="Concepto">@context.Concepto</MudTd>
+                            <MudTd DataLabel="Importe" Style="text-align:right">@context.Importe.ToString("C2")</MudTd>
                         </RowTemplate>
+                        <PagerContent>
+                            <MudTablePager InfoFormat="{first_item}-{last_item} de {all_items}" RowsPerPageString="Filas:" />
+                        </PagerContent>
                     </MudTable>
                 </MudPaper>
             }
@@ -321,17 +347,23 @@
             }
             else
             {
-                <MudTable Items="_categorias" Hover="true" Dense="true" Bordered="true" Striped="true">
+                <MudTextField T="string" @bind-Value="_busquedaCategorias" Immediate="true"
+                              Placeholder="Buscar por nombre o descripción…"
+                              Variant="Variant.Outlined" Margin="Margin.Dense" Adornment="Adornment.Start"
+                              AdornmentIcon="@Icons.Material.Filled.Search" Clearable="true" Class="mb-3" />
+                <MudTable Items="_categorias" Hover="true" Dense="true" Breakpoint="Breakpoint.Sm"
+                          Elevation="0" RowsPerPage="20" T="CatalogoCategoriaGastoDto" Class="tabla-seguimiento"
+                          Filter="new Func<CatalogoCategoriaGastoDto, bool>(FiltrarCategorias)">
                     <HeaderContent>
-                        <MudTh>Nombre</MudTh>
-                        <MudTh>Descripción</MudTh>
-                        <MudTh>¿Comprobante?</MudTh>
-                        <MudTh>Estatus</MudTh>
+                        <MudTh><MudTableSortLabel SortBy="new Func<CatalogoCategoriaGastoDto, object>(x => x.Nombre ?? string.Empty)">Nombre</MudTableSortLabel></MudTh>
+                        <MudTh><MudTableSortLabel SortBy="new Func<CatalogoCategoriaGastoDto, object>(x => x.Descripcion ?? string.Empty)">Descripción</MudTableSortLabel></MudTh>
+                        <MudTh><MudTableSortLabel SortBy="new Func<CatalogoCategoriaGastoDto, object>(x => x.RequiereComprobante)">¿Comprobante?</MudTableSortLabel></MudTh>
+                        <MudTh><MudTableSortLabel SortBy="new Func<CatalogoCategoriaGastoDto, object>(x => x.Activo)">Estatus</MudTableSortLabel></MudTh>
                         <MudTh>Acciones</MudTh>
                     </HeaderContent>
                     <RowTemplate>
-                        <MudTd DataLabel="Nombre">@context.Nombre</MudTd>
-                        <MudTd DataLabel="Descripción">@context.Descripcion</MudTd>
+                        <MudTd DataLabel="Nombre"><b>@Mostrar(context.Nombre)</b></MudTd>
+                        <MudTd DataLabel="Descripción">@Mostrar(context.Descripcion)</MudTd>
                         <MudTd DataLabel="¿Comprobante?">@(context.RequiereComprobante ? "Sí" : "No")</MudTd>
                         <MudTd DataLabel="Estatus">
                             <MudChip T="string" Size="Size.Small" Color="@(context.Activo ? Color.Success : Color.Default)" Variant="Variant.Text">
@@ -346,6 +378,10 @@
                                            title="Activar/Desactivar" OnClick="@(() => CambiarEstatusCategoria(context))" />
                         </MudTd>
                     </RowTemplate>
+                    <NoRecordsContent>@SinDatosFragment</NoRecordsContent>
+                    <PagerContent>
+                        <MudTablePager InfoFormat="{first_item}-{last_item} de {all_items}" RowsPerPageString="Filas:" />
+                    </PagerContent>
                 </MudTable>
             }
         </MudPaper>
@@ -379,9 +415,61 @@
                     <MudSelectItem T="string" Value="@("vendedor")">Por vendedor</MudSelectItem>
                     <MudSelectItem T="string" Value="@("estatus")">Por estatus</MudSelectItem>
                 </MudSelect>
+
+                <AutocompletarCatalogo TItem="CatalogoCategoriaGastoDto" Label="Categoría" Class="f-item"
+                                       Placeholder="Todas las categorías..."
+                                       @bind-Value="_repCategoria"
+                                       Items="_categoriasActivas"
+                                       ObtenerId="@(c => c.IdCategoriaGasto)"
+                                       ObtenerTexto="@(c => c.Nombre)" />
+
+                <MudSelect T="string" @bind-Value="_repEstatus" Label="Estatus"
+                           Variant="Variant.Outlined" Clearable="true" Class="f-item">
+                    @foreach (var est in _estatusGasto)
+                    {
+                        <MudSelectItem T="string" Value="@est">@est</MudSelectItem>
+                    }
+                </MudSelect>
+
+                <AutocompletarCatalogo TItem="ZonaDto" Label="Zona" Class="f-item"
+                                       Placeholder="Todas las zonas..."
+                                       @bind-Value="_repZona"
+                                       Items="_zonas"
+                                       Disabled="_repSoloCentrales"
+                                       ObtenerId="@(z => z.IdZona)"
+                                       ObtenerTexto="@(z => z.Descripcion)" />
+
+                <AutocompletarCatalogo TItem="CobradorDto" Label="Cobrador" Class="f-item"
+                                       Placeholder="Todos los cobradores..."
+                                       @bind-Value="_repCobrador"
+                                       Items="_cobradores"
+                                       Disabled="_repSoloCentrales"
+                                       ObtenerId="@(p => p.IdCobrador)"
+                                       ObtenerTexto="@(p => p.Nombre)" />
+
+                <AutocompletarCatalogo TItem="VendedorDto" Label="Vendedor" Class="f-item"
+                                       Placeholder="Todos los vendedores..."
+                                       @bind-Value="_repVendedor"
+                                       Items="_vendedores"
+                                       Disabled="_repSoloCentrales"
+                                       ObtenerId="@(p => p.IdVendedor)"
+                                       ObtenerTexto="@(p => p.Nombre)" />
+
+                <MudCheckBox T="bool" @bind-Value="_repSoloCentrales" Label="Solo gastos centrales"
+                             Dense="true" Class="f-item" />
+
                 <MudButton Variant="Variant.Filled" Color="Color.Primary"
                            StartIcon="@Icons.Material.Filled.PlayArrow" OnClick="GenerarReporte" Class="f-item">
                     Generar
+                </MudButton>
+            </div>
+
+            <div class="contenedor-exportar mb-3">
+                <MudButton Variant="Variant.Outlined" Color="Color.Success" StartIcon="@Icons.Material.Filled.FileDownload"
+                           OnClick="ExportarReporte"
+                           Class="boton-exportar"
+                           Disabled="@(_cargandoReporte || _exportando || !HayDatosReporte())">
+                    Exportar a Excel
                 </MudButton>
             </div>
 
@@ -391,27 +479,45 @@
             }
             else if (_repAgrupacion == "detalle" && _repDetalle is not null)
             {
-                <MudTable Items="_repDetalle.Filas" Dense="true" Bordered="true" Striped="true" Height="500px" FixedHeader="true">
+                <MudTextField T="string" @bind-Value="_repBusquedaDetalle" Immediate="true"
+                              Placeholder="Buscar por folio, categoría, concepto, proveedor, estatus, zona, cobrador o vendedor…"
+                              Variant="Variant.Outlined" Margin="Margin.Dense" Adornment="Adornment.Start"
+                              AdornmentIcon="@Icons.Material.Filled.Search" Clearable="true" Class="mb-3" />
+                <MudTable Items="_repDetalle.Filas" Hover="true" Dense="true" Breakpoint="Breakpoint.Sm"
+                          Elevation="0" RowsPerPage="20" T="ReporteGastoFila" Class="tabla-seguimiento"
+                          Filter="new Func<ReporteGastoFila, bool>(FiltrarDetalle)">
                     <HeaderContent>
-                        <MudTh>Folio</MudTh>
-                        <MudTh>Fecha</MudTh>
-                        <MudTh>Categoría</MudTh>
-                        <MudTh>Concepto</MudTh>
-                        <MudTh Style="text-align:right">Importe</MudTh>
-                        <MudTh Style="text-align:right">Pagado</MudTh>
-                        <MudTh Style="text-align:right">Saldo</MudTh>
-                        <MudTh>Estatus</MudTh>
+                        <MudTh><MudTableSortLabel SortBy="new Func<ReporteGastoFila, object>(x => x.FolioGasto ?? string.Empty)">Folio</MudTableSortLabel></MudTh>
+                        <MudTh><MudTableSortLabel InitialDirection="SortDirection.Descending" SortBy="new Func<ReporteGastoFila, object>(x => x.FechaGasto)">Fecha</MudTableSortLabel></MudTh>
+                        <MudTh><MudTableSortLabel SortBy="new Func<ReporteGastoFila, object>(x => x.Categoria ?? string.Empty)">Categoría</MudTableSortLabel></MudTh>
+                        <MudTh><MudTableSortLabel SortBy="new Func<ReporteGastoFila, object>(x => x.Concepto ?? string.Empty)">Concepto</MudTableSortLabel></MudTh>
+                        <MudTh><MudTableSortLabel SortBy="new Func<ReporteGastoFila, object>(x => x.Proveedor ?? string.Empty)">Proveedor</MudTableSortLabel></MudTh>
+                        <MudTh Style="text-align:right;"><MudTableSortLabel SortBy="new Func<ReporteGastoFila, object>(x => x.Importe)">Importe</MudTableSortLabel></MudTh>
+                        <MudTh Style="text-align:right;"><MudTableSortLabel SortBy="new Func<ReporteGastoFila, object>(x => x.TotalPagado)">Pagado</MudTableSortLabel></MudTh>
+                        <MudTh Style="text-align:right;"><MudTableSortLabel SortBy="new Func<ReporteGastoFila, object>(x => x.SaldoPendiente)">Saldo</MudTableSortLabel></MudTh>
+                        <MudTh><MudTableSortLabel SortBy="new Func<ReporteGastoFila, object>(x => x.Estatus ?? string.Empty)">Estatus</MudTableSortLabel></MudTh>
+                        <MudTh><MudTableSortLabel SortBy="new Func<ReporteGastoFila, object>(x => x.Zona ?? string.Empty)">Zona</MudTableSortLabel></MudTh>
+                        <MudTh><MudTableSortLabel SortBy="new Func<ReporteGastoFila, object>(x => x.Cobrador ?? string.Empty)">Cobrador</MudTableSortLabel></MudTh>
+                        <MudTh><MudTableSortLabel SortBy="new Func<ReporteGastoFila, object>(x => x.Vendedor ?? string.Empty)">Vendedor</MudTableSortLabel></MudTh>
                     </HeaderContent>
                     <RowTemplate>
-                        <MudTd>@context.FolioGasto</MudTd>
-                        <MudTd>@context.FechaGasto.EnZonaProyecto().DateTime.ToString("dd/MM/yyyy")</MudTd>
-                        <MudTd>@context.Categoria</MudTd>
-                        <MudTd>@context.Concepto</MudTd>
-                        <MudTd Style="text-align:right">@context.Importe.ToString("C2")</MudTd>
-                        <MudTd Style="text-align:right">@context.TotalPagado.ToString("C2")</MudTd>
-                        <MudTd Style="text-align:right">@context.SaldoPendiente.ToString("C2")</MudTd>
-                        <MudTd>@context.Estatus</MudTd>
+                        <MudTd DataLabel="Folio"><b>@Mostrar(context.FolioGasto)</b></MudTd>
+                        <MudTd DataLabel="Fecha">@context.FechaGasto.EnZonaProyecto().DateTime.ToString("dd/MM/yyyy")</MudTd>
+                        <MudTd DataLabel="Categoría">@Mostrar(context.Categoria)</MudTd>
+                        <MudTd DataLabel="Concepto">@Mostrar(context.Concepto)</MudTd>
+                        <MudTd DataLabel="Proveedor">@Mostrar(context.Proveedor)</MudTd>
+                        <MudTd DataLabel="Importe" Style="text-align:right;">@context.Importe.ToString("C2")</MudTd>
+                        <MudTd DataLabel="Pagado" Style="text-align:right;">@context.TotalPagado.ToString("C2")</MudTd>
+                        <MudTd DataLabel="Saldo" Style="text-align:right;"><b class="saldo-pendiente">@context.SaldoPendiente.ToString("C2")</b></MudTd>
+                        <MudTd DataLabel="Estatus">@Mostrar(context.Estatus)</MudTd>
+                        <MudTd DataLabel="Zona">@Mostrar(context.Zona)</MudTd>
+                        <MudTd DataLabel="Cobrador">@Mostrar(context.Cobrador)</MudTd>
+                        <MudTd DataLabel="Vendedor">@Mostrar(context.Vendedor)</MudTd>
                     </RowTemplate>
+                    <NoRecordsContent>@SinDatosFragment</NoRecordsContent>
+                    <PagerContent>
+                        <MudTablePager InfoFormat="{first_item}-{last_item} de {all_items}" RowsPerPageString="Filas:" />
+                    </PagerContent>
                 </MudTable>
                 <MudText Typo="Typo.body2" Class="mt-2">
                     <b>Total:</b> @_repDetalle.ImporteTotal.ToString("C2") &nbsp;•&nbsp;
@@ -421,21 +527,31 @@
             }
             else if (_repAgrupado is not null)
             {
-                <MudTable Items="_repAgrupado.Filas" Dense="true" Bordered="true" Striped="true" Height="500px" FixedHeader="true">
+                <MudTextField T="string" @bind-Value="_repBusquedaAgrupado" Immediate="true"
+                              Placeholder="Buscar por grupo…" Variant="Variant.Outlined" Margin="Margin.Dense"
+                              Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
+                              Clearable="true" Class="mb-3" />
+                <MudTable Items="_repAgrupado.Filas" Hover="true" Dense="true" Breakpoint="Breakpoint.Sm"
+                          Elevation="0" RowsPerPage="20" T="ReporteGastosAgrupadoFila" Class="tabla-seguimiento"
+                          Filter="new Func<ReporteGastosAgrupadoFila, bool>(FiltrarAgrupado)">
                     <HeaderContent>
-                        <MudTh>Grupo</MudTh>
-                        <MudTh Style="text-align:right"># Gastos</MudTh>
-                        <MudTh Style="text-align:right">Importe</MudTh>
-                        <MudTh Style="text-align:right">Pagado</MudTh>
-                        <MudTh Style="text-align:right">Saldo</MudTh>
+                        <MudTh><MudTableSortLabel SortBy="new Func<ReporteGastosAgrupadoFila, object>(x => x.Etiqueta ?? string.Empty)">@EtiquetaAgrupacion()</MudTableSortLabel></MudTh>
+                        <MudTh Style="text-align:right;"><MudTableSortLabel SortBy="new Func<ReporteGastosAgrupadoFila, object>(x => x.NumeroGastos)">N° gastos</MudTableSortLabel></MudTh>
+                        <MudTh Style="text-align:right;"><MudTableSortLabel InitialDirection="SortDirection.Descending" SortBy="new Func<ReporteGastosAgrupadoFila, object>(x => x.Importe)">Importe</MudTableSortLabel></MudTh>
+                        <MudTh Style="text-align:right;"><MudTableSortLabel SortBy="new Func<ReporteGastosAgrupadoFila, object>(x => x.TotalPagado)">Pagado</MudTableSortLabel></MudTh>
+                        <MudTh Style="text-align:right;"><MudTableSortLabel SortBy="new Func<ReporteGastosAgrupadoFila, object>(x => x.SaldoPendiente)">Saldo</MudTableSortLabel></MudTh>
                     </HeaderContent>
                     <RowTemplate>
-                        <MudTd>@context.Etiqueta</MudTd>
-                        <MudTd Style="text-align:right">@context.NumeroGastos</MudTd>
-                        <MudTd Style="text-align:right">@context.Importe.ToString("C2")</MudTd>
-                        <MudTd Style="text-align:right">@context.TotalPagado.ToString("C2")</MudTd>
-                        <MudTd Style="text-align:right">@context.SaldoPendiente.ToString("C2")</MudTd>
+                        <MudTd DataLabel="@EtiquetaAgrupacion()"><b>@Mostrar(context.Etiqueta)</b></MudTd>
+                        <MudTd DataLabel="N° gastos" Style="text-align:right;">@context.NumeroGastos</MudTd>
+                        <MudTd DataLabel="Importe" Style="text-align:right;">@context.Importe.ToString("C2")</MudTd>
+                        <MudTd DataLabel="Pagado" Style="text-align:right;">@context.TotalPagado.ToString("C2")</MudTd>
+                        <MudTd DataLabel="Saldo" Style="text-align:right;"><b class="saldo-pendiente">@context.SaldoPendiente.ToString("C2")</b></MudTd>
                     </RowTemplate>
+                    <NoRecordsContent>@SinDatosFragment</NoRecordsContent>
+                    <PagerContent>
+                        <MudTablePager InfoFormat="{first_item}-{last_item} de {all_items}" RowsPerPageString="Filas:" />
+                    </PagerContent>
                 </MudTable>
                 <MudText Typo="Typo.body2" Class="mt-2">
                     <b>Total:</b> @_repAgrupado.ImporteTotal.ToString("C2") &nbsp;•&nbsp;
@@ -463,6 +579,7 @@
     private List<GastoDto> _gastos = new();
     private bool _cargandoGastos;
     private bool _guardandoGasto;
+    private string? _busquedaGastos;
     private string? _fFolio;
     private string? _fEstatus;
     private long? _fZona;
@@ -483,6 +600,7 @@
     // ---- Cuentas ----
     private List<CuentaGastoDto> _cuentas = new();
     private bool _cargandoCuentas;
+    private string? _busquedaCuentas;
     private CuentaGastoDto? _cuentaMovimientos;
     private List<MovimientoCuentaGastoDto> _movimientos = new();
 
@@ -490,12 +608,22 @@
     private List<CatalogoCategoriaGastoDto> _categorias = new();
     private bool _cargandoCategorias;
     private bool _incluirCategoriasInactivas;
+    private string? _busquedaCategorias;
 
     // ---- Reportes ----
     private DateTime? _repDesde = FechaProyecto.Hoy.AddMonths(-1);
     private DateTime? _repHasta = FechaProyecto.Hoy;
     private string _repAgrupacion = "detalle";
+    private long? _repCategoria;
+    private string? _repEstatus;
+    private long? _repZona;
+    private long? _repCobrador;
+    private long? _repVendedor;
+    private bool _repSoloCentrales;
     private bool _cargandoReporte;
+    private bool _exportando;
+    private string? _repBusquedaDetalle;
+    private string? _repBusquedaAgrupado;
     private ReporteGastosResponse? _repDetalle;
     private ReporteGastosAgrupadoResponse? _repAgrupado;
 
@@ -635,7 +763,7 @@
                 { x => x.SaldoPendiente, g.SaldoPendiente },
                 { x => x.Cuentas, activas }
             },
-            new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+            new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true, FullScreen = EsEntornoMovil });
         var r = await dialogo.Result;
         if (r is not { Canceled: false, Data: DialogoPagoGasto.Resultado d }) return;
 
@@ -688,7 +816,7 @@
     {
         var dialogo = await _dialogo.ShowAsync<DialogoCuentaGasto>("Nueva cuenta",
             new DialogParameters<DialogoCuentaGasto> { { x => x.EsEdicion, false } },
-            new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+            new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true, FullScreen = EsEntornoMovil });
         var r = await dialogo.Result;
         if (r is not { Canceled: false, Data: DialogoCuentaGasto.Resultado d }) return;
 
@@ -711,7 +839,7 @@
                 { x => x.Observaciones, c.Observaciones },
                 { x => x.Activo, c.Activo }
             },
-            new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+            new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true, FullScreen = EsEntornoMovil });
         var r = await dialogo.Result;
         if (r is not { Canceled: false, Data: DialogoCuentaGasto.Resultado d }) return;
 
@@ -776,7 +904,7 @@
     {
         var dialogo = await _dialogo.ShowAsync<DialogoCategoriaGasto>("Nueva categoría",
             new DialogParameters<DialogoCategoriaGasto> { { x => x.EsEdicion, false } },
-            new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+            new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true, FullScreen = EsEntornoMovil });
         var r = await dialogo.Result;
         if (r is not { Canceled: false, Data: DialogoCategoriaGasto.Resultado d }) return;
 
@@ -799,7 +927,7 @@
                 { x => x.RequiereComprobante, cat.RequiereComprobante },
                 { x => x.Activo, cat.Activo }
             },
-            new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+            new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true, FullScreen = EsEntornoMovil });
         var r = await dialogo.Result;
         if (r is not { Canceled: false, Data: DialogoCategoriaGasto.Resultado d }) return;
 
@@ -830,32 +958,209 @@
         DateTimeOffset? desde = _repDesde is { } d ? FechaProyecto.DesdeFechaLocal(d) : null;
         DateTimeOffset? hasta = _repHasta is { } h ? FechaProyecto.DesdeFechaLocal(h.Date.AddDays(1)).AddTicks(-1) : null;
 
+        // "Solo centrales" es excluyente con zona/cobrador/vendedor:
+        // si está activo, esos filtros se ignoran para evitar combinaciones
+        // contradictorias (p. ej. central + zona concreta = siempre vacío).
+        long? zona = _repSoloCentrales ? null : _repZona;
+        long? cobrador = _repSoloCentrales ? null : _repCobrador;
+        long? vendedor = _repSoloCentrales ? null : _repVendedor;
+        long? categoria = _repCategoria;
+        string? estatus = string.IsNullOrWhiteSpace(_repEstatus) ? null : _repEstatus;
+        bool? soloCentrales = _repSoloCentrales ? true : null;
+
         string? error;
         switch (_repAgrupacion)
         {
             case "categoria":
-                (_repAgrupado, error) = await Api.ReporteGastosPorCategoriaAsync(desde, hasta);
+                (_repAgrupado, error) = await Api.ReporteGastosPorCategoriaAsync(
+                    desde, hasta, categoria, estatus, zona, cobrador, vendedor, soloCentrales);
                 break;
             case "zona":
-                (_repAgrupado, error) = await Api.ReporteGastosPorZonaAsync(desde, hasta);
+                (_repAgrupado, error) = await Api.ReporteGastosPorZonaAsync(
+                    desde, hasta, categoria, estatus, zona, cobrador, vendedor, soloCentrales);
                 break;
             case "cobrador":
-                (_repAgrupado, error) = await Api.ReporteGastosPorCobradorAsync(desde, hasta);
+                (_repAgrupado, error) = await Api.ReporteGastosPorCobradorAsync(
+                    desde, hasta, categoria, estatus, zona, cobrador, vendedor, soloCentrales);
                 break;
             case "vendedor":
-                (_repAgrupado, error) = await Api.ReporteGastosPorVendedorAsync(desde, hasta);
+                (_repAgrupado, error) = await Api.ReporteGastosPorVendedorAsync(
+                    desde, hasta, categoria, estatus, zona, cobrador, vendedor, soloCentrales);
                 break;
             case "estatus":
-                (_repAgrupado, error) = await Api.ReporteGastosPorEstatusAsync(desde, hasta);
+                (_repAgrupado, error) = await Api.ReporteGastosPorEstatusAsync(
+                    desde, hasta, categoria, estatus, zona, cobrador, vendedor, soloCentrales);
                 break;
             default:
-                (_repDetalle, error) = await Api.ReporteGastosDetalleAsync(desde, hasta);
+                (_repDetalle, error) = await Api.ReporteGastosDetalleAsync(
+                    desde, hasta, categoria, estatus, zona, cobrador, vendedor, soloCentrales);
                 break;
         }
 
         _cargandoReporte = false;
         if (error is not null) _snackbar.Add(error, Severity.Error);
     }
+
+    // ---- Exportación a Excel (mismo estándar que Reportes) ----
+
+    // Indica si hay datos para exportar en el modo activo (detalle o agrupado).
+    private bool HayDatosReporte() => _repAgrupacion == "detalle"
+        ? _repDetalle is { Filas.Count: > 0 }
+        : _repAgrupado is { Filas.Count: > 0 };
+
+    // Describe los filtros activos para el encabezado del Excel.
+    private Dictionary<string, string> FiltrosReporteExcel() => new()
+    {
+        ["Desde"] = FechaRep(_repDesde),
+        ["Hasta"] = FechaRep(_repHasta),
+        ["Categoría"] = _categoriasActivas.FirstOrDefault(c => c.IdCategoriaGasto == _repCategoria)?.Nombre ?? "Todas",
+        ["Estatus"] = string.IsNullOrWhiteSpace(_repEstatus) ? "Todos" : _repEstatus!,
+        ["Zona"] = _repSoloCentrales ? "—" : (_zonas.FirstOrDefault(z => z.IdZona == _repZona)?.Descripcion ?? "Todas"),
+        ["Cobrador"] = _repSoloCentrales ? "—" : (_cobradores.FirstOrDefault(c => c.IdCobrador == _repCobrador)?.Nombre ?? "Todos"),
+        ["Vendedor"] = _repSoloCentrales ? "—" : (_vendedores.FirstOrDefault(v => v.IdVendedor == _repVendedor)?.Nombre ?? "Todos"),
+        ["Solo centrales"] = _repSoloCentrales ? "Sí" : "No"
+    };
+
+    private Task ExportarReporte() => _repAgrupacion == "detalle"
+        ? ExportarDetalle()
+        : ExportarAgrupado();
+
+    private Task ExportarDetalle() => _repDetalle is not { } d ? Task.CompletedTask : ExportarReporteAsync(
+        "Gastos-Detalle", "REPORTE DE GASTOS (DETALLE)",
+        FiltrosReporteExcel(),
+        [
+            Kpi("Gastos", d.Total.ToString()),
+            Kpi("Importe total", d.ImporteTotal.ToString("C2")),
+            Kpi("Pagado", d.TotalPagado.ToString("C2")),
+            Kpi("Saldo pendiente", d.SaldoPendiente.ToString("C2"))
+        ],
+        ["Folio", "Fecha", "Categoría", "Concepto", "Proveedor", "Importe", "Pagado", "Saldo",
+         "Estatus", "Zona", "Cobrador", "Vendedor"],
+        d.Filas.Select(f => new object?[] { f.FolioGasto, FechaCortaRep(f.FechaGasto), f.Categoria, f.Concepto,
+            f.Proveedor, f.Importe, f.TotalPagado, f.SaldoPendiente, f.Estatus,
+            f.Zona, f.Cobrador, f.Vendedor }),
+        [6, 7, 8]);
+
+    private Task ExportarAgrupado() => _repAgrupado is not { } a ? Task.CompletedTask : ExportarReporteAsync(
+        $"Gastos-{_repAgrupacion}", $"REPORTE DE GASTOS POR {_repAgrupacion.ToUpperInvariant()}",
+        FiltrosReporteExcel(),
+        [
+            Kpi("Grupos", a.Total.ToString()),
+            Kpi("Importe total", a.ImporteTotal.ToString("C2")),
+            Kpi("Pagado", a.TotalPagado.ToString("C2")),
+            Kpi("Saldo pendiente", a.SaldoPendiente.ToString("C2"))
+        ],
+        [EtiquetaAgrupacion(), "N° gastos", "Importe", "Pagado", "Saldo"],
+        a.Filas.Select(f => new object?[] { f.Etiqueta, f.NumeroGastos, f.Importe, f.TotalPagado, f.SaldoPendiente }),
+        [3, 4, 5]);
+
+    private string EtiquetaAgrupacion() => _repAgrupacion switch
+    {
+        "categoria" => "Categoría",
+        "zona" => "Zona",
+        "cobrador" => "Cobrador",
+        "vendedor" => "Vendedor",
+        "estatus" => "Estatus",
+        _ => "Grupo"
+    };
+
+    private async Task ExportarReporteAsync(string archivo, string titulo, Dictionary<string, string> filtros,
+        List<ReporteExcelKpi> kpis, string[] columnas, IEnumerable<object?[]> filas, int[]? columnasMoneda = null)
+    {
+        if (_exportando) return;
+        _exportando = true;
+        try
+        {
+            var info = new ReporteExcelInfo
+            {
+                Empresa = EmpresaGlobal.Info?.NombreCorto
+                          ?? EmpresaGlobal.Identidad?.NombreCorto
+                          ?? "Sistema Cobranza",
+                Titulo = titulo,
+                FechaGeneracion = FechaProyecto.Ahora.DateTime,
+                Filtros = filtros,
+                Kpis = kpis
+            };
+            var bytes = ExportadorExcel.Crear(info, columnas, filas, columnasMoneda);
+            await Descarga.GuardarAsync($"{archivo}-{FechaProyecto.Ahora:yyyyMMdd-HHmmssfff}.xlsx", bytes);
+        }
+        catch (Exception ex) { _snackbar.Add($"No se pudo exportar el reporte: {ex.Message}", Severity.Error); }
+        finally { _exportando = false; }
+    }
+
+    private static ReporteExcelKpi Kpi(string nombre, string valor) => new() { Nombre = nombre, Valor = valor };
+
+    private static string FechaRep(DateTime? d, string vacio = "Sin límite") => d is { } v ? v.ToString("dd/MM/yyyy") : vacio;
+
+    private static string FechaCortaRep(DateTimeOffset d) => d.EnZonaProyecto().DateTime.ToString("dd/MM/yyyy");
+
+    // ---- Búsqueda y presentación de las tablas del reporte ----
+
+    private static string Mostrar(string? v) => string.IsNullOrWhiteSpace(v) ? "—" : v!;
+
+    // Verdadero en plataformas táctiles (MAUI Android/iOS); los modales se muestran
+    // a pantalla completa y ciertos controles ocupan todo el ancho.
+    private bool EsEntornoMovil
+    {
+        get
+        {
+            var ff = _formFactor.GetFormFactor();
+            return !ff.Equals("Web", StringComparison.OrdinalIgnoreCase)
+                   && !ff.Equals("Desktop", StringComparison.OrdinalIgnoreCase);
+        }
+    }
+
+    private bool FiltrarDetalle(ReporteGastoFila f)
+    {
+        var t = _repBusquedaDetalle;
+        if (string.IsNullOrWhiteSpace(t)) return true;
+        return Contiene(f.FolioGasto, t) || Contiene(f.Categoria, t) || Contiene(f.Concepto, t)
+            || Contiene(f.Proveedor, t) || Contiene(f.Estatus, t) || Contiene(f.Zona, t)
+            || Contiene(f.Cobrador, t) || Contiene(f.Vendedor, t);
+    }
+
+    private bool FiltrarAgrupado(ReporteGastosAgrupadoFila f)
+    {
+        var t = _repBusquedaAgrupado;
+        return string.IsNullOrWhiteSpace(t) || Contiene(f.Etiqueta, t);
+    }
+
+    private static bool Contiene(string? valor, string termino)
+        => (valor ?? string.Empty).Contains(termino, StringComparison.OrdinalIgnoreCase);
+
+    private bool FiltrarGastos(GastoDto g)
+    {
+        var t = _busquedaGastos;
+        if (string.IsNullOrWhiteSpace(t)) return true;
+        return Contiene(g.FolioGasto, t) || Contiene(g.NombreCategoria, t) || Contiene(g.Concepto, t)
+            || Contiene(Clasificacion(g), t) || Contiene(g.Estatus, t) || Contiene(g.NombreCuentaPrevista, t);
+    }
+
+    private bool FiltrarCuentas(CuentaGastoDto c)
+    {
+        var t = _busquedaCuentas;
+        if (string.IsNullOrWhiteSpace(t)) return true;
+        return Contiene(c.Nombre, t) || Contiene(c.TipoCuenta, t) || Contiene(c.Moneda, t);
+    }
+
+    private bool FiltrarCategorias(CatalogoCategoriaGastoDto c)
+    {
+        var t = _busquedaCategorias;
+        if (string.IsNullOrWhiteSpace(t)) return true;
+        return Contiene(c.Nombre, t) || Contiene(c.Descripcion, t);
+    }
+
+    private readonly RenderFragment SinDatosFragment = builder =>
+    {
+        builder.OpenElement(0, "div");
+        builder.AddAttribute(1, "class", "pa-3 text-center");
+        builder.OpenComponent<MudText>(2);
+        builder.AddAttribute(3, "Color", Color.Secondary);
+        builder.AddAttribute(4, "Typo", Typo.body2);
+        builder.AddAttribute(5, "ChildContent", (RenderFragment)(b => b.AddContent(0, "No hay datos para los filtros seleccionados.")));
+        builder.CloseComponent();
+        builder.CloseElement();
+    };
 
     // ===================== Helpers de diálogo =====================
 

@@ -132,6 +132,8 @@ builder.Services.AddSingleton<LectorParametrosWhatsApp>();
 builder.Services.AddScoped<ServicioColaWhatsApp>();
 // Consulta de la cola de mensajes (pantalla Mensajes WhatsApp).
 builder.Services.AddScoped<ServicioMensajesWhatsAppAdmin>();
+// Recordatorios de cobranza por WhatsApp (envío manual confirmado por el usuario).
+builder.Services.AddScoped<ServicioRecordatoriosWhatsApp>();
 
 // HttpClient con nombre para Evolution API. BaseUrl sale de la configuración (secreto);
 // si está vacío (aún sin credenciales) no se asigna y el worker queda inactivo.

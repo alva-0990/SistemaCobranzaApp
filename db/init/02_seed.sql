@@ -165,10 +165,53 @@ VALUES
 INSERT INTO ParametrosSistema (Clave, Descripcion, ValorTexto)
 VALUES
     ('TICKET_PAGO_COMPACTO', 'Formato del comprobante de pago: SI = compacto, NO = detallado', 'NO'),
+    ('AYUDA_URL', 'URL del centro de ayuda que se abre desde el botón de ayuda (vacío = oculta el botón)', 'https://alva-0990.github.io/alva-0990.github.oi/'),
     ('PROMO_PAGOS_CONSECUTIVOS_ACTIVA', 'Indica si la promoción de pagos consecutivos está encendida (SI/NO)', 'SI'),
     ('WHATSAPP_ENVIO_ACTIVO', 'Indica si el flujo de envio de notificaciones whatsapp está encendida (SI/NO)', 'SI'),
     ('WHATSAPP_NOTIFICAR_VENTA', 'Indica si se envia la notificacion en alta de ventas encendida (SI/NO)', 'SI'),
-    ('WHATSAPP_NOTIFICAR_PAGO', 'Indica si se envia la notificacion en alta de pagos encendida (SI/NO)', 'SI')
+    ('WHATSAPP_NOTIFICAR_PAGO', 'Indica si se envia la notificacion en alta de pagos encendida (SI/NO)', 'SI'),
+    ('WHATSAPP_NOTIFICAR_RECORDATORIO', 'Indica si se permite el envío manual de recordatorios de cobranza por WhatsApp (SI/NO)', 'SI')
+ON CONFLICT (Clave) DO NOTHING;
+
+-- =====================================================================
+-- Recordatorios de cobranza por WhatsApp (envío MANUAL, confirmado por el usuario)
+-- =====================================================================
+-- Umbrales de etapa según los días de atraso del cliente. Definen qué plantilla se usa:
+--   atraso <= ETAPA1_DIAS_HASTA              -> Etapa 1 (preventiva / amable)
+--   ETAPA1 < atraso <= ETAPA2_DIAS_HASTA     -> Etapa 2 (seguimiento)
+--   atraso > ETAPA2_DIAS_HASTA               -> Etapa 3 (firme / urgente)
+INSERT INTO ParametrosSistema (Clave, Descripcion, ValorNumerico)
+VALUES
+    ('RECORDATORIO_ETAPA1_DIAS_HASTA', 'Días de atraso hasta los que aplica la etapa 1 (preventiva/amable) del recordatorio', 7),
+    ('RECORDATORIO_ETAPA2_DIAS_HASTA', 'Días de atraso hasta los que aplica la etapa 2 (seguimiento) del recordatorio', 15)
+ON CONFLICT (Clave) DO NOTHING;
+
+-- Plantillas de texto de cada etapa. Placeholders admitidos (se sustituyen al enviar):
+--   {cliente}  nombre completo del cliente
+--   {empresa}  nombre corto/comercial del negocio
+--   {saldo}    saldo pendiente total del cliente (formato moneda)
+--   {días}     días de atraso (mayor atraso entre sus ventas vencidas)
+INSERT INTO ParametrosSistema (Clave, Descripcion, ValorTexto)
+VALUES
+    ('RECORDATORIO_MSG_ETAPA1',
+     'Plantilla de recordatorio etapa 1 (preventiva/amable, 1 a 7 días de atraso)',
+     'Hola *{cliente}*, le saludamos de *{empresa}* 👋.
+
+Le recordamos de manera cordial que tiene un saldo pendiente de *{saldo}* y lleva *{días} días* sin abonar.
+
+Nuestro gestor pasará a visitarlo a su domicilio el día de hoy; esto nos ayuda a regularizar su historial crediticio. ¡Gracias por su preferencia! 🙏'),
+    ('RECORDATORIO_MSG_ETAPA2',
+     'Plantilla de recordatorio etapa 2 (seguimiento, 8 a 15 días de atraso)',
+     'Hola *{cliente}*, esperamos que se encuentre muy bien.
+
+Notamos que su cuenta en *{empresa}* presenta un saldo pendiente de *{saldo}* con *{días} días* sin registrar abonos.
+
+Nuestro gestor pasará a visitarlo a su domicilio el día de hoy; atenderlo nos ayuda a regularizar su historial crediticio. Por favor, respóndanos este mensaje para confirmar su atención.'),
+    ('RECORDATORIO_MSG_ETAPA3',
+     'Plantilla de recordatorio etapa 3 (firme/urgente, más de 15 días de atraso)',
+     'Estimado(a) *{cliente}*, le informamos que su cuenta en *{empresa}* registra un atraso de *{días} días* con un saldo vencido de *{saldo}*. ⚠️
+
+Nuestro gestor pasará a visitarlo a su domicilio el día de hoy; regularizar su pago a la brevedad nos ayuda a cuidar su historial crediticio y evitar cargos moratorios. Quedamos atentos a su confirmación por este medio.')
 ON CONFLICT (Clave) DO NOTHING;
 
 -- =====================================================================

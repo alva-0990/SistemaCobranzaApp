@@ -19,6 +19,7 @@ public static class TipoOrigenWhatsApp
 {
     public const string Venta = "VENTA";
     public const string Pago = "PAGO";
+    public const string Recordatorio = "RECORDATORIO";
 }
 
 /// <summary>

@@ -5,6 +5,8 @@
 @using SistemaCobranzaApp.Shared.Dtos
 @using SistemaCobranzaApp.Shared.Services
 @inject ApiCliente Api
+@inject IDescargaArchivo Descarga
+@inject EstadoEmpresaGlobal EmpresaGlobal
 @inject IDialogService _dialogo
 @inject ISnackbar _snackbar
 
@@ -28,6 +30,47 @@
             min-width: 130px;
             height: 40px;
             margin-top: 6px;
+        }
+    }
+
+    /* Barra de acciones (Seleccionadas / Monto Total / Botón).
+       Móvil: apilada a ancho completo. Escritorio: en fila con el botón a la derecha. */
+    .barra-acciones {
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 12px;
+    }
+    .barra-acciones .chips-seleccion {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        width: 100%;
+    }
+    /* En móvil cada chip indicador ocupa todo el ancho. */
+    .barra-acciones .chips-seleccion .mud-chip {
+        width: 100%;
+        justify-content: flex-start;
+    }
+    .barra-acciones .boton-accion {
+        width: 100%;
+    }
+    @@media (min-width: 768px) {
+        .barra-acciones {
+            flex-direction: row;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .barra-acciones .chips-seleccion {
+            flex-direction: row;
+            flex-wrap: wrap;
+            width: auto;
+        }
+        .barra-acciones .chips-seleccion .mud-chip {
+            width: auto;
+        }
+        .barra-acciones .boton-accion {
+            width: auto;
         }
     }
 </style>
@@ -78,27 +121,33 @@
             }
             else
             {
-                <div class="d-flex justify-between align-center mb-3">
-                    <div class="d-flex gap-2">
+                <div class="barra-acciones mb-3">
+                    <div class="chips-seleccion">
                         <MudChip T="string" Color="Color.Secondary" Variant="Variant.Text"><b>Seleccionadas:</b> @_seleccionadasLib.Count</MudChip>
                         <MudChip T="string" Color="Color.Primary" Variant="Variant.Text"><b>Monto Total:</b> @_montoTotalSeleccionadoLib.ToString("C2")</MudChip>
                     </div>
-                    <MudButton Variant="Variant.Filled" Color="Color.Success" StartIcon="@Icons.Material.Filled.AssignmentTurnedIn" Disabled="@(!_seleccionadasLib.Any() || _procesandoLib)" OnClick="ProcesarLiberacionManual">
+                    <MudButton Variant="Variant.Filled" Color="Color.Success" StartIcon="@Icons.Material.Filled.AssignmentTurnedIn" Class="boton-accion" Disabled="@(!_seleccionadasLib.Any() || _procesandoLib)" OnClick="ProcesarLiberacionManual">
                         @(_procesandoLib ? "Liberando..." : "Autorizar y Pasar a Disponible")
                     </MudButton>
                 </div>
 
-                <MudTable Items="_comisionesPendientes" Hover="true" Dense="true" Bordered="true" Striped="true" FixedHeader="true" Height="500px">
+                <MudTextField T="string" @bind-Value="_busquedaLib" Immediate="true"
+                              Placeholder="Buscar por zona, vendedor, folio o producto…"
+                              Variant="Variant.Outlined" Margin="Margin.Dense" Adornment="Adornment.Start"
+                              AdornmentIcon="@Icons.Material.Filled.Search" Clearable="true" Class="mb-3" />
+                <MudTable Items="_comisionesPendientes" Hover="true" Dense="true" Breakpoint="Breakpoint.Sm"
+                          Elevation="0" RowsPerPage="20" T="ComisionPendientePagoDto" Class="tabla-seguimiento"
+                          Filter="new Func<ComisionPendientePagoDto, bool>(FiltrarLib)">
                     <HeaderContent>
                         <MudTh Style="width: 50px; text-align: center;">
                             <MudCheckBox T="bool" Value="_todosSeleccionadosLib" ValueChanged="AlternarTodosCheckboxesLib" Color="Color.Primary" Dense="true" />
                         </MudTh>
-                        <MudTh>Fecha Cálculo</MudTh>
-                        <MudTh>Zona</MudTh>
-                        <MudTh>Vendedor</MudTh>
-                        <MudTh>Folio Venta</MudTh>
-                        <MudTh>Producto</MudTh>
-                        <MudTh Style="text-align:right">Monto Comisión</MudTh>
+                        <MudTh><MudTableSortLabel InitialDirection="SortDirection.Descending" SortBy="new Func<ComisionPendientePagoDto, object>(x => x.FechaCalculo)">Fecha Cálculo</MudTableSortLabel></MudTh>
+                        <MudTh><MudTableSortLabel SortBy="new Func<ComisionPendientePagoDto, object>(x => x.NombreZona ?? string.Empty)">Zona</MudTableSortLabel></MudTh>
+                        <MudTh><MudTableSortLabel SortBy="new Func<ComisionPendientePagoDto, object>(x => x.NombreVendedor ?? string.Empty)">Vendedor</MudTableSortLabel></MudTh>
+                        <MudTh><MudTableSortLabel SortBy="new Func<ComisionPendientePagoDto, object>(x => x.CodigoVenta ?? string.Empty)">Folio Venta</MudTableSortLabel></MudTh>
+                        <MudTh><MudTableSortLabel SortBy="new Func<ComisionPendientePagoDto, object>(x => x.DescripcionProducto ?? string.Empty)">Producto</MudTableSortLabel></MudTh>
+                        <MudTh Style="text-align:right;"><MudTableSortLabel SortBy="new Func<ComisionPendientePagoDto, object>(x => x.MontoComision)">Monto Comisión</MudTableSortLabel></MudTh>
                     </HeaderContent>
                     <RowTemplate>
                         <MudTd Style="text-align: center;">
@@ -116,6 +165,9 @@
                             <MudText Typo="Typo.body1" Color="Color.Secondary">🚩 No se encontraron comisiones en estatus <b>PENDIENTE</b>.</MudText>
                         </div>
                     </NoRecordsContent>
+                    <PagerContent>
+                        <MudTablePager InfoFormat="{first_item}-{last_item} de {all_items}" RowsPerPageString="Filas:" />
+                    </PagerContent>
                 </MudTable>
             }
         </MudPaper>
@@ -163,27 +215,33 @@
             }
             else
             {
-                <div class="d-flex justify-between align-center mb-3">
-                    <div class="d-flex gap-2">
+                <div class="barra-acciones mb-3">
+                    <div class="chips-seleccion">
                         <MudChip T="string" Color="Color.Secondary" Variant="Variant.Text"><b>Seleccionadas:</b> @_seleccionadas.Count</MudChip>
                         <MudChip T="string" Color="Color.Success" Variant="Variant.Text"><b>Monto Total:</b> @_montoTotalSeleccionado.ToString("C2")</MudChip>
                     </div>
-                    <MudButton Variant="Variant.Filled" Color="Color.Success" StartIcon="@Icons.Material.Filled.PriceCheck" Disabled="@(!_seleccionadas.Any() || _procesandoPago)" OnClick="ProcesarPagoManual">
+                    <MudButton Variant="Variant.Filled" Color="Color.Success" StartIcon="@Icons.Material.Filled.PriceCheck" Class="boton-accion" Disabled="@(!_seleccionadas.Any() || _procesandoPago)" OnClick="ProcesarPagoManual">
                         @(_procesandoPago ? "Procesando..." : "Confirmar Pago de Seleccionadas")
                     </MudButton>
                 </div>
 
-                <MudTable Items="_comisiones" Hover="true" Dense="true" Bordered="true" Striped="true" FixedHeader="true" Height="500px">
+                <MudTextField T="string" @bind-Value="_busquedaCaja" Immediate="true"
+                              Placeholder="Buscar por zona, vendedor, folio o producto…"
+                              Variant="Variant.Outlined" Margin="Margin.Dense" Adornment="Adornment.Start"
+                              AdornmentIcon="@Icons.Material.Filled.Search" Clearable="true" Class="mb-3" />
+                <MudTable Items="_comisiones" Hover="true" Dense="true" Breakpoint="Breakpoint.Sm"
+                          Elevation="0" RowsPerPage="20" T="ComisionPendientePagoDto" Class="tabla-seguimiento"
+                          Filter="new Func<ComisionPendientePagoDto, bool>(FiltrarCaja)">
                     <HeaderContent>
                         <MudTh Style="width: 50px; text-align: center;">
                             <MudCheckBox T="bool" Value="_todosSeleccionados" ValueChanged="AlternarTodosCheckboxes" Color="Color.Primary" Dense="true" />
                         </MudTh>
-                        <MudTh>Fecha Cálculo</MudTh>
-                        <MudTh>Zona</MudTh>
-                        <MudTh>Vendedor</MudTh>
-                        <MudTh>Folio Venta</MudTh>
-                        <MudTh>Producto</MudTh>
-                        <MudTh Style="text-align:right">Monto Comisión</MudTh>
+                        <MudTh><MudTableSortLabel InitialDirection="SortDirection.Descending" SortBy="new Func<ComisionPendientePagoDto, object>(x => x.FechaCalculo)">Fecha Cálculo</MudTableSortLabel></MudTh>
+                        <MudTh><MudTableSortLabel SortBy="new Func<ComisionPendientePagoDto, object>(x => x.NombreZona ?? string.Empty)">Zona</MudTableSortLabel></MudTh>
+                        <MudTh><MudTableSortLabel SortBy="new Func<ComisionPendientePagoDto, object>(x => x.NombreVendedor ?? string.Empty)">Vendedor</MudTableSortLabel></MudTh>
+                        <MudTh><MudTableSortLabel SortBy="new Func<ComisionPendientePagoDto, object>(x => x.CodigoVenta ?? string.Empty)">Folio Venta</MudTableSortLabel></MudTh>
+                        <MudTh><MudTableSortLabel SortBy="new Func<ComisionPendientePagoDto, object>(x => x.DescripcionProducto ?? string.Empty)">Producto</MudTableSortLabel></MudTh>
+                        <MudTh Style="text-align:right;"><MudTableSortLabel SortBy="new Func<ComisionPendientePagoDto, object>(x => x.MontoComision)">Monto Comisión</MudTableSortLabel></MudTh>
                     </HeaderContent>
                     <RowTemplate>
                         <MudTd Style="text-align: center;">
@@ -201,6 +259,9 @@
                             <MudText Typo="Typo.body1" Color="Color.Secondary">🚩 No se encontraron comisiones en estatus <b>DISPONIBLE</b>.</MudText>
                         </div>
                     </NoRecordsContent>
+                    <PagerContent>
+                        <MudTablePager InfoFormat="{first_item}-{last_item} de {all_items}" RowsPerPageString="Filas:" />
+                    </PagerContent>
                 </MudTable>
             }
         </MudPaper>
@@ -248,34 +309,50 @@
             }
             else
             {
-                <div class="mb-3">
-                    <MudChip T="string" Color="Color.Success" Variant="Variant.Text">
-                        <b>Total Histórico Pagado:</b> @_montoTotalHistorial.ToString("C2")
-                    </MudChip>
+                <div class="barra-acciones mb-3">
+                    <div class="chips-seleccion">
+                        <MudChip T="string" Color="Color.Success" Variant="Variant.Text">
+                            <b>Total Histórico Pagado:</b> @_montoTotalHistorial.ToString("C2")
+                        </MudChip>
+                    </div>
+                    <MudButton Variant="Variant.Outlined" Color="Color.Success" StartIcon="@Icons.Material.Filled.FileDownload"
+                               Class="boton-accion" OnClick="ExportarHistorial"
+                               Disabled="@(_exportando || _comisionesHistorial.Count == 0)">
+                        Exportar a Excel
+                    </MudButton>
                 </div>
 
-                <MudTable Items="_comisionesHistorial" Hover="true" Dense="true" Bordered="true" Striped="true" FixedHeader="true" Height="500px">
+                <MudTextField T="string" @bind-Value="_busquedaHist" Immediate="true"
+                              Placeholder="Buscar por zona, vendedor, folio o producto…"
+                              Variant="Variant.Outlined" Margin="Margin.Dense" Adornment="Adornment.Start"
+                              AdornmentIcon="@Icons.Material.Filled.Search" Clearable="true" Class="mb-3" />
+                <MudTable Items="_comisionesHistorial" Hover="true" Dense="true" Breakpoint="Breakpoint.Sm"
+                          Elevation="0" RowsPerPage="20" T="ComisionPendientePagoDto" Class="tabla-seguimiento"
+                          Filter="new Func<ComisionPendientePagoDto, bool>(FiltrarHist)">
                     <HeaderContent>
-                        <MudTh>Fecha Pago / Registro</MudTh>
-                        <MudTh>Zona</MudTh>
-                        <MudTh>Vendedor</MudTh>
-                        <MudTh>Folio Venta</MudTh>
-                        <MudTh>Producto</MudTh>
-                        <MudTh Style="text-align:right">Monto Pagado</MudTh>
+                        <MudTh><MudTableSortLabel InitialDirection="SortDirection.Descending" SortBy="new Func<ComisionPendientePagoDto, object>(x => x.FechaCalculo)">Fecha Pago / Registro</MudTableSortLabel></MudTh>
+                        <MudTh><MudTableSortLabel SortBy="new Func<ComisionPendientePagoDto, object>(x => x.NombreZona ?? string.Empty)">Zona</MudTableSortLabel></MudTh>
+                        <MudTh><MudTableSortLabel SortBy="new Func<ComisionPendientePagoDto, object>(x => x.NombreVendedor ?? string.Empty)">Vendedor</MudTableSortLabel></MudTh>
+                        <MudTh><MudTableSortLabel SortBy="new Func<ComisionPendientePagoDto, object>(x => x.CodigoVenta ?? string.Empty)">Folio Venta</MudTableSortLabel></MudTh>
+                        <MudTh><MudTableSortLabel SortBy="new Func<ComisionPendientePagoDto, object>(x => x.DescripcionProducto ?? string.Empty)">Producto</MudTableSortLabel></MudTh>
+                        <MudTh Style="text-align:right;"><MudTableSortLabel SortBy="new Func<ComisionPendientePagoDto, object>(x => x.MontoComision)">Monto Pagado</MudTableSortLabel></MudTh>
                     </HeaderContent>
                     <RowTemplate>
-                        <MudTd>@context.FechaCalculo.EnZonaProyecto().DateTime.ToString("dd/MM/yyyy HH:mm")</MudTd>
-                        <MudTd><MudChip T="string" Size="Size.Small" Color="Color.Info" Variant="Variant.Text">@context.NombreZona</MudChip></MudTd>
-                        <MudTd><b>@context.NombreVendedor</b></MudTd>
-                        <MudTd><code>@context.CodigoVenta</code></MudTd>
-                        <MudTd>@context.DescripcionProducto</MudTd>
-                        <MudTd Style="text-align:right; font-weight:bold;" Class="text-success">@context.MontoComision.ToString("C2")</MudTd>
+                        <MudTd DataLabel="Fecha Pago / Registro">@context.FechaCalculo.EnZonaProyecto().DateTime.ToString("dd/MM/yyyy HH:mm")</MudTd>
+                        <MudTd DataLabel="Zona"><MudChip T="string" Size="Size.Small" Color="Color.Info" Variant="Variant.Text">@context.NombreZona</MudChip></MudTd>
+                        <MudTd DataLabel="Vendedor"><b>@context.NombreVendedor</b></MudTd>
+                        <MudTd DataLabel="Folio Venta"><code>@context.CodigoVenta</code></MudTd>
+                        <MudTd DataLabel="Producto">@context.DescripcionProducto</MudTd>
+                        <MudTd DataLabel="Monto Pagado" Style="text-align:right; font-weight:bold;" Class="text-success">@context.MontoComision.ToString("C2")</MudTd>
                     </RowTemplate>
                     <NoRecordsContent>
                         <div class="pa-4 text-center">
                             <MudText Typo="Typo.body1" Color="Color.Secondary">🚩 No se encontraron registros de comisiones pagadas.</MudText>
                         </div>
                     </NoRecordsContent>
+                    <PagerContent>
+                        <MudTablePager InfoFormat="{first_item}-{last_item} de {all_items}" RowsPerPageString="Filas:" />
+                    </PagerContent>
                 </MudTable>
             }
         </MudPaper>
@@ -287,6 +364,10 @@
 
     private List<ZonaDto> _zonas = new();
     private List<VendedorDto> _vendedoresGlobales = new();
+    private bool _exportando;
+    private string? _busquedaLib;
+    private string? _busquedaCaja;
+    private string? _busquedaHist;
     
     // ---- Pestaña 1: Liberaciones (Pendientes) ----
     private List<ComisionPendientePagoDto> _comisionesPendientes = new();
@@ -416,6 +497,65 @@
         _snackbar.Add($"Se aplicó el pago correctamente para {res} comisiones.", Severity.Success);
         await Task.WhenAll(CargarComisiones(), CargarHistorialPagadas()); 
     }
+
+    // ---- Búsqueda de las tablas ----
+    private bool FiltrarLib(ComisionPendientePagoDto c) => CoincideComision(c, _busquedaLib);
+    private bool FiltrarCaja(ComisionPendientePagoDto c) => CoincideComision(c, _busquedaCaja);
+    private bool FiltrarHist(ComisionPendientePagoDto c) => CoincideComision(c, _busquedaHist);
+
+    private static bool CoincideComision(ComisionPendientePagoDto c, string? termino)
+    {
+        if (string.IsNullOrWhiteSpace(termino)) return true;
+        return Contiene(c.NombreZona, termino) || Contiene(c.NombreVendedor, termino)
+            || Contiene(c.CodigoVenta, termino) || Contiene(c.DescripcionProducto, termino);
+    }
+
+    private static bool Contiene(string? valor, string termino)
+        => (valor ?? string.Empty).Contains(termino, StringComparison.OrdinalIgnoreCase);
+
+    // ---- Exportación a Excel del historial (mismo estándar que Reportes) ----
+    private async Task ExportarHistorial()
+    {
+        if (_exportando || _comisionesHistorial.Count == 0) return;
+        _exportando = true;
+        try
+        {
+            var info = new ReporteExcelInfo
+            {
+                Empresa = EmpresaGlobal.Info?.NombreCorto
+                          ?? EmpresaGlobal.Identidad?.NombreCorto
+                          ?? "Sistema Cobranza",
+                Titulo = "HISTORIAL DE COMISIONES PAGADAS",
+                FechaGeneracion = FechaProyecto.Ahora.DateTime,
+                Filtros = new()
+                {
+                    ["Zona"] = _zonas.FirstOrDefault(z => z.IdZona == _fZonaHist)?.Descripcion ?? "Todas",
+                    ["Vendedor"] = _vendedoresGlobales.FirstOrDefault(v => v.IdVendedor == _fVendedorHist)?.Nombre ?? "Todos",
+                    ["Desde"] = FechaFiltro(_fDesdeHist),
+                    ["Hasta"] = FechaFiltro(_fHastaHist)
+                },
+                Kpis = new()
+                {
+                    Kpi("Comisiones", _comisionesHistorial.Count.ToString()),
+                    Kpi("Total pagado", _montoTotalHistorial.ToString("C2"))
+                }
+            };
+            string[] columnas = ["Fecha pago / registro", "Zona", "Vendedor", "Folio venta", "Producto", "Monto pagado"];
+            var filas = _comisionesHistorial.Select(c => new object?[]
+            {
+                c.FechaCalculo.EnZonaProyecto().DateTime.ToString("dd/MM/yyyy HH:mm"),
+                c.NombreZona, c.NombreVendedor, c.CodigoVenta, c.DescripcionProducto, c.MontoComision
+            });
+            var bytes = ExportadorExcel.Crear(info, columnas, filas, [6]);
+            await Descarga.GuardarAsync($"Historial-Comisiones-{FechaProyecto.Ahora:yyyyMMdd-HHmmssfff}.xlsx", bytes);
+        }
+        catch (Exception ex) { _snackbar.Add($"No se pudo exportar el historial: {ex.Message}", Severity.Error); }
+        finally { _exportando = false; }
+    }
+
+    private static ReporteExcelKpi Kpi(string nombre, string valor) => new() { Nombre = nombre, Valor = valor };
+
+    private static string FechaFiltro(DateTime? d, string vacio = "Sin límite") => d is { } v ? v.ToString("dd/MM/yyyy") : vacio;
 
     private async Task<bool> ConfirmarDialogo(string titulo, string mensaje, string textoAceptar, Color color)
     {

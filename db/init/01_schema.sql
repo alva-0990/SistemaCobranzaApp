@@ -857,8 +857,8 @@ CREATE TABLE ColaMensajesWhatsapp (
     mensaje        TEXT         NOT NULL,                       -- El texto dinámico (sea Pago o Venta)
     estado         VARCHAR(20)  NOT NULL DEFAULT 'Pendiente',   -- 'Pendiente', 'Procesando', 'Enviado', 'Fallido'
     intentos       INT          NOT NULL DEFAULT 0,             -- Contador para reintentos automáticos (máximo 3)
-    tipo_origen    VARCHAR(20),                                 -- 'VENTA' | 'PAGO' (trazabilidad; informativo)
-    plantilla      VARCHAR(30),                                 -- 'VENTA_CREDITO' | 'VENTA_CONTADO' | 'PAGO' (plantilla Meta con API oficial)
+    tipo_origen    VARCHAR(20),                                 -- 'VENTA' | 'PAGO' | 'RECORDATORIO' (trazabilidad; informativo)
+    plantilla      VARCHAR(30),                                 -- 'VENTA_CREDITO' | 'VENTA_CONTADO' | 'PAGO' | 'RECORDATORIO' (plantilla Meta con API oficial)
     variables      TEXT,                                        -- Variables posicionales {{1}}..{{n}} en JSON (API oficial)
     id_venta       BIGINT,                                      -- Referencia informativa (sin FK dura: tabla de paso)
     id_pago        BIGINT,                                      -- Referencia informativa (sin FK dura: tabla de paso)
@@ -869,7 +869,7 @@ CREATE TABLE ColaMensajesWhatsapp (
         CHECK (estado IN ('Pendiente', 'Procesando', 'Enviado', 'Fallido')),
 
     CONSTRAINT chk_tipo_origen_whatsapp
-        CHECK (tipo_origen IS NULL OR tipo_origen IN ('VENTA', 'PAGO'))
+        CHECK (tipo_origen IS NULL OR tipo_origen IN ('VENTA', 'PAGO', 'RECORDATORIO'))
 );
 
 

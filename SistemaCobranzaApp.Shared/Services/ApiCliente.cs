@@ -542,6 +542,15 @@ public partial class ApiCliente
         => GetReporteAsync<ReporteConcentracionResponse>(
             FiltroDeuda("/api/reportes/concentracion-cartera?_=1", idZona, idRuta), ct);
 
+    public Task<(ReporteCoberturaResponse? datos, string? error)> ReporteCoberturaCobranzaAsync(
+        DateTimeOffset? desde, DateTimeOffset? hasta, long? idZona = null, long? idRuta = null, CancellationToken ct = default)
+    {
+        var url = $"/api/reportes/cobertura-cobranza?desde={Fecha(desde)}&hasta={Fecha(hasta)}";
+        if (idZona is { } z) url += $"&idZona={z}";
+        if (idRuta is { } r) url += $"&idRuta={r}";
+        return GetReporteAsync<ReporteCoberturaResponse>(url, ct);
+    }
+
     public Task<(ReporteSeguimientoResponse? datos, string? error)> ReporteSeguimientoAsync(
         long? idZona = null, DateTimeOffset? altaDesde = null, DateTimeOffset? altaHasta = null, CancellationToken ct = default)
     {

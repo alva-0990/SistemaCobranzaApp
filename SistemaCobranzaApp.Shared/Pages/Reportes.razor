@@ -10,6 +10,22 @@
 @inject NavigationManager Nav
 @inject IDialogService Dialogo
 
+<style>
+    /* Contenedor del botón "Exportar a Excel": móvil a ancho completo, escritorio a la derecha. */
+    .contenedor-exportar {
+        display: flex;
+        justify-content: flex-end;
+    }
+    @@media (max-width: 600px) {
+        .contenedor-exportar {
+            align-items: stretch;
+        }
+        .contenedor-exportar .boton-exportar {
+            width: 100%;
+        }
+    }
+</style>
+
 <MudTabs Elevation="2" Rounded="true" Color="Color.Primary" ApplyEffectsToContainer="true"
          PanelClass="pa-0 pt-4" SliderColor="Color.Warning" Class="ma-2 tabs-remarcados">
 
@@ -68,8 +84,8 @@
                         Saldo total: @_cartera.SaldoTotal.ToString("C2")
                     </MudChip>
                 </div>
-                <div class="d-flex justify-end mb-3">
-                    <MudButton Variant="Variant.Outlined" Color="Color.Success" StartIcon="@Icons.Material.Filled.FileDownload"
+                <div class="contenedor-exportar mb-3">
+                    <MudButton Variant="Variant.Outlined" Color="Color.Success" Class="boton-exportar" StartIcon="@Icons.Material.Filled.FileDownload"
                                OnClick="ExportarCartera" Disabled="@(_cargando || _exportando || _cartera.Filas.Count == 0)">
                         Exportar a Excel
                     </MudButton>
@@ -85,6 +101,8 @@
                         <MudTh><MudTableSortLabel SortBy="new Func<ReporteCarteraFila, object>(x => x.IdVenta)">Venta</MudTableSortLabel></MudTh>
                         <MudTh><MudTableSortLabel SortBy="new Func<ReporteCarteraFila, object>(x => x.CodigoVenta ?? string.Empty)">Código</MudTableSortLabel></MudTh>
                         <MudTh><MudTableSortLabel SortBy="new Func<ReporteCarteraFila, object>(x => x.Cliente ?? string.Empty)">Cliente</MudTableSortLabel></MudTh>
+                        <MudTh>Dirección</MudTh>
+                        <MudTh>Celular</MudTh>
                         <MudTh>Producto</MudTh>
                         <MudTh><MudTableSortLabel SortBy="new Func<ReporteCarteraFila, object>(x => x.Ruta ?? string.Empty)">Ruta</MudTableSortLabel></MudTh>
                         <MudTh><MudTableSortLabel SortBy="new Func<ReporteCarteraFila, object>(x => x.Zona ?? string.Empty)">Zona</MudTableSortLabel></MudTh>
@@ -98,6 +116,8 @@
                         <MudTd DataLabel="Venta">@context.IdVenta</MudTd>
                         <MudTd DataLabel="Código"><b>@Mostrar(context.CodigoVenta)</b></MudTd>
                         <MudTd DataLabel="Cliente">@context.Cliente</MudTd>
+                        <MudTd DataLabel="Dirección">@Mostrar(context.Direccion)</MudTd>
+                        <MudTd DataLabel="Celular">@Mostrar(context.TelefonoPrincipal)</MudTd>
                         <MudTd DataLabel="Producto">@Mostrar(context.Productos)</MudTd>
                         <MudTd DataLabel="Ruta">@Mostrar(context.Ruta)</MudTd>
                         <MudTd DataLabel="Zona">@Mostrar(context.Zona)</MudTd>
@@ -184,8 +204,8 @@
                         Monto total: @_pagos.MontoTotal.ToString("C2")
                     </MudChip>
                 </div>
-                <div class="d-flex justify-end mb-3">
-                    <MudButton Variant="Variant.Outlined" Color="Color.Success" StartIcon="@Icons.Material.Filled.FileDownload"
+                <div class="contenedor-exportar mb-3">
+                    <MudButton Variant="Variant.Outlined" Color="Color.Success" Class="boton-exportar" StartIcon="@Icons.Material.Filled.FileDownload"
                                OnClick="ExportarPagos" Disabled="@(_cargando || _exportando || _pagos.Filas.Count == 0)">
                         Exportar a Excel
                     </MudButton>
@@ -201,6 +221,7 @@
                         <MudTh><MudTableSortLabel SortBy="new Func<ReportePagoFila, object>(x => x.IdPago)">Pago</MudTableSortLabel></MudTh>
                         <MudTh><MudTableSortLabel SortBy="new Func<ReportePagoFila, object>(x => x.FolioPago ?? string.Empty)">Folio</MudTableSortLabel></MudTh>
                         <MudTh><MudTableSortLabel SortBy="new Func<ReportePagoFila, object>(x => x.IdVenta)">Venta</MudTableSortLabel></MudTh>
+                        <MudTh><MudTableSortLabel SortBy="new Func<ReportePagoFila, object>(x => x.CodigoVenta ?? string.Empty)">Código</MudTableSortLabel></MudTh>
                         <MudTh><MudTableSortLabel SortBy="new Func<ReportePagoFila, object>(x => x.Cliente ?? string.Empty)">Cliente</MudTableSortLabel></MudTh>
                         <MudTh>Producto</MudTh>
                         <MudTh><MudTableSortLabel SortBy="new Func<ReportePagoFila, object>(x => x.Cobrador ?? string.Empty)">Cobrador</MudTableSortLabel></MudTh>
@@ -214,6 +235,7 @@
                         <MudTd DataLabel="Pago">@context.IdPago</MudTd>
                         <MudTd DataLabel="Folio"><b>@Mostrar(context.FolioPago)</b></MudTd>
                         <MudTd DataLabel="Venta">@context.IdVenta</MudTd>
+                        <MudTd DataLabel="Código"><b>@Mostrar(context.CodigoVenta)</b></MudTd>
                         <MudTd DataLabel="Cliente">@context.Cliente</MudTd>
                         <MudTd DataLabel="Producto">@Mostrar(context.Productos)</MudTd>
                         <MudTd DataLabel="Cobrador">@Mostrar(context.Cobrador)</MudTd>
@@ -304,8 +326,8 @@
                         Monto total: @_ventas.MontoTotal.ToString("C2")
                     </MudChip>
                 </div>
-                <div class="d-flex justify-end mb-3">
-                    <MudButton Variant="Variant.Outlined" Color="Color.Success" StartIcon="@Icons.Material.Filled.FileDownload"
+                <div class="contenedor-exportar mb-3">
+                    <MudButton Variant="Variant.Outlined" Color="Color.Success" Class="boton-exportar" StartIcon="@Icons.Material.Filled.FileDownload"
                                OnClick="ExportarVentas" Disabled="@(_cargando || _exportando || _ventas.Filas.Count == 0)">
                         Exportar a Excel
                     </MudButton>
@@ -321,6 +343,8 @@
                         <MudTh><MudTableSortLabel SortBy="new Func<ReporteVentaFila, object>(x => x.IdVenta)">Venta</MudTableSortLabel></MudTh>
                         <MudTh><MudTableSortLabel SortBy="new Func<ReporteVentaFila, object>(x => x.CodigoVenta ?? string.Empty)">Código</MudTableSortLabel></MudTh>
                         <MudTh><MudTableSortLabel SortBy="new Func<ReporteVentaFila, object>(x => x.Cliente ?? string.Empty)">Cliente</MudTableSortLabel></MudTh>
+                        <MudTh>Dirección</MudTh>
+                        <MudTh>Celular</MudTh>
                         <MudTh>Producto</MudTh>
                         <MudTh><MudTableSortLabel SortBy="new Func<ReporteVentaFila, object>(x => x.Vendedor ?? string.Empty)">Vendedor</MudTableSortLabel></MudTh>
                         <MudTh Style="text-align:right;"><MudTableSortLabel SortBy="new Func<ReporteVentaFila, object>(x => x.TotalFinal)">Total</MudTableSortLabel></MudTh>
@@ -333,6 +357,8 @@
                         <MudTd DataLabel="Venta">@context.IdVenta</MudTd>
                         <MudTd DataLabel="Código"><b>@Mostrar(context.CodigoVenta)</b></MudTd>
                         <MudTd DataLabel="Cliente">@context.Cliente</MudTd>
+                        <MudTd DataLabel="Dirección">@Mostrar(context.Direccion)</MudTd>
+                        <MudTd DataLabel="Celular">@Mostrar(context.TelefonoPrincipal)</MudTd>
                         <MudTd DataLabel="Producto">@Mostrar(context.Productos)</MudTd>
                         <MudTd DataLabel="Vendedor">@Mostrar(context.Vendedor)</MudTd>
                         <MudTd DataLabel="Total" Style="text-align:right;"><b>@context.TotalFinal.ToString("C2")</b></MudTd>
@@ -404,8 +430,8 @@
                         Monto total: @_recuperacion.MontoTotal.ToString("C2")
                     </MudChip>
                 </div>
-                <div class="d-flex justify-end mb-3">
-                    <MudButton Variant="Variant.Outlined" Color="Color.Success" StartIcon="@Icons.Material.Filled.FileDownload"
+                <div class="contenedor-exportar mb-3">
+                    <MudButton Variant="Variant.Outlined" Color="Color.Success" Class="boton-exportar" StartIcon="@Icons.Material.Filled.FileDownload"
                                OnClick="ExportarRecuperacion" Disabled="@(_cargando || _exportando || _recuperacion.Filas.Count == 0)">
                         Exportar a Excel
                     </MudButton>
@@ -491,8 +517,8 @@
                         Clientes (@_clientes.Total)
                     </div>
                 </div>
-                <div class="d-flex justify-end mb-3">
-                    <MudButton Variant="Variant.Outlined" Color="Color.Success" StartIcon="@Icons.Material.Filled.FileDownload"
+                <div class="contenedor-exportar mb-3">
+                    <MudButton Variant="Variant.Outlined" Color="Color.Success" Class="boton-exportar" StartIcon="@Icons.Material.Filled.FileDownload"
                                OnClick="ExportarClientes" Disabled="@(_cargando || _exportando || _clientes.Filas.Count == 0)">
                         Exportar a Excel
                     </MudButton>
@@ -507,6 +533,8 @@
                     <HeaderContent>
                         <MudTh><MudTableSortLabel SortBy="new Func<ReporteClienteFila, object>(x => x.IdCliente)">ID</MudTableSortLabel></MudTh>
                         <MudTh><MudTableSortLabel SortBy="new Func<ReporteClienteFila, object>(x => x.Cliente ?? string.Empty)">Cliente</MudTableSortLabel></MudTh>
+                        <MudTh>Dirección</MudTh>
+                        <MudTh>Celular</MudTh>
                         <MudTh><MudTableSortLabel SortBy="new Func<ReporteClienteFila, object>(x => x.Ruta ?? string.Empty)">Ruta</MudTableSortLabel></MudTh>
                         <MudTh><MudTableSortLabel SortBy="new Func<ReporteClienteFila, object>(x => x.Zona ?? string.Empty)">Zona</MudTableSortLabel></MudTh>
                         <MudTh><MudTableSortLabel SortBy="new Func<ReporteClienteFila, object>(x => x.Clasificacion ?? string.Empty)">Clasificación</MudTableSortLabel></MudTh>
@@ -516,6 +544,8 @@
                     <RowTemplate>
                         <MudTd DataLabel="ID">@context.IdCliente</MudTd>
                         <MudTd DataLabel="Cliente"><b>@context.Cliente</b></MudTd>
+                        <MudTd DataLabel="Dirección">@Mostrar(context.Direccion)</MudTd>
+                        <MudTd DataLabel="Celular">@Mostrar(context.TelefonoPrincipal)</MudTd>
                         <MudTd DataLabel="Ruta">@Mostrar(context.Ruta)</MudTd>
                         <MudTd DataLabel="Zona">@Mostrar(context.Zona)</MudTd>
                         <MudTd DataLabel="Clasificación">@Mostrar(context.Clasificacion)</MudTd>
@@ -583,8 +613,8 @@
                         Pendiente total: @_seguimiento.TotalPendienteGlobal.ToString("C2")
                     </MudChip>
                 </div>
-                <div class="d-flex justify-end mb-3">
-                    <MudButton Variant="Variant.Outlined" Color="Color.Success" StartIcon="@Icons.Material.Filled.FileDownload"
+                <div class="contenedor-exportar mb-3">
+                    <MudButton Variant="Variant.Outlined" Color="Color.Success" Class="boton-exportar" StartIcon="@Icons.Material.Filled.FileDownload"
                                OnClick="ExportarSeguimiento" Disabled="@(_cargando || _exportando || _seguimiento.Filas.Count == 0)">
                         Exportar a Excel
                     </MudButton>
@@ -599,6 +629,8 @@
                     <HeaderContent>
                         <MudTh><MudTableSortLabel SortBy="new Func<ReporteSeguimientoFila, object>(x => x.IdCliente)">ID</MudTableSortLabel></MudTh>
                         <MudTh><MudTableSortLabel SortBy="new Func<ReporteSeguimientoFila, object>(x => x.Cliente)">Cliente</MudTableSortLabel></MudTh>
+                        <MudTh>Dirección</MudTh>
+                        <MudTh>Celular</MudTh>
                         <MudTh><MudTableSortLabel SortBy="new Func<ReporteSeguimientoFila, object>(x => x.FolioVenta ?? string.Empty)">Folio</MudTableSortLabel></MudTh>
                         <MudTh>Producto</MudTh>
                         <MudTh Style="text-align:right;"><MudTableSortLabel SortBy="new Func<ReporteSeguimientoFila, object>(x => x.TotalVenta)">Total venta</MudTableSortLabel></MudTh>
@@ -614,6 +646,8 @@
                     <RowTemplate>
                         <MudTd DataLabel="ID">@context.IdCliente</MudTd>
                         <MudTd DataLabel="Cliente"><b>@context.Cliente</b></MudTd>
+                        <MudTd DataLabel="Dirección">@Mostrar(context.Direccion)</MudTd>
+                        <MudTd DataLabel="Celular">@Mostrar(context.TelefonoPrincipal)</MudTd>
                         <MudTd DataLabel="Folio">@Mostrar(context.FolioVenta)</MudTd>
                         <MudTd DataLabel="Producto">@Mostrar(context.Productos)</MudTd>
                         <MudTd DataLabel="Total venta" Style="text-align:right;">@context.TotalVenta.ToString("C2")</MudTd>
@@ -1004,10 +1038,10 @@
             Kpi("Saldo total", c.SaldoTotal.ToString("C2")),
             Kpi("Saldo promedio", c.Total > 0 ? (c.SaldoTotal / c.Total).ToString("C2") : "$0.00")
         ],
-        ["Venta", "Código", "Cliente", "Producto", "Ruta", "Zona", "Total", "Abonado", "Saldo", "Estado", "Último pago"],
-        c.Filas.Select(f => new object?[] { f.IdVenta, f.CodigoVenta, f.Cliente, f.Productos, f.Ruta, f.Zona,
+        ["Venta", "Código", "Cliente", "Dirección", "Celular", "Producto", "Ruta", "Zona", "Total", "Abonado", "Saldo", "Estado", "Último pago"],
+        c.Filas.Select(f => new object?[] { f.IdVenta, f.CodigoVenta, f.Cliente, f.Direccion, f.TelefonoPrincipal, f.Productos, f.Ruta, f.Zona,
             f.TotalFinal, f.TotalAbonos, f.Saldo, f.Estado, FechaCorta(f.FechaUltimoPago) }),
-        [7, 8, 9]);
+        [9, 10, 11]);
 
     private Task ExportarPagos() => _pagos is not { } p ? Task.CompletedTask : ExportarReporteAsync(
         "Pagos", "REPORTE DE PAGOS",
@@ -1025,10 +1059,10 @@
             Kpi("Monto total", p.MontoTotal.ToString("C2")),
             Kpi("Pago promedio", p.Total > 0 ? (p.MontoTotal / p.Total).ToString("C2") : "$0.00")
         ],
-        ["Pago", "Folio", "Venta", "Cliente", "Producto", "Cobrador", "Movimiento", "Total de venta", "Abono", "Saldo actual", "Fecha"],
-        p.Filas.Select(f => new object?[] { f.IdPago, f.FolioPago, f.IdVenta, f.Cliente, f.Productos, f.Cobrador,
+        ["Pago", "Folio", "Venta", "Código", "Cliente", "Producto", "Cobrador", "Movimiento", "Total de venta", "Abono", "Saldo actual", "Fecha"],
+        p.Filas.Select(f => new object?[] { f.IdPago, f.FolioPago, f.IdVenta, f.CodigoVenta, f.Cliente, f.Productos, f.Cobrador,
             f.Movimiento, f.TotalVenta, f.MontoAbona, f.SaldoActual, FechaHora(f.FechaPago) }),
-        [9]); // Solo se suma el abono; sumar totales/saldos de venta por pago no tiene sentido.
+        [10]); // Solo se suma el abono; sumar totales/saldos de venta por pago no tiene sentido.
 
     private Task ExportarVentas() => _ventas is not { } v ? Task.CompletedTask : ExportarReporteAsync(
         "Ventas", "REPORTE DE VENTAS",
@@ -1046,10 +1080,10 @@
             Kpi("Monto total", v.MontoTotal.ToString("C2")),
             Kpi("Venta promedio", v.Total > 0 ? (v.MontoTotal / v.Total).ToString("C2") : "$0.00")
         ],
-        ["Venta", "Código", "Cliente", "Producto", "Vendedor", "Condición", "Total", "Enganche", "Saldo", "Estado", "Fecha"],
-        v.Filas.Select(f => new object?[] { f.IdVenta, f.CodigoVenta, f.Cliente, f.Productos, f.Vendedor, f.Condicion,
+        ["Venta", "Código", "Cliente", "Dirección", "Celular", "Producto", "Vendedor", "Condición", "Total", "Enganche", "Saldo", "Estado", "Fecha"],
+        v.Filas.Select(f => new object?[] { f.IdVenta, f.CodigoVenta, f.Cliente, f.Direccion, f.TelefonoPrincipal, f.Productos, f.Vendedor, f.Condicion,
             f.TotalFinal, f.Enganche, f.Saldo, f.Estado, FechaCorta(f.FechaCompra) }),
-        [7, 8, 9]);
+        [9, 10, 11]);
 
     private Task ExportarRecuperacion() => _recuperacion is not { } r ? Task.CompletedTask : ExportarReporteAsync(
         "Recuperacion", "REPORTE DE RECUPERACIÓN",
@@ -1083,8 +1117,8 @@
             Kpi("Activos", c.Filas.Count(f => f.Activo).ToString()),
             Kpi("Inactivos", c.Filas.Count(f => !f.Activo).ToString())
         ],
-        ["ID", "Cliente", "Ruta", "Zona", "Clasificación", "Estatus", "Alta"],
-        c.Filas.Select(f => new object?[] { f.IdCliente, f.Cliente, f.Ruta, f.Zona, f.Clasificacion,
+        ["ID", "Cliente", "Dirección", "Celular", "Ruta", "Zona", "Clasificación", "Estatus", "Alta"],
+        c.Filas.Select(f => new object?[] { f.IdCliente, f.Cliente, f.Direccion, f.TelefonoPrincipal, f.Ruta, f.Zona, f.Clasificacion,
             f.Activo ? "Activo" : "Inactivo", FechaCorta(f.FechaAlta) }));
 
     private Task ExportarSeguimiento() => _seguimiento is not { } s ? Task.CompletedTask : ExportarReporteAsync(
@@ -1100,12 +1134,12 @@
             Kpi("Total pendiente", s.TotalPendienteGlobal.ToString("C2")),
             Kpi("Total cobrado", s.Filas.Sum(f => f.TotalCobrado).ToString("C2"))
         ],
-        ["ID cliente", "Cliente", "Folio venta", "Producto", "Total venta", "Total cobrado", "Total pendiente",
+        ["ID cliente", "Cliente", "Dirección", "Celular", "Folio venta", "Producto", "Total venta", "Total cobrado", "Total pendiente",
          "Fecha venta", "Último pago", "Días transcurridos", "Frecuencia", "Clasificación", "Ruta", "Zona", "Fecha alta"],
-        s.Filas.Select(f => new object?[] { f.IdCliente, f.Cliente, f.FolioVenta, f.Productos,
+        s.Filas.Select(f => new object?[] { f.IdCliente, f.Cliente, f.Direccion, f.TelefonoPrincipal, f.FolioVenta, f.Productos,
             f.TotalVenta, f.TotalCobrado, f.TotalPendiente, FechaCorta(f.FechaVenta), FechaCorta(f.FechaUltimoPago),
             f.DiasTranscurridos, f.FrecuenciaPago, f.Clasificacion, f.Ruta, f.Zona, FechaCorta(f.FechaAlta) }),
-        [5, 6, 7]);
+        [7, 8, 9]);
 
     // ===================== Helpers =====================
 

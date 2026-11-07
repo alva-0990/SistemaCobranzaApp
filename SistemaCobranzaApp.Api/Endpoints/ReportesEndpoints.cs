@@ -81,5 +81,12 @@ public class ReportesEndpoints: IEndpointModule
                 async (long? idZona, long? idRuta, ServicioReportes s, CancellationToken ct) =>
                     Results.Ok(await s.ConcentracionCarteraAsync(new ReporteDeudaFiltro(idZona, idRuta), ct)))
             .RequireAuthorization();
+
+        app.MapGet("/api/reportes/cobertura-cobranza",
+                async (DateTimeOffset? desde, DateTimeOffset? hasta, long? idZona, long? idRuta,
+                    ServicioReportes s, CancellationToken ct) =>
+                    Results.Ok(await s.CoberturaCobranzaAsync(
+                        new ReporteCoberturaFiltro(desde, hasta, idZona, idRuta), ct)))
+            .RequireAuthorization();
     }
 }

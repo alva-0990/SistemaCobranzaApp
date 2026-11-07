@@ -1,0 +1,282 @@
+@page "/recordatorios-whatsapp"
+
+@using MudBlazor
+@using SistemaCobranzaApp.Shared.Components
+@using SistemaCobranzaApp.Shared.Dtos
+@using SistemaCobranzaApp.Shared.Services
+@inject ApiCliente Api
+@inject IDialogService _dialogo
+@inject ISnackbar _snackbar
+
+<style>
+    .barra-filtros-responsiva {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        width: 100%;
+    }
+    @@media (min-width: 768px) {
+        .barra-filtros-responsiva { flex-direction: row; align-items: center; }
+        .f-item-compacto { flex: 1; min-width: 140px; }
+        .btn-buscar-compacto { min-width: 130px; height: 40px; margin-top: 6px; }
+    }
+
+    /* Barra de acciones (Seleccionados / botón). Móvil: apilada a ancho completo. */
+    .barra-acciones { display: flex; flex-direction: column; align-items: stretch; gap: 12px; }
+    .barra-acciones .chips-seleccion { display: flex; flex-direction: column; gap: 8px; width: 100%; }
+    .barra-acciones .chips-seleccion .mud-chip { width: 100%; justify-content: flex-start; }
+    .barra-acciones .boton-accion { width: 100%; }
+    @@media (min-width: 768px) {
+        .barra-acciones { flex-direction: row; align-items: center; justify-content: space-between; }
+        .barra-acciones .chips-seleccion { flex-direction: row; flex-wrap: wrap; width: auto; }
+        .barra-acciones .chips-seleccion .mud-chip { width: auto; }
+        .barra-acciones .boton-accion { width: auto; }
+    }
+</style>
+
+<MudPaper Elevation="0" Class="pa-4 ma-2">
+
+    <div class="encabezado-seccion mb-4">
+        <MudIcon Icon="@Icons.Material.Filled.NotificationsActive" Color="Color.Primary" Size="Size.Large" />
+        <div>
+            <MudText Typo="Typo.h6" Class="titulo-seccion">Recordatorios de Cobranza por WhatsApp</MudText>
+            <MudText Typo="Typo.body2" Color="Color.Secondary">
+                Revise los clientes en atraso y su mensaje según la etapa (preventiva, seguimiento o urgente).
+                Seleccione a quién enviar y confirme. Nada se envía sin su confirmación.
+            </MudText>
+        </div>
+    </div>
+
+    <div class="barra-filtros-responsiva mb-3">
+        <AutocompletarCatalogo TItem="ZonaDto" Label="Zona" Placeholder="Todas" Class="f-item-compacto"
+                               @bind-Value="_fZona"
+                               Items="_zonas"
+                               ObtenerId="@(z => z.IdZona)"
+                               ObtenerTexto="@(z => z.Descripcion)" />
+
+        <AutocompletarCatalogo TItem="RutaAdminDto" Label="Ruta" Placeholder="Todas" Class="f-item-compacto"
+                               @bind-Value="_fRuta"
+                               Items="_rutas"
+                               ObtenerId="@(r => r.IdRuta)"
+                               ObtenerTexto="@(r => r.Descripcion)" />
+
+        <MudNumericField T="int" Label="Días de atraso (mínimo)" @bind-Value="_fDias" Min="1"
+                         Variant="Variant.Outlined" Class="f-item-compacto" />
+
+        <MudButton Variant="Variant.Filled" Color="Color.Success" StartIcon="@Icons.Material.Filled.Search"
+                   OnClick="CargarCandidatos" Class="btn-buscar-compacto fw-bold">
+            Buscar
+        </MudButton>
+    </div>
+
+    @if (_cargando)
+    {
+        <div class="d-flex justify-center pa-8"><MudProgressCircular Indeterminate="true" /></div>
+    }
+    else if (_respuesta is not null)
+    {
+        <div class="barra-acciones mb-3">
+            <div class="chips-seleccion">
+                <MudChip T="string" Color="Color.Secondary" Variant="Variant.Text"><b>Candidatos:</b> @_respuesta.Total</MudChip>
+                <MudChip T="string" Color="Color.Primary" Variant="Variant.Text"><b>Seleccionados:</b> @_seleccionados.Count</MudChip>
+                <MudChip T="string" Color="Color.Warning" Variant="Variant.Text"><b>Saldo seleccionado:</b> @_saldoSeleccionado.ToString("C2")</MudChip>
+            </div>
+            <MudButton Variant="Variant.Filled" Color="Color.Success" StartIcon="@Icons.Material.Filled.Send"
+                       Class="boton-accion" Disabled="@(!_seleccionados.Any() || _enviando)" OnClick="EnviarRecordatorios">
+                @(_enviando ? "Enviando..." : "Enviar recordatorios seleccionados")
+            </MudButton>
+        </div>
+
+        <MudTextField T="string" @bind-Value="_busqueda" Immediate="true"
+                      Placeholder="Buscar por cliente, teléfono, zona o ruta…"
+                      Variant="Variant.Outlined" Margin="Margin.Dense" Adornment="Adornment.Start"
+                      AdornmentIcon="@Icons.Material.Filled.Search" Clearable="true" Class="mb-3" />
+
+        <MudTable Items="_respuesta.Candidatos" Hover="true" Dense="true" Breakpoint="Breakpoint.Sm"
+                  Elevation="0" RowsPerPage="20" T="RecordatorioCandidatoDto" Class="tabla-seguimiento"
+                  Filter="new Func<RecordatorioCandidatoDto, bool>(Filtrar)">
+            <HeaderContent>
+                <MudTh Style="width: 50px; text-align: center;">
+                    <MudCheckBox T="bool" Value="_todosSeleccionados" ValueChanged="AlternarTodos" Color="Color.Primary" Dense="true" />
+                </MudTh>
+                <MudTh><MudTableSortLabel SortBy="new Func<RecordatorioCandidatoDto, object>(x => x.IdCliente)">ID</MudTableSortLabel></MudTh>
+                <MudTh><MudTableSortLabel SortBy="new Func<RecordatorioCandidatoDto, object>(x => x.Cliente)">Cliente</MudTableSortLabel></MudTh>
+                <MudTh>Teléfono</MudTh>
+                <MudTh><MudTableSortLabel SortBy="new Func<RecordatorioCandidatoDto, object>(x => x.Zona ?? string.Empty)">Zona</MudTableSortLabel></MudTh>
+                <MudTh><MudTableSortLabel SortBy="new Func<RecordatorioCandidatoDto, object>(x => x.Ruta ?? string.Empty)">Ruta</MudTableSortLabel></MudTh>
+                <MudTh Style="text-align:right;"><MudTableSortLabel SortBy="new Func<RecordatorioCandidatoDto, object>(x => x.SaldoPendiente)">Saldo</MudTableSortLabel></MudTh>
+                <MudTh Style="text-align:right;"><MudTableSortLabel InitialDirection="SortDirection.Descending" SortBy="new Func<RecordatorioCandidatoDto, object>(x => x.DiasAtraso)">Días</MudTableSortLabel></MudTh>
+                <MudTh>Etapa</MudTh>
+                <MudTh>Mensaje</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd Style="text-align: center;">
+                    <MudCheckBox T="bool" Value="@_seleccionados.Contains(context.IdCliente)"
+                                 ValueChanged="@((bool v) => AlternarFila(context.IdCliente, v))"
+                                 Color="Color.Primary" Dense="true" Disabled="@(!context.Enviable)" />
+                </MudTd>
+                <MudTd DataLabel="ID">@context.IdCliente</MudTd>
+                <MudTd DataLabel="Cliente"><b>@context.Cliente</b></MudTd>
+                <MudTd DataLabel="Teléfono">
+                    @if (context.Enviable)
+                    {
+                        @Mostrar(context.Telefono)
+                    }
+                    else
+                    {
+                        <MudTooltip Text="Sin teléfono utilizable o cliente dado de baja de WhatsApp">
+                            <MudChip T="string" Size="Size.Small" Color="Color.Error" Variant="Variant.Text">No enviable</MudChip>
+                        </MudTooltip>
+                    }
+                </MudTd>
+                <MudTd DataLabel="Zona">@Mostrar(context.Zona)</MudTd>
+                <MudTd DataLabel="Ruta">@Mostrar(context.Ruta)</MudTd>
+                <MudTd DataLabel="Saldo" Style="text-align:right;"><b class="saldo-pendiente">@context.SaldoPendiente.ToString("C2")</b></MudTd>
+                <MudTd DataLabel="Días" Style="text-align:right;">@context.DiasAtraso</MudTd>
+                <MudTd DataLabel="Etapa">
+                    <MudChip T="string" Size="Size.Small" Variant="Variant.Filled" Color="@ColorEtapa(context.Etapa)">@context.EtapaNombre</MudChip>
+                </MudTd>
+                <MudTd DataLabel="Mensaje">
+                    <MudTooltip>
+                        <ChildContent>
+                            <MudIconButton Icon="@Icons.Material.Filled.Visibility" Size="Size.Small" Color="Color.Primary"
+                                           OnClick="@(() => VerMensaje(context))" />
+                        </ChildContent>
+                        <TooltipContent>
+                            <div style="max-width:320px; white-space:pre-wrap; text-align:left;">@context.Mensaje</div>
+                        </TooltipContent>
+                    </MudTooltip>
+                </MudTd>
+            </RowTemplate>
+            <NoRecordsContent>
+                <div class="pa-4 text-center">
+                    <MudText Typo="Typo.body1" Color="Color.Secondary">No hay clientes en atraso para los filtros seleccionados.</MudText>
+                </div>
+            </NoRecordsContent>
+            <PagerContent>
+                <MudTablePager InfoFormat="{first_item}-{last_item} de {all_items}" RowsPerPageString="Filas:" />
+            </PagerContent>
+        </MudTable>
+    }
+</MudPaper>
+
+@code {
+    private List<ZonaDto> _zonas = new();
+    private List<RutaAdminDto> _rutas = new();
+
+    private long? _fZona;
+    private long? _fRuta;
+    private int _fDias = 1;
+    private string? _busqueda;
+
+    private bool _cargando;
+    private bool _enviando;
+    private RecordatorioCandidatosResponse? _respuesta;
+    private HashSet<long> _seleccionados = new();
+
+    private IEnumerable<RecordatorioCandidatoDto> Enviables =>
+        _respuesta?.Candidatos.Where(c => c.Enviable) ?? Enumerable.Empty<RecordatorioCandidatoDto>();
+
+    private decimal _saldoSeleccionado =>
+        _respuesta?.Candidatos.Where(c => _seleccionados.Contains(c.IdCliente)).Sum(c => c.SaldoPendiente) ?? 0m;
+
+    private bool _todosSeleccionados =>
+        Enviables.Any() && Enviables.All(c => _seleccionados.Contains(c.IdCliente));
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Api.CargarSesionDesdeAlmacenamientoAsync();
+        var (zonas, _) = await Api.ListarZonasOperativasAsync();
+        _zonas = zonas ?? new();
+        var (rutas, _) = await Api.ListarRutasOperativasAsync();
+        _rutas = rutas ?? new();
+    }
+
+    private async Task CargarCandidatos()
+    {
+        _cargando = true;
+        _seleccionados.Clear();
+        try
+        {
+            var (datos, error) = await Api.ListarCandidatosRecordatorioAsync(_fZona, _fRuta, Math.Max(1, _fDias));
+            if (error is not null) { _snackbar.Add(error, Severity.Error); return; }
+            _respuesta = datos;
+        }
+        finally { _cargando = false; }
+    }
+
+    private void AlternarFila(long id, bool check) => _ = check ? _seleccionados.Add(id) : _seleccionados.Remove(id);
+
+    private void AlternarTodos(bool check)
+        => _seleccionados = check ? Enviables.Select(c => c.IdCliente).ToHashSet() : new();
+
+    private async Task VerMensaje(RecordatorioCandidatoDto c)
+    {
+        var parametros = new DialogParameters<DialogoConfirmacion>
+        {
+            { x => x.Titulo, $"Mensaje para {c.Cliente} ({c.EtapaNombre})" },
+            { x => x.Mensaje, c.Mensaje },
+            { x => x.TextoAceptar, "Cerrar" },
+            { x => x.ColorAceptar, Color.Primary },
+            { x => x.Icono, Icons.Material.Filled.Chat },
+            { x => x.ColorIcono, Color.Primary }
+        };
+        await _dialogo.ShowAsync<DialogoConfirmacion>("Vista previa", parametros,
+            new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+    }
+
+    private async Task EnviarRecordatorios()
+    {
+        if (!_seleccionados.Any()) return;
+        var ok = await ConfirmarDialogo("Confirmar envío de recordatorios",
+            $"¿Enviar {_seleccionados.Count} recordatorio(s) por WhatsApp a los clientes seleccionados?",
+            "Enviar", Color.Success);
+        if (!ok) return;
+
+        _enviando = true;
+        try
+        {
+            var req = new EnviarRecordatoriosRequest(_seleccionados.ToList());
+            var (datos, error) = await Api.EnviarRecordatoriosAsync(req, _fZona, _fRuta, Math.Max(1, _fDias));
+            if (error is not null) { _snackbar.Add(error, Severity.Error); return; }
+
+            var r = datos!;
+            _snackbar.Add($"Recordatorios encolados: {r.Encolados}." + (r.Omitidos > 0 ? $" Omitidos: {r.Omitidos}." : ""),
+                r.Encolados > 0 ? Severity.Success : Severity.Warning);
+            if (!string.IsNullOrWhiteSpace(r.Detalle)) _snackbar.Add(r.Detalle, Severity.Info);
+
+            await CargarCandidatos();
+        }
+        finally { _enviando = false; }
+    }
+
+    private bool Filtrar(RecordatorioCandidatoDto c)
+    {
+        var t = _busqueda;
+        if (string.IsNullOrWhiteSpace(t)) return true;
+        bool Contiene(string? v) => (v ?? string.Empty).Contains(t, StringComparison.OrdinalIgnoreCase);
+        return Contiene(c.Cliente) || Contiene(c.Telefono) || Contiene(c.Zona) || Contiene(c.Ruta);
+    }
+
+    private static string Mostrar(string? v) => string.IsNullOrWhiteSpace(v) ? "—" : v!;
+
+    private static Color ColorEtapa(int etapa) => etapa switch
+    {
+        1 => Color.Success,
+        2 => Color.Warning,
+        _ => Color.Error
+    };
+
+    private async Task<bool> ConfirmarDialogo(string titulo, string mensaje, string textoAceptar, Color color)
+    {
+        var opciones = new DialogOptions { MaxWidth = MaxWidth.ExtraSmall, FullWidth = true };
+        var parametros = new DialogParameters<DialogoConfirmacion>
+        {
+            { x => x.Titulo, titulo }, { x => x.Mensaje, mensaje }, { x => x.TextoAceptar, textoAceptar },
+            { x => x.ColorAceptar, color }, { x => x.Icono, Icons.Material.Filled.CheckCircle }, { x => x.ColorIcono, color }
+        };
+        var dialogo = await _dialogo.ShowAsync<DialogoConfirmacion>(titulo, parametros, opciones);
+        var resultado = await dialogo.Result;
+        return resultado is { Canceled: false, Data: true };
+    }
+}

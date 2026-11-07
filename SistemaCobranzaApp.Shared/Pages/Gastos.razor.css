@@ -19,6 +19,13 @@
     flex: 0 0 auto;
 }
 
+/* Contenedor del botón "Exportar a Excel".
+   Escritorio: alineado a la derecha. Móvil: ocupa todo el ancho. */
+.contenedor-exportar {
+    display: flex;
+    justify-content: flex-end;
+}
+
 @media (max-width: 600px) {
     .filtros-gastos,
     .barra-gastos {
@@ -30,6 +37,15 @@
     .barra-gastos .b-item {
         flex: 1 1 auto;
         max-width: none;
+        width: 100%;
+    }
+
+    /* El botón de exportar ocupa todo el ancho en pantallas pequeñas. */
+    .contenedor-exportar {
+        align-items: stretch;
+    }
+
+    .contenedor-exportar ::deep .boton-exportar {
         width: 100%;
     }
 }

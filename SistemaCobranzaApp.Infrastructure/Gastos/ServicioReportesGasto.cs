@@ -38,7 +38,7 @@ public class ServicioReportesGasto
         var pagosPorGasto = _db.GastosPagos
             .AsNoTracking()
             .GroupBy(p => p.IdGasto)
-            .Select(g => new { IdGasto = g.Key, Total = g.Sum(x => x.Importe) });
+            .Select(g => new { IdGasto = g.Key, Total = g.Sum(x => (decimal?)x.Importe) });
 
         var query =
             from g in _db.Gastos.AsNoTracking()
@@ -48,7 +48,7 @@ public class ServicioReportesGasto
                 .Include(x => x.Vendedor)
             join p in pagosPorGasto on g.IdGasto equals p.IdGasto into pj
             from p in pj.DefaultIfEmpty()
-            select new { g, Pagado = (decimal?)(p == null ? 0m : p.Total) };
+            select new { g, Pagado = p.Total };
 
         if (f.Desde is { } d0) { var d = d0.ToUniversalTime(); query = query.Where(x => x.g.FechaGasto >= d); }
         if (f.Hasta is { } h0) { var h = h0.ToUniversalTime(); query = query.Where(x => x.g.FechaGasto <= h); }

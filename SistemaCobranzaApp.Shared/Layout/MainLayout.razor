@@ -52,6 +52,14 @@
             </MudChip>
         }
 
+        @* Botón de ayuda: abre el centro de ayuda (web externa) en un visor.
+           Web = diálogo grande; móvil = pantalla completa. Solo se muestra si hay URL configurada. *@
+        <MudIconButton Icon="@Icons.Material.Filled.HelpOutline"
+                       Color="Color.Inherit"
+                       Class="mr-1"
+                       title="Ayuda"
+                       OnClick="@AbrirAyuda" />
+
         @* Toggle de tema: ícono en ambos entornos. *@
         <MudIconButton Icon="@(ObtenerModoOscuroActivo() ? Icons.Material.Filled.LightMode : Icons.Material.Filled.DarkMode)"
                        Color="Color.Inherit"
@@ -213,10 +221,16 @@ else if (EsEntornoMovil && ApiClienteService.Autenticado)
                 <MudIcon Icon="@Icons.Material.Filled.Tune" Size="Size.Medium" Class="mr-3" />
                 <span>Parámetros Generales</span>
             </button>
-            <button type="button" class="mas-item" @onclick="@(() => IrA("mensajes-whatsapp"))">
-                <MudIcon Icon="@Icons.Material.Filled.Chat" Size="Size.Medium" Class="mr-3" />
-                <span>Mensajes WhatsApp</span>
+            <button type="button" class="mas-item" @onclick="@(() => IrA("recordatorios-whatsapp"))">
+                <MudIcon Icon="@Icons.Material.Filled.Send" Size="Size.Medium" Class="mr-3" />
+                <span>Envío de Recordatorios de Cobranza</span>
             </button>
+
+            <button type="button" class="mas-item" @onclick="@(() => IrA("mensajes-whatsapp"))">
+                <MudIcon Icon="@Icons.Material.Filled.History" Size="Size.Medium" Class="mr-3" />
+                <span>Histórico Mensajes WhatsApp</span>
+            </button>
+
             <button type="button" class="mas-item" @onclick="@(() => IrA("empresa"))">
                 <MudIcon Icon="@Icons.Material.Filled.Business" Size="Size.Medium" Class="mr-3" />
                 <span>Datos de la Empresa</span>
@@ -308,6 +322,43 @@ else if (EsEntornoMovil && ApiClienteService.Autenticado)
             _isDarkMode = !_isDarkMode;
             StateHasChanged();
         }
+    }
+
+    // URL del centro de ayuda (parámetro AYUDA_URL, administrable en caliente).
+    private const string ClaveAyudaUrl = "AYUDA_URL";
+    private const string AyudaUrlPorDefecto = "https://alva-0990.github.io/alva-0990.github.oi/";
+
+    /// <summary>
+    /// Abre el centro de ayuda (web externa) en un visor: en web como diálogo grande y en móvil
+    /// (MAUI) a pantalla completa. La URL se lee del parámetro AYUDA_URL; si no hay conexión o el
+    /// parámetro está vacío, se usa la URL por defecto.
+    /// </summary>
+    private async Task AbrirAyuda()
+    {
+        var url = AyudaUrlPorDefecto;
+        var (param, error) = await ApiClienteService.ObtenerParametroAsync(ClaveAyudaUrl);
+        if (error is null && !string.IsNullOrWhiteSpace(param?.ValorTexto))
+            url = param!.ValorTexto!.Trim();
+
+        if (string.IsNullOrWhiteSpace(url))
+        {
+            Snackbar.Add("No hay una URL de ayuda configurada.", Severity.Warning);
+            return;
+        }
+
+        var parametros = new DialogParameters<DialogoVisorWeb>
+        {
+            { x => x.Url, url },
+            { x => x.Titulo, "Centro de ayuda" }
+        };
+        var opciones = new DialogOptions
+        {
+            FullScreen = EsEntornoMovil,
+            FullWidth = true,
+            MaxWidth = MaxWidth.ExtraLarge,
+            CloseButton = false
+        };
+        await Dialogos.ShowAsync<DialogoVisorWeb>("Centro de ayuda", parametros, opciones);
     }
 
     private DialogOptions OpcionesCuenta => new()

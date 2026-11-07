@@ -24,6 +24,14 @@ public static class ClavesParametrosWhatsApp
 
     public const string PurgaActiva = "WHATSAPP_PURGA_ACTIVA";       // texto SI/NO
     public const string PurgaDias = "WHATSAPP_PURGA_DIAS";           // numérico (días)
+
+    // ---- Recordatorios de cobranza (envío manual confirmado por el usuario) ----
+    public const string NotificarRecordatorio = "WHATSAPP_NOTIFICAR_RECORDATORIO"; // texto SI/NO
+    public const string RecordatorioEtapa1DiasHasta = "RECORDATORIO_ETAPA1_DIAS_HASTA"; // numérico
+    public const string RecordatorioEtapa2DiasHasta = "RECORDATORIO_ETAPA2_DIAS_HASTA"; // numérico
+    public const string RecordatorioMsgEtapa1 = "RECORDATORIO_MSG_ETAPA1"; // texto (plantilla)
+    public const string RecordatorioMsgEtapa2 = "RECORDATORIO_MSG_ETAPA2"; // texto (plantilla)
+    public const string RecordatorioMsgEtapa3 = "RECORDATORIO_MSG_ETAPA3"; // texto (plantilla)
 }
 
 /// <summary>Valores válidos de <see cref="ClavesParametrosWhatsApp.Proveedor"/>.</summary>
@@ -39,6 +47,7 @@ public static class PlantillaWhatsApp
     public const string VentaCredito = "VENTA_CREDITO";
     public const string VentaContado = "VENTA_CONTADO";
     public const string Pago = "PAGO";
+    public const string Recordatorio = "RECORDATORIO";
 }
 
 /// <summary>

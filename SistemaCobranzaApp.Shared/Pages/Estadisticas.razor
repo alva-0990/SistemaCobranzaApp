@@ -62,8 +62,8 @@
                     <MudIcon Icon="@Icons.Material.Filled.Dashboard" Size="Size.Small" Class="mr-1" />
                     Indicadores ejecutivos
                 </div>
-                <div class="d-flex justify-end mb-3">
-                    <MudButton Variant="Variant.Outlined" Color="Color.Success" StartIcon="@Icons.Material.Filled.FileDownload"
+                <div class="contenedor-exportar mb-3">
+                    <MudButton Variant="Variant.Outlined" Color="Color.Success" Class="boton-exportar" StartIcon="@Icons.Material.Filled.FileDownload"
                                OnClick="ExportarDashboardEjecutivo" Disabled="@(_cargando || _exportando)">
                         Exportar a Excel
                     </MudButton>
@@ -146,26 +146,35 @@
                         </MudChip>
                     }
                 </div>
-                <div class="d-flex justify-end mb-3">
-                    <MudButton Variant="Variant.Outlined" Color="Color.Success" StartIcon="@Icons.Material.Filled.FileDownload"
+                <div class="contenedor-exportar mb-3">
+                    <MudButton Variant="Variant.Outlined" Color="Color.Success" Class="boton-exportar" StartIcon="@Icons.Material.Filled.FileDownload"
                                OnClick="ExportarAntiguedad" Disabled="@(_cargando || _exportando || _antiguedad.Filas.Count == 0)">
                         Exportar a Excel
                     </MudButton>
                 </div>
+                <MudTextField T="string" @bind-Value="_antBusqueda" Immediate="true"
+                              Placeholder="Buscar por cliente, dirección, teléfono, zona, ruta, clasificación o rango…"
+                              Variant="Variant.Outlined" Margin="Margin.Dense" Adornment="Adornment.Start"
+                              AdornmentIcon="@Icons.Material.Filled.Search" Clearable="true" Class="mb-3" />
                 <MudTable Items="_antiguedad.Filas" Hover="true" Dense="true" Breakpoint="Breakpoint.Sm"
-                          Elevation="0" RowsPerPage="15" T="ReporteAntiguedadFila">
+                          Elevation="0" RowsPerPage="15" T="ReporteAntiguedadFila" Class="tabla-seguimiento"
+                          Filter="new Func<ReporteAntiguedadFila, bool>(FiltrarAntiguedad)">
                     <HeaderContent>
-                        <MudTh>Cliente</MudTh>
-                        <MudTh>Zona</MudTh>
-                        <MudTh>Ruta</MudTh>
-                        <MudTh>Clasificación</MudTh>
-                        <MudTh>Último pago</MudTh>
-                        <MudTh Style="text-align:right;">Días transcurridos</MudTh>
-                        <MudTh Style="text-align:right;">Saldo pendiente</MudTh>
-                        <MudTh>Rango</MudTh>
+                        <MudTh><MudTableSortLabel SortBy="new Func<ReporteAntiguedadFila, object>(x => x.Cliente)">Cliente</MudTableSortLabel></MudTh>
+                        <MudTh>Dirección</MudTh>
+                        <MudTh>Teléfono</MudTh>
+                        <MudTh><MudTableSortLabel SortBy="new Func<ReporteAntiguedadFila, object>(x => x.Zona ?? string.Empty)">Zona</MudTableSortLabel></MudTh>
+                        <MudTh><MudTableSortLabel SortBy="new Func<ReporteAntiguedadFila, object>(x => x.Ruta ?? string.Empty)">Ruta</MudTableSortLabel></MudTh>
+                        <MudTh><MudTableSortLabel SortBy="new Func<ReporteAntiguedadFila, object>(x => x.Clasificacion ?? string.Empty)">Clasificación</MudTableSortLabel></MudTh>
+                        <MudTh><MudTableSortLabel SortBy="new Func<ReporteAntiguedadFila, object>(x => (object?)x.FechaUltimoPago ?? DateTimeOffset.MinValue)">Último pago</MudTableSortLabel></MudTh>
+                        <MudTh Style="text-align:right;"><MudTableSortLabel InitialDirection="SortDirection.Descending" SortBy="new Func<ReporteAntiguedadFila, object>(x => x.DiasTranscurridos)">Días transcurridos</MudTableSortLabel></MudTh>
+                        <MudTh Style="text-align:right;"><MudTableSortLabel SortBy="new Func<ReporteAntiguedadFila, object>(x => x.SaldoPendiente)">Saldo pendiente</MudTableSortLabel></MudTh>
+                        <MudTh><MudTableSortLabel SortBy="new Func<ReporteAntiguedadFila, object>(x => x.Rango)">Rango</MudTableSortLabel></MudTh>
                     </HeaderContent>
                     <RowTemplate>
                         <MudTd DataLabel="Cliente"><b>@context.Cliente</b></MudTd>
+                        <MudTd DataLabel="Dirección">@Mostrar(context.Direccion)</MudTd>
+                        <MudTd DataLabel="Teléfono">@Mostrar(context.TelefonoPrincipal)</MudTd>
                         <MudTd DataLabel="Zona">@Mostrar(context.Zona)</MudTd>
                         <MudTd DataLabel="Ruta">@Mostrar(context.Ruta)</MudTd>
                         <MudTd DataLabel="Clasificación">@Mostrar(context.Clasificacion)</MudTd>
@@ -242,27 +251,36 @@
                     @Tarjeta("Promedio de días", _sinPago.PromedioDias.ToString("0.#"), Icons.Material.Filled.HourglassBottom, Color.Warning, 3)
                     @Tarjeta("Máximo atraso", _sinPago.MaximoAtraso + " días", Icons.Material.Filled.ReportProblem, Color.Secondary, 3)
                 </MudGrid>
-                <div class="d-flex justify-end mb-3">
-                    <MudButton Variant="Variant.Outlined" Color="Color.Success" StartIcon="@Icons.Material.Filled.FileDownload"
+                <div class="contenedor-exportar mb-3">
+                    <MudButton Variant="Variant.Outlined" Color="Color.Success" Class="boton-exportar" StartIcon="@Icons.Material.Filled.FileDownload"
                                OnClick="ExportarSinPago" Disabled="@(_cargando || _exportando || _sinPago.Filas.Count == 0)">
                         Exportar a Excel
                     </MudButton>
                 </div>
+                <MudTextField T="string" @bind-Value="_spBusqueda" Immediate="true"
+                              Placeholder="Buscar por ID, cliente, dirección, teléfono, zona, ruta o clasificación…"
+                              Variant="Variant.Outlined" Margin="Margin.Dense" Adornment="Adornment.Start"
+                              AdornmentIcon="@Icons.Material.Filled.Search" Clearable="true" Class="mb-3" />
                 <MudTable Items="_sinPago.Filas" Hover="true" Dense="true" Breakpoint="Breakpoint.Sm"
-                          Elevation="0" RowsPerPage="15" T="ReporteSinPagoFila">
+                          Elevation="0" RowsPerPage="15" T="ReporteSinPagoFila" Class="tabla-seguimiento"
+                          Filter="new Func<ReporteSinPagoFila, bool>(FiltrarSinPago)">
                     <HeaderContent>
-                        <MudTh>ID cliente</MudTh>
-                        <MudTh>Cliente</MudTh>
-                        <MudTh>Zona</MudTh>
-                        <MudTh>Ruta</MudTh>
-                        <MudTh>Clasificación</MudTh>
-                        <MudTh>Último pago</MudTh>
-                        <MudTh Style="text-align:right;">Días sin pago</MudTh>
-                        <MudTh Style="text-align:right;">Saldo pendiente</MudTh>
+                        <MudTh><MudTableSortLabel SortBy="new Func<ReporteSinPagoFila, object>(x => x.IdCliente)">ID cliente</MudTableSortLabel></MudTh>
+                        <MudTh><MudTableSortLabel SortBy="new Func<ReporteSinPagoFila, object>(x => x.Cliente)">Cliente</MudTableSortLabel></MudTh>
+                        <MudTh>Dirección</MudTh>
+                        <MudTh>Teléfono</MudTh>
+                        <MudTh><MudTableSortLabel SortBy="new Func<ReporteSinPagoFila, object>(x => x.Zona ?? string.Empty)">Zona</MudTableSortLabel></MudTh>
+                        <MudTh><MudTableSortLabel SortBy="new Func<ReporteSinPagoFila, object>(x => x.Ruta ?? string.Empty)">Ruta</MudTableSortLabel></MudTh>
+                        <MudTh><MudTableSortLabel SortBy="new Func<ReporteSinPagoFila, object>(x => x.Clasificacion ?? string.Empty)">Clasificación</MudTableSortLabel></MudTh>
+                        <MudTh><MudTableSortLabel SortBy="new Func<ReporteSinPagoFila, object>(x => (object?)x.FechaUltimoPago ?? DateTimeOffset.MinValue)">Último pago</MudTableSortLabel></MudTh>
+                        <MudTh Style="text-align:right;"><MudTableSortLabel InitialDirection="SortDirection.Descending" SortBy="new Func<ReporteSinPagoFila, object>(x => x.DiasSinPago)">Días sin pago</MudTableSortLabel></MudTh>
+                        <MudTh Style="text-align:right;"><MudTableSortLabel SortBy="new Func<ReporteSinPagoFila, object>(x => x.SaldoPendiente)">Saldo pendiente</MudTableSortLabel></MudTh>
                     </HeaderContent>
                     <RowTemplate>
                         <MudTd DataLabel="ID cliente">@context.IdCliente</MudTd>
                         <MudTd DataLabel="Cliente"><b>@context.Cliente</b></MudTd>
+                        <MudTd DataLabel="Dirección">@Mostrar(context.Direccion)</MudTd>
+                        <MudTd DataLabel="Teléfono">@Mostrar(context.TelefonoPrincipal)</MudTd>
                         <MudTd DataLabel="Zona">@Mostrar(context.Zona)</MudTd>
                         <MudTd DataLabel="Ruta">@Mostrar(context.Ruta)</MudTd>
                         <MudTd DataLabel="Clasificación">@Mostrar(context.Clasificacion)</MudTd>
@@ -335,27 +353,36 @@
                     @Tarjeta("Saldo total", _ranking.SaldoTotal.ToString("C2"), Icons.Material.Filled.AccountBalanceWallet, Color.Warning, 3)
                     @Tarjeta("Participación Top 10", _ranking.ParticipacionTop10.ToString("0.##") + " %", Icons.Material.Filled.PieChart, Color.Info, 3)
                 </MudGrid>
-                <div class="d-flex justify-end mb-3">
-                    <MudButton Variant="Variant.Outlined" Color="Color.Success" StartIcon="@Icons.Material.Filled.FileDownload"
+                <div class="contenedor-exportar mb-3">
+                    <MudButton Variant="Variant.Outlined" Color="Color.Success" Class="boton-exportar" StartIcon="@Icons.Material.Filled.FileDownload"
                                OnClick="ExportarRanking" Disabled="@(_cargando || _exportando || _ranking.Filas.Count == 0)">
                         Exportar a Excel
                     </MudButton>
                 </div>
+                <MudTextField T="string" @bind-Value="_rkBusqueda" Immediate="true"
+                              Placeholder="Buscar por cliente, dirección, teléfono, zona, ruta o clasificación…"
+                              Variant="Variant.Outlined" Margin="Margin.Dense" Adornment="Adornment.Start"
+                              AdornmentIcon="@Icons.Material.Filled.Search" Clearable="true" Class="mb-3" />
                 <MudTable Items="_ranking.Filas" Hover="true" Dense="true" Breakpoint="Breakpoint.Sm"
-                          Elevation="0" RowsPerPage="15" T="ReporteRankingDeudoresFila">
+                          Elevation="0" RowsPerPage="15" T="ReporteRankingDeudoresFila" Class="tabla-seguimiento"
+                          Filter="new Func<ReporteRankingDeudoresFila, bool>(FiltrarRanking)">
                     <HeaderContent>
-                        <MudTh>Posición</MudTh>
-                        <MudTh>Cliente</MudTh>
-                        <MudTh>Zona</MudTh>
-                        <MudTh>Ruta</MudTh>
-                        <MudTh>Clasificación</MudTh>
-                        <MudTh>Último pago</MudTh>
-                        <MudTh Style="text-align:right;">Días</MudTh>
-                        <MudTh Style="text-align:right;">Saldo pendiente</MudTh>
+                        <MudTh><MudTableSortLabel SortBy="new Func<ReporteRankingDeudoresFila, object>(x => x.Posicion)">Posición</MudTableSortLabel></MudTh>
+                        <MudTh><MudTableSortLabel SortBy="new Func<ReporteRankingDeudoresFila, object>(x => x.Cliente)">Cliente</MudTableSortLabel></MudTh>
+                        <MudTh>Dirección</MudTh>
+                        <MudTh>Teléfono</MudTh>
+                        <MudTh><MudTableSortLabel SortBy="new Func<ReporteRankingDeudoresFila, object>(x => x.Zona ?? string.Empty)">Zona</MudTableSortLabel></MudTh>
+                        <MudTh><MudTableSortLabel SortBy="new Func<ReporteRankingDeudoresFila, object>(x => x.Ruta ?? string.Empty)">Ruta</MudTableSortLabel></MudTh>
+                        <MudTh><MudTableSortLabel SortBy="new Func<ReporteRankingDeudoresFila, object>(x => x.Clasificacion ?? string.Empty)">Clasificación</MudTableSortLabel></MudTh>
+                        <MudTh><MudTableSortLabel SortBy="new Func<ReporteRankingDeudoresFila, object>(x => (object?)x.FechaUltimoPago ?? DateTimeOffset.MinValue)">Último pago</MudTableSortLabel></MudTh>
+                        <MudTh Style="text-align:right;"><MudTableSortLabel SortBy="new Func<ReporteRankingDeudoresFila, object>(x => x.DiasTranscurridos)">Días</MudTableSortLabel></MudTh>
+                        <MudTh Style="text-align:right;"><MudTableSortLabel InitialDirection="SortDirection.Descending" SortBy="new Func<ReporteRankingDeudoresFila, object>(x => x.SaldoPendiente)">Saldo pendiente</MudTableSortLabel></MudTh>
                     </HeaderContent>
                     <RowTemplate>
                         <MudTd DataLabel="Posición"><b>@context.Posicion</b></MudTd>
                         <MudTd DataLabel="Cliente"><b>@context.Cliente</b></MudTd>
+                        <MudTd DataLabel="Dirección">@Mostrar(context.Direccion)</MudTd>
+                        <MudTd DataLabel="Teléfono">@Mostrar(context.TelefonoPrincipal)</MudTd>
                         <MudTd DataLabel="Zona">@Mostrar(context.Zona)</MudTd>
                         <MudTd DataLabel="Ruta">@Mostrar(context.Ruta)</MudTd>
                         <MudTd DataLabel="Clasificación">@Mostrar(context.Clasificacion)</MudTd>
@@ -421,19 +448,19 @@
                     @Tarjeta("Mayor clasificación", Mostrar(_carteraClasif.MayorClasificacion), Icons.Material.Filled.PieChart, Color.Info, 3)
                     @Tarjeta("Clasificación de riesgo", Mostrar(_carteraClasif.ClasificacionRiesgo), Icons.Material.Filled.ReportProblem, Color.Warning, 3)
                 </MudGrid>
-                <div class="d-flex justify-end mb-3">
-                    <MudButton Variant="Variant.Outlined" Color="Color.Success" StartIcon="@Icons.Material.Filled.FileDownload"
+                <div class="contenedor-exportar mb-3">
+                    <MudButton Variant="Variant.Outlined" Color="Color.Success" Class="boton-exportar" StartIcon="@Icons.Material.Filled.FileDownload"
                                OnClick="ExportarCarteraClasificacion" Disabled="@(_cargando || _exportando || _carteraClasif.Filas.Count == 0)">
                         Exportar a Excel
                     </MudButton>
                 </div>
                 <MudTable Items="_carteraClasif.Filas" Hover="true" Dense="true" Breakpoint="Breakpoint.Sm"
-                          Elevation="0" RowsPerPage="15" T="ReporteCarteraClasificacionFila">
+                          Elevation="0" RowsPerPage="15" T="ReporteCarteraClasificacionFila" Class="tabla-seguimiento">
                     <HeaderContent>
-                        <MudTh>Clasificación</MudTh>
-                        <MudTh Style="text-align:right;">Clientes</MudTh>
-                        <MudTh Style="text-align:right;">Saldo pendiente</MudTh>
-                        <MudTh Style="text-align:right;">Porcentaje</MudTh>
+                        <MudTh><MudTableSortLabel SortBy="new Func<ReporteCarteraClasificacionFila, object>(x => x.Clasificacion)">Clasificación</MudTableSortLabel></MudTh>
+                        <MudTh Style="text-align:right;"><MudTableSortLabel SortBy="new Func<ReporteCarteraClasificacionFila, object>(x => x.Clientes)">Clientes</MudTableSortLabel></MudTh>
+                        <MudTh Style="text-align:right;"><MudTableSortLabel InitialDirection="SortDirection.Descending" SortBy="new Func<ReporteCarteraClasificacionFila, object>(x => x.SaldoPendiente)">Saldo pendiente</MudTableSortLabel></MudTh>
+                        <MudTh Style="text-align:right;"><MudTableSortLabel SortBy="new Func<ReporteCarteraClasificacionFila, object>(x => x.Porcentaje)">Porcentaje</MudTableSortLabel></MudTh>
                     </HeaderContent>
                     <RowTemplate>
                         <MudTd DataLabel="Clasificación"><b>@context.Clasificacion</b></MudTd>
@@ -499,20 +526,20 @@
                     @Tarjeta("Top 20", _concentracion.Top20.ToString("C2"), Icons.Material.Filled.Leaderboard, Color.Info, 3)
                     @Tarjeta("% de concentración (Top 10)", _concentracion.PorcentajeConcentracion.ToString("0.##") + " %", Icons.Material.Filled.DonutLarge, Color.Secondary, 3)
                 </MudGrid>
-                <div class="d-flex justify-end mb-3">
-                    <MudButton Variant="Variant.Outlined" Color="Color.Success" StartIcon="@Icons.Material.Filled.FileDownload"
+                <div class="contenedor-exportar mb-3">
+                    <MudButton Variant="Variant.Outlined" Color="Color.Success" Class="boton-exportar" StartIcon="@Icons.Material.Filled.FileDownload"
                                OnClick="ExportarConcentracion" Disabled="@(_cargando || _exportando || _concentracion.Filas.Count == 0)">
                         Exportar a Excel
                     </MudButton>
                 </div>
                 <MudTable Items="_concentracion.Filas" Hover="true" Dense="true" Breakpoint="Breakpoint.Sm"
-                          Elevation="0" RowsPerPage="15" T="ReporteConcentracionFila">
+                          Elevation="0" RowsPerPage="15" T="ReporteConcentracionFila" Class="tabla-seguimiento">
                     <HeaderContent>
-                        <MudTh>Cliente</MudTh>
-                        <MudTh Style="text-align:right;">Saldo pendiente</MudTh>
-                        <MudTh Style="text-align:right;">Participación</MudTh>
-                        <MudTh>Clasificación</MudTh>
-                        <MudTh>Zona</MudTh>
+                        <MudTh><MudTableSortLabel SortBy="new Func<ReporteConcentracionFila, object>(x => x.Posicion)">Cliente</MudTableSortLabel></MudTh>
+                        <MudTh Style="text-align:right;"><MudTableSortLabel InitialDirection="SortDirection.Descending" SortBy="new Func<ReporteConcentracionFila, object>(x => x.SaldoPendiente)">Saldo pendiente</MudTableSortLabel></MudTh>
+                        <MudTh Style="text-align:right;"><MudTableSortLabel SortBy="new Func<ReporteConcentracionFila, object>(x => x.Participacion)">Participación</MudTableSortLabel></MudTh>
+                        <MudTh><MudTableSortLabel SortBy="new Func<ReporteConcentracionFila, object>(x => x.Clasificacion ?? string.Empty)">Clasificación</MudTableSortLabel></MudTh>
+                        <MudTh><MudTableSortLabel SortBy="new Func<ReporteConcentracionFila, object>(x => x.Zona ?? string.Empty)">Zona</MudTableSortLabel></MudTh>
                     </HeaderContent>
                     <RowTemplate>
                         <MudTd DataLabel="Cliente"><b>@context.Posicion. @context.Cliente</b></MudTd>
@@ -529,13 +556,171 @@
             </MudPaper>
         }
     </MudTabPanel>
+
+    <!-- ===================== COBERTURA DE COBRANZA ===================== -->
+    <MudTabPanel Text="Cobertura de cobranza" Icon="@Icons.Material.Filled.FactCheck">
+        <MudPaper Elevation="0" Class="pa-4">
+            <div class="seccion-titulo mb-3">
+                <MudIcon Icon="@Icons.Material.Filled.FilterAlt" Size="Size.Small" Class="mr-1" />
+                Filtros de cobertura de cobranza
+            </div>
+            <MudGrid Spacing="2" Class="align-end">
+                <MudItem xs="12" sm="6" md="3">
+                    <MudDatePicker Label="Desde" @bind-Date="_cobDesde" Variant="Variant.Outlined" Clearable="true" />
+                </MudItem>
+                <MudItem xs="12" sm="6" md="3">
+                    <MudDatePicker Label="Hasta" @bind-Date="_cobHasta" Variant="Variant.Outlined" Clearable="true" />
+                </MudItem>
+                <MudItem xs="12" sm="6" md="3">
+                    <AutocompletarCatalogo TItem="ZonaDto" Label="Zona" Placeholder="Todas"
+                                           @bind-Value="_cobZona"
+                                           Items="_zonas"
+                                           ObtenerId="@(z => z.IdZona)"
+                                           ObtenerTexto="@(z => z.Descripcion)" />
+                </MudItem>
+                <MudItem xs="12" sm="6" md="3">
+                    <AutocompletarCatalogo TItem="RutaAdminDto" Label="Ruta" Placeholder="Todas"
+                                           @bind-Value="_cobRuta"
+                                           Items="_rutas"
+                                           ObtenerId="@(r => r.IdRuta)"
+                                           ObtenerTexto="@(r => r.Descripcion)" />
+                </MudItem>
+            </MudGrid>
+
+            <div class="d-flex justify-end mt-3 contenedor-generar">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Assessment"
+                           OnClick="GenerarCoberturaAsync" Disabled="_cargando" Class="boton-generar">
+                    Generar reporte
+                </MudButton>
+            </div>
+        </MudPaper>
+
+        @if (_cargando && _tabActivo == 6)
+        {
+            @CargandoFragment
+        }
+        else if (_cobertura is not null)
+        {
+            <MudPaper Elevation="0" Outlined="true" Class="pa-3 ma-2">
+                <div class="seccion-titulo mb-2">
+                    <MudIcon Icon="@Icons.Material.Filled.FactCheck" Size="Size.Small" Class="mr-1" />
+                    Cobertura de cobranza (@_cobertura.TotalCreditos créditos)
+                </div>
+                <MudGrid Spacing="2" Class="mb-3">
+                    @Tarjeta("% Cobertura global", _cobertura.PorcentajeCoberturaGlobal.ToString("0.##") + " %", Icons.Material.Filled.Percent, Color.Primary, 3)
+                    @Tarjeta("Pagaron", _cobertura.Pagaron.ToString("N0"), Icons.Material.Filled.CheckCircle, Color.Success, 3)
+                    @Tarjeta("Parciales", _cobertura.Parciales.ToString("N0"), Icons.Material.Filled.Adjust, Color.Warning, 3)
+                    @Tarjeta("No pagaron", _cobertura.NoPagaron.ToString("N0"), Icons.Material.Filled.Cancel, Color.Error, 3)
+                    @Tarjeta("Esperado", _cobertura.EsperadoGlobal.ToString("C2"), Icons.Material.Filled.RequestQuote, Color.Info, 3)
+                    @Tarjeta("Cobrado", _cobertura.CobradoGlobal.ToString("C2"), Icons.Material.Filled.Payments, Color.Success, 3)
+                    @Tarjeta("Sin frecuencia", _cobertura.SinFrecuencia.ToString("N0"), Icons.Material.Filled.HelpOutline, Color.Secondary, 3)
+                    @Tarjeta("Créditos", _cobertura.TotalCreditos.ToString("N0"), Icons.Material.Filled.ReceiptLong, Color.Default, 3)
+                </MudGrid>
+
+                <div class="contenedor-exportar mb-3">
+                    <MudButton Variant="Variant.Outlined" Color="Color.Success" Class="boton-exportar" StartIcon="@Icons.Material.Filled.FileDownload"
+                               OnClick="ExportarCobertura" Disabled="@(_cargando || _exportando || _cobertura.Detalle.Count == 0)">
+                        Exportar a Excel
+                    </MudButton>
+                </div>
+
+                <!-- Resumen por zona -->
+                <MudText Typo="Typo.subtitle2" Class="mb-2"><b>Resumen por zona</b></MudText>
+                <MudTable Items="_cobertura.Resumen" Hover="true" Dense="true" Breakpoint="Breakpoint.Sm"
+                          Elevation="0" RowsPerPage="10" T="ReporteCoberturaResumenFila" Class="tabla-seguimiento mb-4">
+                    <HeaderContent>
+                        <MudTh>Zona</MudTh>
+                        <MudTh Style="text-align:right;">Créditos</MudTh>
+                        <MudTh Style="text-align:right;">Pagaron</MudTh>
+                        <MudTh Style="text-align:right;">Parciales</MudTh>
+                        <MudTh Style="text-align:right;">No pagaron</MudTh>
+                        <MudTh Style="text-align:right;">Sin frec.</MudTh>
+                        <MudTh Style="text-align:right;">Esperado</MudTh>
+                        <MudTh Style="text-align:right;">Cobrado</MudTh>
+                        <MudTh Style="text-align:right;">% Cobertura</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd DataLabel="Zona"><b>@Mostrar(context.Zona)</b></MudTd>
+                        <MudTd DataLabel="Créditos" Style="text-align:right;">@context.TotalCreditos</MudTd>
+                        <MudTd DataLabel="Pagaron" Style="text-align:right;">@context.Pagaron</MudTd>
+                        <MudTd DataLabel="Parciales" Style="text-align:right;">@context.Parciales</MudTd>
+                        <MudTd DataLabel="No pagaron" Style="text-align:right;"><b class="saldo-pendiente">@context.NoPagaron</b></MudTd>
+                        <MudTd DataLabel="Sin frec." Style="text-align:right;">@context.SinFrecuencia</MudTd>
+                        <MudTd DataLabel="Esperado" Style="text-align:right;">@context.EsperadoTotal.ToString("C2")</MudTd>
+                        <MudTd DataLabel="Cobrado" Style="text-align:right;">@context.CobradoTotal.ToString("C2")</MudTd>
+                        <MudTd DataLabel="% Cobertura" Style="text-align:right;"><b>@context.PorcentajeCobertura.ToString("0.##") %</b></MudTd>
+                    </RowTemplate>
+                    <NoRecordsContent>@SinDatosFragment</NoRecordsContent>
+                </MudTable>
+
+                <!-- Detalle por crédito -->
+                <MudText Typo="Typo.subtitle2" Class="mb-2"><b>Detalle por crédito</b></MudText>
+                <MudTextField T="string" @bind-Value="_cobBusqueda" Immediate="true"
+                              Placeholder="Buscar por cliente, código, producto, zona, ruta o estado…" Variant="Variant.Outlined"
+                              Margin="Margin.Dense" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
+                              Clearable="true" Class="mb-3" />
+                <MudTable Items="_cobertura.Detalle" Hover="true" Dense="true" Breakpoint="Breakpoint.Sm"
+                          Elevation="0" RowsPerPage="20" T="ReporteCoberturaFila" Class="tabla-seguimiento"
+                          Filter="new Func<ReporteCoberturaFila, bool>(FiltrarCobertura)">
+                    <HeaderContent>
+                        <MudTh><MudTableSortLabel SortBy="new Func<ReporteCoberturaFila, object>(x => x.IdCliente)">ID cliente</MudTableSortLabel></MudTh>
+                        <MudTh><MudTableSortLabel SortBy="new Func<ReporteCoberturaFila, object>(x => x.Cliente)">Cliente</MudTableSortLabel></MudTh>
+                        <MudTh>Dirección</MudTh>
+                        <MudTh>Teléfono</MudTh>
+                        <MudTh><MudTableSortLabel SortBy="new Func<ReporteCoberturaFila, object>(x => x.CodigoVenta ?? string.Empty)">Código venta</MudTableSortLabel></MudTh>
+                        <MudTh>Producto</MudTh>
+                        <MudTh><MudTableSortLabel SortBy="new Func<ReporteCoberturaFila, object>(x => x.Zona ?? string.Empty)">Zona</MudTableSortLabel></MudTh>
+                        <MudTh><MudTableSortLabel SortBy="new Func<ReporteCoberturaFila, object>(x => x.Ruta ?? string.Empty)">Ruta</MudTableSortLabel></MudTh>
+                        <MudTh>Frecuencia</MudTh>
+                        <MudTh Style="text-align:right;"><MudTableSortLabel SortBy="new Func<ReporteCoberturaFila, object>(x => x.MontoCuota)">Cuota</MudTableSortLabel></MudTh>
+                        <MudTh Style="text-align:right;"><MudTableSortLabel SortBy="new Func<ReporteCoberturaFila, object>(x => x.MontoEsperado)">Esperado</MudTableSortLabel></MudTh>
+                        <MudTh Style="text-align:right;"><MudTableSortLabel SortBy="new Func<ReporteCoberturaFila, object>(x => x.MontoCobrado)">Cobrado</MudTableSortLabel></MudTh>
+                        <MudTh Style="text-align:right;"><MudTableSortLabel SortBy="new Func<ReporteCoberturaFila, object>(x => x.SaldoPendiente)">Saldo</MudTableSortLabel></MudTh>
+                        <MudTh>Último pago</MudTh>
+                        <MudTh Style="text-align:right;"><MudTableSortLabel SortBy="new Func<ReporteCoberturaFila, object>(x => x.DiasSinPago)">Días</MudTableSortLabel></MudTh>
+                        <MudTh>Estado</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd DataLabel="ID cliente">@context.IdCliente</MudTd>
+                        <MudTd DataLabel="Cliente"><b>@context.Cliente</b></MudTd>
+                        <MudTd DataLabel="Dirección">@Mostrar(context.Direccion)</MudTd>
+                        <MudTd DataLabel="Teléfono">@Mostrar(context.TelefonoPrincipal)</MudTd>
+                        <MudTd DataLabel="Código venta">@Mostrar(context.CodigoVenta)</MudTd>
+                        <MudTd DataLabel="Producto">@Mostrar(context.Productos)</MudTd>
+                        <MudTd DataLabel="Zona">@Mostrar(context.Zona)</MudTd>
+                        <MudTd DataLabel="Ruta">@Mostrar(context.Ruta)</MudTd>
+                        <MudTd DataLabel="Frecuencia">@Mostrar(context.Frecuencia)</MudTd>
+                        <MudTd DataLabel="Cuota" Style="text-align:right;">@context.MontoCuota.ToString("C2")</MudTd>
+                        <MudTd DataLabel="Esperado" Style="text-align:right;">@context.MontoEsperado.ToString("C2")</MudTd>
+                        <MudTd DataLabel="Cobrado" Style="text-align:right;">@context.MontoCobrado.ToString("C2")</MudTd>
+                        <MudTd DataLabel="Saldo" Style="text-align:right;"><b class="saldo-pendiente">@context.SaldoPendiente.ToString("C2")</b></MudTd>
+                        <MudTd DataLabel="Último pago">@FechaCorta(context.FechaUltimoPago)</MudTd>
+                        <MudTd DataLabel="Días" Style="text-align:right;">@context.DiasSinPago</MudTd>
+                        <MudTd DataLabel="Estado"><MudChip T="string" Size="Size.Small" Variant="Variant.Filled" Color="@ColorEstadoCobertura(context.Estado)">@EtiquetaEstadoCobertura(context.Estado)</MudChip></MudTd>
+                    </RowTemplate>
+                    <NoRecordsContent>@SinDatosFragment</NoRecordsContent>
+                    <PagerContent>
+                        <MudTablePager InfoFormat="{first_item}-{last_item} de {all_items}" RowsPerPageString="Filas:" />
+                    </PagerContent>
+                </MudTable>
+            </MudPaper>
+        }
+    </MudTabPanel>
 </MudTabs>
 
 <style>
     /* En pantallas chicas el botón "Generar reporte" ocupa todo el ancho (todas las pestañas). */
+    .contenedor-exportar {
+        display: flex;
+        justify-content: flex-end;
+    }
     @@media (max-width: 599.98px) {
         .contenedor-generar { justify-content: stretch; }
         .contenedor-generar .boton-generar { width: 100%; }
+
+        /* En pantallas chicas el botón "Exportar a Excel" ocupa todo el ancho. */
+        .contenedor-exportar { align-items: stretch; }
+        .contenedor-exportar .boton-exportar { width: 100%; }
     }
 </style>
 
@@ -562,6 +747,7 @@
     private long? _antZona;
     private long? _antRuta;
     private long? _antClasificacion;
+    private string? _antBusqueda;
     private ReporteAntiguedadResponse? _antiguedad;
 
     // ---- Clientes sin pago reciente ----
@@ -569,12 +755,14 @@
     private long? _spRuta;
     private long? _spClasificacion;
     private int _spDias = 15;
+    private string? _spBusqueda;
     private ReporteSinPagoResponse? _sinPago;
 
     // ---- Ranking de deudores ----
     private long? _rkZona;
     private long? _rkRuta;
     private long? _rkClasificacion;
+    private string? _rkBusqueda;
     private ReporteRankingDeudoresResponse? _ranking;
 
     // ---- Cartera por clasificación ----
@@ -586,6 +774,14 @@
     private long? _conZona;
     private long? _conRuta;
     private ReporteConcentracionResponse? _concentracion;
+
+    // ---- Cobertura de cobranza ----
+    private DateTime? _cobDesde = FechaProyecto.Hoy.AddDays(-30);
+    private DateTime? _cobHasta = FechaProyecto.Hoy;
+    private long? _cobZona;
+    private long? _cobRuta;
+    private string? _cobBusqueda;
+    private ReporteCoberturaResponse? _cobertura;
 
     protected override async Task OnInitializedAsync()
     {
@@ -696,6 +892,73 @@
         finally { _cargando = false; }
     }
 
+    private async Task GenerarCoberturaAsync()
+    {
+        _tabActivo = 6;
+        _cargando = true;
+        try
+        {
+            var (datos, error) = await Api.ReporteCoberturaCobranzaAsync(ADesde(_cobDesde), AHasta(_cobHasta), _cobZona, _cobRuta);
+            if (error is not null) { Snackbar.Add(error, Severity.Error); return; }
+            _cobertura = datos;
+        }
+        finally { _cargando = false; }
+    }
+
+    // Búsqueda del detalle de cobertura.
+    private bool FiltrarCobertura(ReporteCoberturaFila f)
+    {
+        var t = _cobBusqueda;
+        if (string.IsNullOrWhiteSpace(t)) return true;
+        bool Contiene(string? v) => (v ?? string.Empty).Contains(t, StringComparison.OrdinalIgnoreCase);
+        return Contiene(f.Cliente) || Contiene(f.CodigoVenta) || Contiene(f.Productos)
+            || Contiene(f.Zona) || Contiene(f.Ruta) || Contiene(EtiquetaEstadoCobertura(f.Estado));
+    }
+
+    private static bool Contiene(string? valor, string termino)
+        => (valor ?? string.Empty).Contains(termino, StringComparison.OrdinalIgnoreCase);
+
+    private bool FiltrarAntiguedad(ReporteAntiguedadFila f)
+    {
+        var t = _antBusqueda;
+        if (string.IsNullOrWhiteSpace(t)) return true;
+        return Contiene(f.Cliente, t) || Contiene(f.Direccion, t) || Contiene(f.TelefonoPrincipal, t)
+            || Contiene(f.Zona, t) || Contiene(f.Ruta, t) || Contiene(f.Clasificacion, t) || Contiene(f.Rango, t);
+    }
+
+    private bool FiltrarSinPago(ReporteSinPagoFila f)
+    {
+        var t = _spBusqueda;
+        if (string.IsNullOrWhiteSpace(t)) return true;
+        return Contiene(f.IdCliente.ToString(), t) || Contiene(f.Cliente, t) || Contiene(f.Direccion, t)
+            || Contiene(f.TelefonoPrincipal, t) || Contiene(f.Zona, t) || Contiene(f.Ruta, t) || Contiene(f.Clasificacion, t);
+    }
+
+    private bool FiltrarRanking(ReporteRankingDeudoresFila f)
+    {
+        var t = _rkBusqueda;
+        if (string.IsNullOrWhiteSpace(t)) return true;
+        return Contiene(f.Cliente, t) || Contiene(f.Direccion, t) || Contiene(f.TelefonoPrincipal, t)
+            || Contiene(f.Zona, t) || Contiene(f.Ruta, t) || Contiene(f.Clasificacion, t);
+    }
+
+    private static string EtiquetaEstadoCobertura(string estado) => estado switch
+    {
+        EstadoCobertura.Pago => "Pagó",
+        EstadoCobertura.Parcial => "Parcial",
+        EstadoCobertura.NoPago => "No pagó",
+        EstadoCobertura.SinFrecuencia => "Sin frecuencia",
+        _ => estado
+    };
+
+    private static Color ColorEstadoCobertura(string estado) => estado switch
+    {
+        EstadoCobertura.Pago => Color.Success,
+        EstadoCobertura.Parcial => Color.Warning,
+        EstadoCobertura.NoPago => Color.Error,
+        _ => Color.Default
+    };
+
     // ---- Exportación a Excel con formato (empresa, filtros, KPIs, tabla y totales) ----
 
     private async Task ExportarReporteAsync(string archivo, string titulo, Dictionary<string, string> filtros,
@@ -764,10 +1027,10 @@
             Kpi("Saldo crítico (+30 días)", a.SaldoCritico.ToString("C2")),
             Kpi("Máximo atraso", $"{a.MaximoAtraso} días")
         ],
-        ["Cliente", "Zona", "Ruta", "Clasificación", "Último pago", "Días transcurridos", "Saldo pendiente", "Rango"],
-        a.Filas.Select(f => new object?[] { f.Cliente, f.Zona, f.Ruta, f.Clasificacion, FechaCorta(f.FechaUltimoPago),
+        ["Cliente", "Dirección", "Teléfono", "Zona", "Ruta", "Clasificación", "Último pago", "Días transcurridos", "Saldo pendiente", "Rango"],
+        a.Filas.Select(f => new object?[] { f.Cliente, f.Direccion, f.TelefonoPrincipal, f.Zona, f.Ruta, f.Clasificacion, FechaCorta(f.FechaUltimoPago),
             f.DiasTranscurridos, f.SaldoPendiente, f.Rango }),
-        [7]);
+        [9]);
 
     private Task ExportarSinPago() => _sinPago is not { } p ? Task.CompletedTask : ExportarReporteAsync(
         "ClientesSinPago", "CLIENTES SIN PAGO RECIENTE",
@@ -778,10 +1041,10 @@
             Kpi("Promedio de días", p.PromedioDias.ToString("0.#")),
             Kpi("Máximo atraso", $"{p.MaximoAtraso} días")
         ],
-        ["ID cliente", "Cliente", "Zona", "Ruta", "Clasificación", "Último pago", "Días sin pago", "Saldo pendiente"],
-        p.Filas.Select(f => new object?[] { f.IdCliente, f.Cliente, f.Zona, f.Ruta, f.Clasificacion,
+        ["ID cliente", "Cliente", "Dirección", "Teléfono", "Zona", "Ruta", "Clasificación", "Último pago", "Días sin pago", "Saldo pendiente"],
+        p.Filas.Select(f => new object?[] { f.IdCliente, f.Cliente, f.Direccion, f.TelefonoPrincipal, f.Zona, f.Ruta, f.Clasificacion,
             FechaCorta(f.FechaUltimoPago), f.DiasSinPago, f.SaldoPendiente }),
-        [8]);
+        [10]);
 
     private Task ExportarRanking() => _ranking is not { } r ? Task.CompletedTask : ExportarReporteAsync(
         "RankingDeudores", "RANKING DE DEUDORES",
@@ -792,10 +1055,10 @@
             Kpi("Saldo total", r.SaldoTotal.ToString("C2")),
             Kpi("Participación Top 10", $"{r.ParticipacionTop10:0.##} %")
         ],
-        ["Posición", "Cliente", "Zona", "Ruta", "Clasificación", "Último pago", "Días", "Saldo pendiente"],
-        r.Filas.Select(f => new object?[] { f.Posicion, f.Cliente, f.Zona, f.Ruta, f.Clasificacion,
+        ["Posición", "Cliente", "Dirección", "Teléfono", "Zona", "Ruta", "Clasificación", "Último pago", "Días", "Saldo pendiente"],
+        r.Filas.Select(f => new object?[] { f.Posicion, f.Cliente, f.Direccion, f.TelefonoPrincipal, f.Zona, f.Ruta, f.Clasificacion,
             FechaCorta(f.FechaUltimoPago), f.DiasTranscurridos, f.SaldoPendiente }),
-        [8]);
+        [10]);
 
     private Task ExportarCarteraClasificacion() => _carteraClasif is not { } c ? Task.CompletedTask : ExportarReporteAsync(
         "CarteraPorClasificacion", "CARTERA POR CLASIFICACIÓN",
@@ -822,6 +1085,30 @@
         ["Posición", "Cliente", "Saldo pendiente", "Participación", "Clasificación", "Zona"],
         c.Filas.Select(f => new object?[] { f.Posicion, f.Cliente, f.SaldoPendiente, $"{f.Participacion:0.##} %", f.Clasificacion, f.Zona }),
         [3]);
+
+    private Task ExportarCobertura() => _cobertura is not { } c ? Task.CompletedTask : ExportarReporteAsync(
+        "CoberturaCobranza", "COBERTURA DE COBRANZA",
+        new()
+        {
+            ["Desde"] = Fecha(_cobDesde),
+            ["Hasta"] = Fecha(_cobHasta),
+            ["Zona"] = _zonas.FirstOrDefault(x => x.IdZona == _cobZona)?.Descripcion ?? "Todas",
+            ["Ruta"] = _rutas.FirstOrDefault(x => x.IdRuta == _cobRuta)?.Descripcion ?? "Todas"
+        },
+        [
+            Kpi("% Cobertura global", $"{c.PorcentajeCoberturaGlobal:0.##} %"),
+            Kpi("Pagaron", c.Pagaron.ToString("N0")),
+            Kpi("Parciales", c.Parciales.ToString("N0")),
+            Kpi("No pagaron", c.NoPagaron.ToString("N0")),
+            Kpi("Esperado", c.EsperadoGlobal.ToString("C2")),
+            Kpi("Cobrado", c.CobradoGlobal.ToString("C2"))
+        ],
+        ["ID cliente", "Cliente", "Dirección", "Teléfono", "Código venta", "Producto", "Zona", "Ruta", "Frecuencia",
+         "Cuota", "Esperado", "Cobrado", "Saldo", "Último pago", "Días sin pago", "Estado"],
+        c.Detalle.Select(f => new object?[] { f.IdCliente, f.Cliente, f.Direccion, f.TelefonoPrincipal, f.CodigoVenta, f.Productos,
+            f.Zona, f.Ruta, f.Frecuencia, f.MontoCuota, f.MontoEsperado, f.MontoCobrado, f.SaldoPendiente,
+            FechaCorta(f.FechaUltimoPago), f.DiasSinPago, EtiquetaEstadoCobertura(f.Estado) }),
+        [10, 11, 12, 13]);
 
 
     // ===================== Helpers =====================

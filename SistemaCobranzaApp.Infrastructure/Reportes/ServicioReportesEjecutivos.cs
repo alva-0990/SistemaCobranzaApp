@@ -20,7 +20,8 @@ public partial class ServicioReportes
     // Deuda consolidada por cliente: se toma la venta más rezagada como representante (días y último pago).
     private sealed record ClienteDeuda(
         long IdCliente, string Cliente, string? Zona, string? Ruta, long? IdClasificacion, string? Clasificacion,
-        DateTimeOffset? FechaUltimoPago, int Dias, int DiasPeriodo, decimal Saldo);
+        DateTimeOffset? FechaUltimoPago, int Dias, int DiasPeriodo, decimal Saldo,
+        string? Direccion, string? TelefonoPrincipal);
 
     private static List<ClienteDeuda> AgruparPorCliente(IEnumerable<ReporteSeguimientoFila> filas)
         => filas.GroupBy(f => f.IdCliente).Select(g =>
@@ -30,7 +31,7 @@ public partial class ServicioReportes
             var ruta = g.Select(x => x.Ruta).FirstOrDefault(r => r is not null);
             return new ClienteDeuda(peor.IdCliente, peor.Cliente, peor.Zona, ruta, peor.IdClasificacion,
                 peor.Clasificacion, peor.FechaUltimoPago, peor.DiasTranscurridos, peor.DiasPeriodo,
-                g.Sum(x => x.TotalPendiente));
+                g.Sum(x => x.TotalPendiente), peor.Direccion, peor.TelefonoPrincipal);
         }).ToList();
 
     private static decimal Porcentaje(decimal parte, decimal total)
@@ -105,7 +106,8 @@ public partial class ServicioReportes
 
         var filas = clientes.OrderByDescending(c => c.Dias).ThenByDescending(c => c.Saldo)
             .Select(c => new ReporteAntiguedadFila(c.IdCliente, c.Cliente, c.Zona, c.Ruta, c.Clasificacion,
-                c.FechaUltimoPago, c.Dias, c.Saldo, RangoAntiguedad(c.Dias)))
+                c.FechaUltimoPago, c.Dias, c.Saldo, RangoAntiguedad(c.Dias))
+            { Direccion = c.Direccion, TelefonoPrincipal = c.TelefonoPrincipal })
             .ToList();
 
         var rangos = RangosAntiguedad.Select(r =>
@@ -130,7 +132,8 @@ public partial class ServicioReportes
         var filas = clientes.Where(c => c.Dias >= f.DiasSinPago)
             .OrderByDescending(c => c.Dias)
             .Select(c => new ReporteSinPagoFila(c.IdCliente, c.Cliente, c.Zona, c.Ruta, c.Clasificacion,
-                c.FechaUltimoPago, c.Dias, c.Saldo))
+                c.FechaUltimoPago, c.Dias, c.Saldo)
+            { Direccion = c.Direccion, TelefonoPrincipal = c.TelefonoPrincipal })
             .ToList();
 
         return new ReporteSinPagoResponse(
@@ -147,7 +150,8 @@ public partial class ServicioReportes
         var total = clientes.Sum(c => c.Saldo);
 
         var filas = clientes.Select((c, i) => new ReporteRankingDeudoresFila(i + 1, c.IdCliente, c.Cliente, c.Zona,
-            c.Ruta, c.Clasificacion, c.FechaUltimoPago, c.Dias, c.Saldo)).ToList();
+            c.Ruta, c.Clasificacion, c.FechaUltimoPago, c.Dias, c.Saldo)
+        { Direccion = c.Direccion, TelefonoPrincipal = c.TelefonoPrincipal }).ToList();
 
         var top10 = clientes.Take(10).Sum(c => c.Saldo);
         return new ReporteRankingDeudoresResponse(filas, total, clientes.FirstOrDefault()?.Cliente,

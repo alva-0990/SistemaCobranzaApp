@@ -38,7 +38,11 @@ public record ReporteAntiguedadFila(
     DateTimeOffset? FechaUltimoPago,
     int DiasTranscurridos,
     decimal SaldoPendiente,
-    string Rango);
+    string Rango)
+{
+    public string? Direccion { get; init; }
+    public string? TelefonoPrincipal { get; init; }
+}
 
 public record ReporteAntiguedadRangoFila(
     string Rango,
@@ -69,7 +73,11 @@ public record ReporteSinPagoFila(
     string? Clasificacion,
     DateTimeOffset? FechaUltimoPago,
     int DiasSinPago,
-    decimal SaldoPendiente);
+    decimal SaldoPendiente)
+{
+    public string? Direccion { get; init; }
+    public string? TelefonoPrincipal { get; init; }
+}
 
 public record ReporteSinPagoResponse(
     IReadOnlyList<ReporteSinPagoFila> Filas,
@@ -88,7 +96,11 @@ public record ReporteRankingDeudoresFila(
     string? Clasificacion,
     DateTimeOffset? FechaUltimoPago,
     int DiasTranscurridos,
-    decimal SaldoPendiente);
+    decimal SaldoPendiente)
+{
+    public string? Direccion { get; init; }
+    public string? TelefonoPrincipal { get; init; }
+}
 
 public record ReporteRankingDeudoresResponse(
     IReadOnlyList<ReporteRankingDeudoresFila> Filas,
@@ -129,3 +141,67 @@ public record ReporteConcentracionResponse(
     decimal Top10,
     decimal Top20,
     decimal PorcentajeConcentracion);
+
+// ---- Cobertura de cobranza (por crédito/venta) ----
+// Compara, para cada crédito vigente con saldo, cuánto DEBERÍA haberse cobrado en el rango
+// (cuota fija × periodos de su frecuencia, topado al saldo) contra lo realmente cobrado,
+// y clasifica el crédito como PAGO / PARCIAL / NO_PAGO / SIN_FRECUENCIA.
+public record ReporteCoberturaFiltro(
+    DateTimeOffset? Desde = null,
+    DateTimeOffset? Hasta = null,
+    long? IdZona = null,
+    long? IdRuta = null);
+
+// Estados posibles de cobertura de un crédito en el periodo.
+public static class EstadoCobertura
+{
+    public const string Pago = "PAGO";
+    public const string Parcial = "PARCIAL";
+    public const string NoPago = "NO_PAGO";
+    public const string SinFrecuencia = "SIN_FRECUENCIA";
+}
+
+public record ReporteCoberturaFila(
+    long IdVenta,
+    string? CodigoVenta,
+    long IdCliente,
+    string Cliente,
+    string? Direccion,
+    string? TelefonoPrincipal,
+    string? Zona,
+    string? Ruta,
+    string Productos,
+    decimal MontoCuota,
+    string? Frecuencia,
+    int DiasPeriodo,
+    decimal MontoEsperado,
+    decimal MontoCobrado,
+    decimal Diferencia,
+    string Estado,
+    DateTimeOffset? FechaUltimoPago,
+    int DiasSinPago,
+    decimal SaldoPendiente);
+
+// Resumen agregado por zona.
+public record ReporteCoberturaResumenFila(
+    string Zona,
+    int TotalCreditos,
+    int Pagaron,
+    int Parciales,
+    int NoPagaron,
+    int SinFrecuencia,
+    decimal EsperadoTotal,
+    decimal CobradoTotal,
+    decimal PorcentajeCobertura);
+
+public record ReporteCoberturaResponse(
+    IReadOnlyList<ReporteCoberturaResumenFila> Resumen,
+    IReadOnlyList<ReporteCoberturaFila> Detalle,
+    int TotalCreditos,
+    int Pagaron,
+    int Parciales,
+    int NoPagaron,
+    int SinFrecuencia,
+    decimal EsperadoGlobal,
+    decimal CobradoGlobal,
+    decimal PorcentajeCoberturaGlobal);

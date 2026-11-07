@@ -60,7 +60,8 @@ public partial class ServicioReportes
                 x.v.IdVenta, x.v.CodigoVenta, x.v.IdCliente, nombre,
                 x.r?.Descripcion, x.z?.Descripcion, x.v.TotalFinal, x.v.Enganche,
                 x.v.TotalAbonado, saldo, x.ev?.Descripcion, x.v.FechaCompra, x.v.FechaUltimoPago)
-            { Productos = productos.GetValueOrDefault(x.v.IdVenta, "") };
+            { Productos = productos.GetValueOrDefault(x.v.IdVenta, ""),
+              Direccion = x.c.Direccion, TelefonoPrincipal = x.c.TelefonoPrincipal };
         })
         .Where(x => x.Saldo > 0)
         .OrderByDescending(x => x.Saldo)
@@ -102,7 +103,8 @@ public partial class ServicioReportes
                 Productos = productos.GetValueOrDefault(x.p.IdVenta, ""),
                 TotalVenta = x.v.TotalFinal,
                 IdMovimiento = x.p.IdMovimiento,
-                Movimiento = x.m != null ? x.m.Descripcion : null
+                Movimiento = x.m != null ? x.m.Descripcion : null,
+                CodigoVenta = x.v.CodigoVenta
             }).ToList();
 
         return new ReportePagosResponse(filas, filas.Count, filas.Sum(x => x.MontoAbona));
@@ -142,7 +144,8 @@ public partial class ServicioReportes
                 x.v.IdVenta, x.v.CodigoVenta,
                 BusquedaHelper.NombreCompleto(x.c.Nombre, x.c.ApPaterno, x.c.ApMaterno),
                 x.ven?.Nombre, x.v.TotalFinal, x.v.Enganche, saldo, x.ev?.Descripcion, x.v.FechaCompra)
-            { Productos = productos.GetValueOrDefault(x.v.IdVenta, ""), Condicion = x.cond?.Descripcion };
+            { Productos = productos.GetValueOrDefault(x.v.IdVenta, ""), Condicion = x.cond?.Descripcion,
+              Direccion = x.c.Direccion, TelefonoPrincipal = x.c.TelefonoPrincipal };
         }).ToList();
 
         return new ReporteVentasResponse(filas, filas.Count, filas.Sum(x => x.TotalFinal));
@@ -208,7 +211,8 @@ public partial class ServicioReportes
                 x.c.IdCliente,
                 BusquedaHelper.NombreCompleto(x.c.Nombre, x.c.ApPaterno, x.c.ApMaterno),
                 x.r?.Descripcion, x.z?.Descripcion, x.cl?.Descripcion,
-                x.c.Estatus == Estatus.Activo, x.c.FechaAlta)).ToList();
+                x.c.Estatus == Estatus.Activo, x.c.FechaAlta)
+            { Direccion = x.c.Direccion, TelefonoPrincipal = x.c.TelefonoPrincipal }).ToList();
 
         return new ReporteClientesResponse(filas, filas.Count);
     }
@@ -292,7 +296,7 @@ public partial class ServicioReportes
                 x.c.Observaciones,
                 x.fp?.DiasPeriodo ?? 0,
                 x.fp?.Descripcion)
-            { Ruta = x.r?.Descripcion };
+            { Ruta = x.r?.Descripcion, Direccion = x.c.Direccion, TelefonoPrincipal = x.c.TelefonoPrincipal };
         })
         .Where(x => x.TotalPendiente > 0)
         .OrderByDescending(x => x.DiasTranscurridos)

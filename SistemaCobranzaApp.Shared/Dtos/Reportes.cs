@@ -22,6 +22,8 @@ public record ReporteCarteraFila(
     DateTimeOffset? FechaUltimoPago)
 {
     public string Productos { get; init; } = "";
+    public string? Direccion { get; init; }
+    public string? TelefonoPrincipal { get; init; }
 }
 
 public record ReporteCarteraResponse(
@@ -53,6 +55,7 @@ public record ReportePagoFila(
     public decimal TotalVenta { get; init; }
     public long? IdMovimiento { get; init; }
     public string? Movimiento { get; init; }
+    public string? CodigoVenta { get; init; }
 }
 
 public record ReportePagosResponse(
@@ -83,6 +86,8 @@ public record ReporteVentaFila(
 {
     public string Productos { get; init; } = "";
     public string? Condicion { get; init; }
+    public string? Direccion { get; init; }
+    public string? TelefonoPrincipal { get; init; }
 }
 
 public record ReporteVentasResponse(
@@ -124,7 +129,11 @@ public record ReporteClienteFila(
     string? Zona,
     string? Clasificacion,
     bool Activo,
-    DateTimeOffset FechaAlta);
+    DateTimeOffset FechaAlta)
+{
+    public string? Direccion { get; init; }
+    public string? TelefonoPrincipal { get; init; }
+}
 
 public record ReporteClientesResponse(
     IReadOnlyList<ReporteClienteFila> Filas, 
@@ -158,6 +167,8 @@ public record ReporteSeguimientoFila(
     string? FrecuenciaPago = null)
 {
     public string? Ruta { get; init; }
+    public string? Direccion { get; init; }
+    public string? TelefonoPrincipal { get; init; }
 }
 
 public record ReporteSeguimientoResponse(
