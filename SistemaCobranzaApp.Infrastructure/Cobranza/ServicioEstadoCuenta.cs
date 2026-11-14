@@ -51,8 +51,16 @@ public class ServicioEstadoCuenta
                 .ToListAsync(ct))
             .ToLookup(x => x.IdVenta, x => (x.IdMovimiento, x.Monto));
 
+        // Renovaciones del cliente: vínculo entre la cuenta vieja (liquidada) y la nueva (que absorbe su saldo).
+        var unificaciones = await _db.VentaUnificaciones.AsNoTracking()
+            .Where(u => idsVentas.Contains(u.IdVentaNueva) || idsVentas.Contains(u.IdVentaVieja))
+            .ToListAsync(ct);
+        string? Codigo(long id) => ventasFilas.FirstOrDefault(f => f.v.IdVenta == id)?.v.CodigoVenta ?? $"#{id}";
+
         var ventas = ventasFilas.Select(x =>
         {
+            var absorbidas = unificaciones.Where(u => u.IdVentaNueva == x.v.IdVenta).ToList();
+            var renovadaEn = unificaciones.FirstOrDefault(u => u.IdVentaVieja == x.v.IdVenta);
             // El saldo autoritativo es SaldoPendiente (lo mantiene el trigger de cobranza e incluye
             // ajustes/condonaciones). Calcularlo con Total-Enganche-Abonado ignoraría esos ajustes
             // y haría que ventas ya liquidadas aparezcan con saldo.
@@ -63,8 +71,13 @@ public class ServicioEstadoCuenta
                 saldo, x.ev?.Descripcion, x.v.FechaCompra, x.v.FechaUltimoPago)
             {
                 IdEstatusVenta = x.v.IdEstatusVenta,
+                Latitud = x.v.Latitud,
+                Longitud = x.v.Longitud,
                 Subtotal = x.v.Subtotal,
-                DescuentoGlobal = x.v.DescuentoGlobal
+                DescuentoGlobal = x.v.DescuentoGlobal,
+                SaldoRenovado = absorbidas.Sum(u => u.MontoTraspasado),
+                RenuevaCuentas = absorbidas.Count == 0 ? null : string.Join(", ", absorbidas.Select(u => Codigo(u.IdVentaVieja))),
+                RenovadaEnCuenta = renovadaEn is null ? null : Codigo(renovadaEn.IdVentaNueva)
             }, bonificaciones[x.v.IdVenta]);
         }).ToList();
 

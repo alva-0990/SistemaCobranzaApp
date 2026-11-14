@@ -1,5 +1,8 @@
 @using MudBlazor
+@using SistemaCobranzaApp.Shared.Seguridad
+@implements IDisposable
 @inject SistemaCobranzaApp.Shared.Services.EstadoEmpresaGlobal EmpresaGlobal
+@inject SistemaCobranzaApp.Shared.Services.ApiCliente Api
 
 <div class="top-row ps-3 navbar navbar-dark">
     <div class="container-fluid">
@@ -14,111 +17,200 @@
     <MudNavMenu Color="Color.Inherit" Bordered="false">
         
         <!-- INICIO / DASHBOARD -->
-        <MudNavLink Href="" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Home">
-            Home (Cartera)
-        </MudNavLink>
+        @if (Puede(""))
+        {
+            <MudNavLink Href="" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Home">
+                Home (Cartera)
+            </MudNavLink>
+        }
         
+        @if (Hay("clientes", "pagos", "reversion-pagos", "gastos", "pagos-comisiones"))
+        {
         <MudNavGroup Title="Operación Diaria" Icon="@Icons.Material.Filled.Assignment" Expanded="true">
     
+            @if (Puede("clientes"))
+            {
             <MudNavLink Href="clientes" Icon="@Icons.Material.Filled.People" Match="NavLinkMatch.Prefix">
                 Cartera de Clientes
             </MudNavLink>
+            }
 
+            @if (Puede("pagos"))
+            {
             <MudNavLink Href="pagos" Icon="@Icons.Material.Filled.Payments" Match="NavLinkMatch.Prefix">
                 Registro de Pagos
             </MudNavLink>
+            }
     
+            @if (Puede("reversion-pagos"))
+            {
             <MudNavLink Href="reversion-pagos" Icon="@Icons.Material.Filled.HistoryToggleOff" Match="NavLinkMatch.Prefix">
                 Reversión de Pagos
             </MudNavLink>
+            }
 
+            @if (Puede("gastos"))
+            {
             <MudNavLink Href="gastos" Icon="@Icons.Material.Filled.PriceChange" Match="NavLinkMatch.Prefix">
                 Gastos Operativos
             </MudNavLink>
+            }
 
+            @if (Puede("pagos-comisiones"))
+            {
             <MudNavLink Href="pagos-comisiones" Icon="@Icons.Material.Filled.PriceCheck" Match="NavLinkMatch.Prefix">
                 Pago Comisión Vendedores
             </MudNavLink>
+            }
 
         </MudNavGroup>
+        }
 
+        @if (Hay("vendedores-cobradores", "zonas-rutas"))
+        {
         <MudNavGroup Title="Zonas y Personal" Icon="@Icons.Material.Filled.Map" Expanded="false">
             
+            @if (Puede("vendedores-cobradores"))
+            {
             <MudNavLink Href="vendedores-cobradores" Icon="@Icons.Material.Filled.Badge">
                 Asignación de Vendedores
             </MudNavLink>
+            }
             
+            @if (Puede("zonas-rutas"))
+            {
             <MudNavLink Href="zonas-rutas" Icon="@Icons.Material.Filled.AltRoute">
                 Control de Zonas y Rutas
             </MudNavLink>
+            }
 
         </MudNavGroup>
+        }
 
       
+        @if (Hay("productos", "inventario"))
+        {
         <MudNavGroup Title="Productos e Inventario" Icon="@Icons.Material.Filled.Inventory" Expanded="false">
             
+            @if (Puede("productos"))
+            {
             <MudNavLink Href="productos" Icon="@Icons.Material.Filled.LocalOffer">
                 Productos
             </MudNavLink>
+            }
             
+            @if (Puede("inventario"))
+            {
             <MudNavLink Href="inventario" Icon="@Icons.Material.Filled.Inventory2">
                 Inventario
             </MudNavLink>
+            }
 
         </MudNavGroup>
+        }
 
      
+        @if (Hay("cartera-clientes", "operaciones-ventas", "parametros"))
+        {
         <MudNavGroup Title="Catálogos y Tablas" Icon="@Icons.Material.Filled.FolderShared" Expanded="false">
             
+            @if (Puede("cartera-clientes"))
+            {
             <MudNavLink Href="cartera-clientes" Icon="@Icons.Material.Filled.Rule">
                 Calificación de Clientes (B/M/R)
             </MudNavLink>
+            }
 
+            @if (Puede("operaciones-ventas"))
+            {
             <MudNavLink Href="operaciones-ventas" Icon="@Icons.Material.Filled.SettingsApplications">
                 Reglas de Venta y Crédito
             </MudNavLink>
+            }
             
+            @if (Puede("parametros"))
+            {
             <MudNavLink Href="parametros" Icon="@Icons.Material.Filled.Tune">
                 Parámetros Generales
             </MudNavLink>
+            }
             
         </MudNavGroup>
+        }
+
+        @if (Hay("recordatorios-whatsapp", "mensajes-whatsapp"))
+        {
         <MudNavGroup Title="WhatsApp" Icon="@Icons.Material.Filled.Forum" Expanded="false">
             
+            @if (Puede("recordatorios-whatsapp"))
+            {
             <MudNavLink Href="recordatorios-whatsapp" Icon="@Icons.Material.Filled.Send">
                 Envío de Recordatorios de Cobranza
             </MudNavLink>
+            }
     
+            @if (Puede("mensajes-whatsapp"))
+            {
             <MudNavLink Href="mensajes-whatsapp" Icon="@Icons.Material.Filled.History">
                 Histórico Mensajes WhatsApp
             </MudNavLink>
+            }
     
         </MudNavGroup>
+        }
 
  
+        @if (Puede("reportes"))
+        {
         <MudNavLink Href="reportes" Icon="@Icons.Material.Filled.Assessment">
             Reportes
         </MudNavLink>
+        }
 
+        @if (Puede("estadisticas"))
+        {
         <MudNavLink Href="estadisticas" Icon="@Icons.Material.Filled.Insights">
             Estadísticas
         </MudNavLink>
+        }
 
+        @if (Hay("roles-usuarios", "empresa"))
+        {
         <MudNavGroup Title="Seguridad y Empresa" Icon="@Icons.Material.Filled.AdminPanelSettings" Expanded="false">
 
+            @if (Puede("roles-usuarios"))
+            {
             <MudNavLink Href="roles-usuarios" Icon="@Icons.Material.Filled.GroupAdd">
                 Roles y Usuarios
             </MudNavLink>
+            }
             
+            @if (Puede("empresa"))
+            {
             <MudNavLink Href="empresa" Icon="@Icons.Material.Filled.Business">
                 Datos de la Empresa
             </MudNavLink>
+            }
 
         </MudNavGroup>
+        }
 
     </MudNavMenu>
 </div>
 
+@code {
+    private long? IdRol => Api.Sesion?.IdRol;
+
+    private bool Puede(string ruta) => PermisosRol.PuedeAcceder(IdRol, ruta);
+
+    private bool Hay(params string[] rutas) => rutas.Any(Puede);
+
+    protected override void OnInitialized() => Api.SesionCambiada += OnSesionCambiada;
+
+    private void OnSesionCambiada() => InvokeAsync(StateHasChanged);
+
+    public void Dispose() => Api.SesionCambiada -= OnSesionCambiada;
+}
 
 <style>
     /* Estilos base de los enlaces en estado normal */

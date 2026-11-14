@@ -264,7 +264,12 @@
                     </HeaderContent>
                     <RowTemplate>
                         <MudTd DataLabel="Venta">@context.IdVenta</MudTd>
-                        <MudTd DataLabel="Código"><b>@(context.CodigoVenta ?? "—")</b></MudTd>
+                        <MudTd DataLabel="Código">
+                            @* La renovación no se pinta en la tabla: se explica en el tooltip. *@
+                            <MudTooltip Text="@DetalleRenovacion(context)" Disabled="@(!context.EsRenovacion)">
+                                <b>@(context.CodigoVenta ?? "—")</b>
+                            </MudTooltip>
+                        </MudTd>
                         <MudTd DataLabel="Fecha">@context.FechaCompra.EnZonaProyecto().DateTime.ToString("dd/MM/yyyy")</MudTd>
                         <MudTd DataLabel="Estado">
                             <MudChip T="string" Size="Size.Small" Variant="Variant.Text" Color="Color.Primary" Class="chip-compacto">
@@ -310,7 +315,21 @@
             var v = Venta;
 
             <!-- Aviso destacado: la venta/crédito ya está liquidada (no hay saldo por cobrar). -->
-            @if (v.SaldoPendiente <= 0)
+            @* Liquidada por renovación: el saldo no se pagó, pasó a una cuenta nueva (se avisa distinto). *@
+            @if (v.RenovadaEn is { } renovadaEn)
+            {
+                <MudAlert Severity="Severity.Info" Variant="Variant.Filled" Elevation="2"
+                          Icon="@Icons.Material.Filled.Autorenew" Class="mb-2">
+                    <MudText Typo="Typo.subtitle1" Style="font-weight:700;">Cuenta renovada</MudText>
+                    <MudText Typo="Typo.body2">
+                        Su saldo de @renovadaEn.MontoTraspasado.ToString("C2") pasó a la cuenta
+                        <b>@(renovadaEn.CodigoVentaNueva ?? $"#{renovadaEn.IdVentaNueva}")</b>
+                        (folio @renovadaEn.CodigoLiquidacion, @renovadaEn.FechaUnificacion.EnZonaProyecto().DateTime.ToString("dd/MM/yyyy")).
+                        Los pagos se registran en la cuenta nueva.
+                    </MudText>
+                </MudAlert>
+            }
+            else if (v.SaldoPendiente <= 0)
             {
                 <MudAlert Severity="Severity.Success" Variant="Variant.Filled" Elevation="2"
                           Icon="@Icons.Material.Filled.CheckCircle" Class="mb-2 aviso-liquidada">
@@ -345,6 +364,14 @@
                     <MudItem xs="12" md="6">
                         @Campo("Venta", v.IdVenta.ToString())
                         @Campo("Código", Mostrar(v.CodigoVenta))
+                        @if (v.CuentasRenovadas.Count > 0)
+                        {
+                            @Campo("Renueva", string.Join(", ", v.CuentasRenovadas.Select(c => c.CodigoVentaVieja ?? $"#{c.IdVentaVieja}")))
+                        }
+                        @if (v.RenovadaEn is { } rn)
+                        {
+                            @Campo("Renovada en", rn.CodigoVentaNueva ?? $"#{rn.IdVentaNueva}")
+                        }
                         @Campo("Fecha compra", v.FechaCompra.EnZonaProyecto().DateTime.ToString("dd/MM/yyyy"))
                         @Campo("Condición", v.DescripcionCondicion)
                         @Campo("Estatus", v.DescripcionEstatus)
@@ -370,12 +397,30 @@
                 <div class="resumen-banda">
                     @Metrica("Subtotal", v.Subtotal, Color.Default)
                     @Metrica("Descuento", v.DescuentoGlobal, Color.Warning)
+                    @if (v.SaldoRenovado > 0)
+                    {
+                        @Metrica("+ Saldo cuenta anterior", v.SaldoRenovado, Color.Warning)
+                    }
                     @Metrica("Total final", v.TotalFinal, Color.Default)
                     @Metrica("Enganche", v.Enganche, Color.Info)
                     @Metrica("Financiado", v.MontoFinanciado, Color.Default)
                     @Metrica("Abonado", v.TotalAbonado, Color.Success)
                     @Metrica("Saldo pendiente", v.SaldoPendiente, v.SaldoPendiente > 0 ? Color.Error : Color.Success)
                 </div>
+
+                @if (v.CuentasRenovadas.Count > 0)
+                {
+                    <MudAlert Severity="Severity.Info" Dense="true" Variant="Variant.Outlined" Class="mt-2">
+                        <b>Renovación de crédito.</b> El total incluye el saldo de:
+                        <ul style="margin:4px 0 4px 18px; padding:0;">
+                            @foreach (var c in v.CuentasRenovadas)
+                            {
+                                <li><b>@(c.CodigoVentaVieja ?? $"#{c.IdVentaVieja}")</b> · @c.MontoTraspasado.ToString("C2") · folio @c.CodigoLiquidacion</li>
+                            }
+                        </ul>
+                        Productos nuevos @v.TotalProductos.ToString("C2") + saldo anterior @v.SaldoRenovado.ToString("C2") = @v.TotalFinal.ToString("C2").
+                    </MudAlert>
+                }
 
                 <MudDivider Class="my-3" />
 
@@ -424,6 +469,7 @@
                         <MudTh Style="text-align:right;">Saldo ant.</MudTh>
                         <MudTh Style="text-align:right;">Abono</MudTh>
                         <MudTh Style="text-align:right;">Saldo act.</MudTh>
+                        <MudTh Style="text-align:center;">Ubicación</MudTh>
                     </HeaderContent>
                     <RowTemplate>
                         <MudTd DataLabel="#">@context.IdPago</MudTd>
@@ -434,6 +480,12 @@
                         <MudTd DataLabel="Saldo ant." Style="text-align:right;">@context.SaldoAnterior.ToString("C2")</MudTd>
                         <MudTd DataLabel="Abono" Style="text-align:right;"><b>@context.MontoAbona.ToString("C2")</b></MudTd>
                         <MudTd DataLabel="Saldo act." Style="text-align:right;">@context.SaldoActual.ToString("C2")</MudTd>
+                        <MudTd DataLabel="Ubicación" Style="text-align:center;">
+                            <BotonMapa SoloIcono="true" Latitud="context.LatitudPago" Longitud="context.LongitudPago"
+                                       Nombre="@($"Pago {context.FolioPago ?? $"#{context.IdPago}"}")"
+                                       Direccion="@($"{context.Movimiento} · {context.MontoAbona:C2}")"
+                                       Titulo="Ubicación del pago" Texto="Ubicación del pago" />
+                        </MudTd>
                     </RowTemplate>
                     <NoRecordsContent>
                         <div class="pa-3 text-center">

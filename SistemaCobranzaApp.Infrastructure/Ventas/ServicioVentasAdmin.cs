@@ -322,6 +322,11 @@ public class ServicioVentasAdmin
         if (venta.IdEstatusVenta == EstatusVentaIds.Cancelada)
             return ResultadoVenta.Fallo("La venta se encuentra cancelada y no puede editarse.");
 
+        // Una venta ligada a una renovación no se edita: su total incluye (o cedió) saldo de otra cuenta.
+        if (await _db.VentaUnificaciones.AnyAsync(
+                u => u.IdVentaNueva == idVenta || u.IdVentaVieja == idVenta, ct))
+            return ResultadoVenta.Fallo("La venta no puede editarse porque forma parte de una renovación de crédito.");
+
         // Regla de negocio: solo se pueden editar ventas sin abonos.
         if (venta.TotalAbonado > 0)
             return ResultadoVenta.Fallo("La venta no puede editarse porque ya tiene abonos registrados.");
@@ -581,6 +586,16 @@ public class ServicioVentasAdmin
                             select new VentaPlanDto(
                                 pl.IdPlan, pl.IdVenta, pl.NumeroMeses, pl.MontoLiquidacion, pl.Activo)).ToListAsync(ct);
 
+        // 4b. Renovaciones: cuentas anteriores que esta venta absorbió y, si aplica, la venta que la liquidó.
+        var unificaciones = await (from u in _db.VentaUnificaciones.AsNoTracking()
+                                   where u.IdVentaNueva == idVenta || u.IdVentaVieja == idVenta
+                                   join vv in _db.Ventas.AsNoTracking() on u.IdVentaVieja equals vv.IdVenta
+                                   join vn in _db.Ventas.AsNoTracking() on u.IdVentaNueva equals vn.IdVenta
+                                   orderby u.FechaUnificacion
+                                   select new VentaUnificacionDto(u.IdVentaVieja, vv.CodigoVenta, u.IdVentaNueva,
+                                       vn.CodigoVenta, u.MontoTraspasado, u.CodigoLiquidacion, u.FechaUnificacion))
+            .ToListAsync(ct);
+
         var cliente = BusquedaHelper.NombreCompleto(fila.c.Nombre, fila.c.ApPaterno, fila.c.ApMaterno);
 
         // 5. 🎯 CORREGIDO: Retorna el VentaDto nativo unificado que requiere tu API
@@ -613,7 +628,13 @@ public class ServicioVentasAdmin
             Detalles: detalles,
             Cuotas: cuotas,
             PlanesPromocionales: planes
-        );
+        )
+        {
+            Latitud = fila.v.Latitud,
+            Longitud = fila.v.Longitud,
+            CuentasRenovadas = unificaciones.Where(u => u.IdVentaNueva == idVenta).ToList(),
+            RenovadaEn = unificaciones.FirstOrDefault(u => u.IdVentaVieja == idVenta)
+        };
     }
 
     private static string MensajeValidacion(CalculoVenta.ResultadoValidacion v) => v switch

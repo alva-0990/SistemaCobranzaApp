@@ -1,3 +1,5 @@
+using SistemaCobranzaApp.Shared.Seguridad;
+using SistemaCobranzaApp.Api.Seguridad;
 using System.Security.Claims;
 using SistemaCobranzaApp.Api.Comun;
 using SistemaCobranzaApp.Infrastructure.Clientes;
@@ -120,6 +122,7 @@ public class ClientesEndpoints : IEndpointModule
 
         // ===================== Admin (CRUD) =====================
         var admin = app.MapGroup("/api/admin/clientes").RequireAuthorization();
+        admin.RequiereRolesParaEscribir(RolesSistema.Administrador, RolesSistema.Supervisor, RolesSistema.VendedorEnLinea, RolesSistema.AuxiliarAdministrativo);
 
         // Listado paginado con filtros.
         admin.MapGet("/", async (

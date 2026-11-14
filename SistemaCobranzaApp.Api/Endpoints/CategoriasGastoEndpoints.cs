@@ -1,3 +1,5 @@
+using SistemaCobranzaApp.Shared.Seguridad;
+using SistemaCobranzaApp.Api.Seguridad;
 using SistemaCobranzaApp.Api.Comun;
 using SistemaCobranzaApp.Domain.Entidades;
 using SistemaCobranzaApp.Infrastructure.Gastos;
@@ -24,7 +26,8 @@ public class CategoriasGastoEndpoints : IEndpointModule
     {
         var admin = app
             .MapGroup("/api/admin/categorias-gasto")
-            .RequireAuthorization();
+            .RequireAuthorization(Politicas.AdminSupervisorAuxiliar);
+        admin.RequiereRolesParaEscribir(RolesSistema.Administrador, RolesSistema.Supervisor);
 
         // ============================================================
         // LISTAR CATEGORÍAS

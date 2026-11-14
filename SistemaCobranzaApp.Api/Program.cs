@@ -179,7 +179,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         };
     });
 
-builder.Services.AddAuthorization();
+builder.Services.AddAuthorization(SistemaCobranzaApp.Api.Seguridad.Politicas.Registrar);
 
 var app = builder.Build();
 

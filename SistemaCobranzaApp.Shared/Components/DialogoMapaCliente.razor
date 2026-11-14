@@ -1,0 +1,116 @@
+@using System.Globalization
+@using MudBlazor
+@using SistemaCobranzaApp.Shared.Services
+@inject INavegadorMapa _navegador
+@inject ISnackbar _snackbar
+
+<MudDialog Class="@(PantallaCompleta ? "dialogo-mapa-completo" : null)">
+    <TitleContent>
+        <MudText Typo="Typo.h6" Style="font-weight: 600;">
+            <MudIcon Icon="@Icons.Material.Filled.Map" Class="mr-2" Style="vertical-align: middle;" />
+            @Titulo
+        </MudText>
+    </TitleContent>
+
+    <DialogContent>
+        @if (!TieneUbicacion)
+        {
+            <MudAlert Severity="Severity.Info" Variant="Variant.Outlined">
+                Este cliente aún no tiene ubicación registrada.
+            </MudAlert>
+        }
+        else
+        {
+            @if (!string.IsNullOrWhiteSpace(Nombre))
+            {
+                <MudText Typo="Typo.subtitle1"><b>@Nombre</b></MudText>
+            }
+            @if (!string.IsNullOrWhiteSpace(Direccion))
+            {
+                <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-2">@Direccion</MudText>
+            }
+
+            @* Mapa de OpenStreetMap (gratuito, sin API key) embebido con marcador. *@
+            <iframe title="Mapa del cliente"
+                    src="@UrlMapa"
+                    style="@EstiloMapa"
+                    loading="lazy"
+                    referrerpolicy="no-referrer"></iframe>
+
+            <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-1">
+                © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">Colaboradores de OpenStreetMap</a>
+            </MudText>
+        }
+    </DialogContent>
+
+    <DialogActions>
+        <MudButton OnClick="Cerrar" Variant="Variant.Text" Color="Color.Default">Cerrar</MudButton>
+        <MudButton OnClick="Llevarme" Variant="Variant.Filled" Color="Color.Success"
+                   StartIcon="@Icons.Material.Filled.Navigation" Disabled="@(!TieneUbicacion)">
+            Llévame ahí
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+<style>
+    .dialogo-mapa-completo {
+        box-sizing: border-box;
+        padding-bottom: env(safe-area-inset-bottom);
+        padding-left: env(safe-area-inset-left);
+        padding-right: env(safe-area-inset-right);
+    }
+    .dialogo-mapa-completo .mud-dialog-title { padding-top: env(safe-area-inset-top); }
+    .dialogo-mapa-completo .mud-dialog-close-button {
+        top: calc(env(safe-area-inset-top) + 8px);
+        right: calc(env(safe-area-inset-right) + 8px);
+    }
+</style>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter] public decimal? Latitud { get; set; }
+    [Parameter] public decimal? Longitud { get; set; }
+    [Parameter] public string? Nombre { get; set; }
+    [Parameter] public string? Direccion { get; set; }
+    [Parameter] public string Titulo { get; set; } = "Ubicación del cliente";
+
+    /// <summary>Pantalla completa (móvil): el mapa ocupa todo el alto disponible.</summary>
+    [Parameter] public bool PantallaCompleta { get; set; }
+
+    private string EstiloMapa => PantallaCompleta
+        ? "width:100%; height:calc(100vh - 230px - env(safe-area-inset-top) - env(safe-area-inset-bottom)); min-height:300px; border:1px solid #ccc; border-radius:8px;"
+        : "width:100%; height:min(60vh, 420px); border:1px solid #ccc; border-radius:8px;";
+
+    private bool TieneUbicacion =>
+        Latitud is >= -90 and <= 90 && Longitud is >= -180 and <= 180
+        && !(Latitud == 0 && Longitud == 0);
+
+    private string UrlMapa
+    {
+        get
+        {
+            const double delta = 0.004; // ~400 m alrededor del punto
+            var lat = (double)Latitud!.Value;
+            var lon = (double)Longitud!.Value;
+            string F(double v) => v.ToString("0.######", CultureInfo.InvariantCulture);
+            var bbox = $"{F(lon - delta)}%2C{F(lat - delta)}%2C{F(lon + delta)}%2C{F(lat + delta)}";
+            return $"https://www.openstreetmap.org/export/embed.html?bbox={bbox}&layer=mapnik&marker={F(lat)}%2C{F(lon)}";
+        }
+    }
+
+    private async Task Llevarme()
+    {
+        if (!TieneUbicacion) return;
+        try
+        {
+            await _navegador.LlevarmeAsync(Latitud!.Value, Longitud!.Value, Nombre);
+        }
+        catch (Exception)
+        {
+            _snackbar.Add("No se pudo abrir la aplicación de mapas.", Severity.Error);
+        }
+    }
+
+    private void Cerrar() => MudDialog.Close();
+}

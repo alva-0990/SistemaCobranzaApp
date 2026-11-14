@@ -1,3 +1,4 @@
+using SistemaCobranzaApp.Api.Seguridad;
 using SistemaCobranzaApp.Api.Comun;
 using SistemaCobranzaApp.Infrastructure.Gastos;
 using SistemaCobranzaApp.Shared.Dtos;
@@ -19,7 +20,7 @@ public class ReportesGastoEndpoints : IEndpointModule
     {
         var api = app
             .MapGroup("/api/admin/reportes/gastos")
-            .RequireAuthorization();
+            .RequireAuthorization(Politicas.AdminSupervisorAuxiliar);
 
         static ReporteGastosFiltro ConstruirFiltro(
             DateTimeOffset? desde,

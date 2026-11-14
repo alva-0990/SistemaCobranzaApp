@@ -66,12 +66,39 @@ public class ServicioEstadoCuentaIntegral
                                        + Mov(idVenta, MovimientoIds.BonificacionProntoPago) + Mov(idVenta, MovimientoIds.Ajuste);
         decimal Traspaso(long idVenta) => Mov(idVenta, MovimientoIds.LiquidacionRenovacion);
 
+        // Renovaciones: qué cuentas absorbió cada crédito y en qué crédito nuevo terminó cada cuenta liquidada.
+        var idsTodas = ventas.Select(x => x.v.IdVenta).ToList();
+        var unificaciones = await _db.VentaUnificaciones.AsNoTracking()
+            .Where(u => idsTodas.Contains(u.IdVentaNueva) || idsTodas.Contains(u.IdVentaVieja))
+            .ToListAsync(ct);
+        string CodigoDe(long id)
+        {
+            var v = ventas.FirstOrDefault(x => x.v.IdVenta == id)?.v;
+            return string.IsNullOrWhiteSpace(v?.CodigoVenta) ? $"V{id}" : v!.CodigoVenta!;
+        }
+        decimal SaldoRenovado(long idVenta) => unificaciones.Where(u => u.IdVentaNueva == idVenta).Sum(u => u.MontoTraspasado);
+        string? Renueva(long idVenta)
+        {
+            var l = unificaciones.Where(u => u.IdVentaNueva == idVenta).Select(u => CodigoDe(u.IdVentaVieja)).ToList();
+            return l.Count == 0 ? null : string.Join(", ", l);
+        }
+        string? RenovadaEn(long idVenta)
+        {
+            var u = unificaciones.FirstOrDefault(x => x.IdVentaVieja == idVenta);
+            return u is null ? null : CodigoDe(u.IdVentaNueva);
+        }
+
         EstadoCuentaIntegralCreditoDto Mapear(Domain.Entidades.Venta v, string? estado, string? condicion)
             => new(v.IdVenta, string.IsNullOrWhiteSpace(v.CodigoVenta) ? $"V{v.IdVenta}" : v.CodigoVenta!,
                 v.FechaCompra, estado ?? "—", condicion,
                 v.Subtotal, v.DescuentoGlobal, v.TotalFinal, v.Enganche, v.TotalAbonado,
                 // Pagado = enganche + abonos aplicados (las bonificaciones/ajustes solo reducen el saldo).
-                v.Enganche + v.TotalAbonado, Bonif(v.IdVenta), Traspaso(v.IdVenta), v.SaldoPendiente, v.FechaUltimoPago);
+                v.Enganche + v.TotalAbonado, Bonif(v.IdVenta), Traspaso(v.IdVenta), v.SaldoPendiente, v.FechaUltimoPago)
+            {
+                SaldoRenovado = SaldoRenovado(v.IdVenta),
+                RenuevaCuentas = Renueva(v.IdVenta),
+                RenovadaEnCuenta = RenovadaEn(v.IdVenta)
+            };
 
         var noCanceladas = ventas.Where(x => x.v.IdEstatusVenta != EstatusVentaIds.Cancelada).ToList();
         var creditos = noCanceladas.Select(x => Mapear(x.v, x.Estado, x.Condicion)).ToList();
@@ -130,7 +157,12 @@ public class ServicioEstadoCuentaIntegral
         EstadoCuentaIntegralCerradoDto Cerrado(Domain.Entidades.Venta v, DateTimeOffset? cierre) => new(
             v.IdVenta, string.IsNullOrWhiteSpace(v.CodigoVenta) ? $"V{v.IdVenta}" : v.CodigoVenta!,
             v.FechaCompra, cierre, v.DescuentoGlobal, v.TotalFinal, v.Enganche, v.Enganche + v.TotalAbonado,
-            Bonif(v.IdVenta), Traspaso(v.IdVenta));
+            Bonif(v.IdVenta), Traspaso(v.IdVenta))
+        {
+            SaldoRenovado = SaldoRenovado(v.IdVenta),
+            RenuevaCuentas = Renueva(v.IdVenta),
+            RenovadaEnCuenta = RenovadaEn(v.IdVenta)
+        };
 
         var liquidados = liquidadas.Select(x => Cerrado(x.v, x.v.FechaUltimoPago ?? x.v.FechaModificacion)).ToList();
         var cancelados = canceladas.Select(x => Cerrado(x.v, x.v.FechaModificacion)).ToList();

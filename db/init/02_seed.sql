@@ -67,9 +67,13 @@ OVERRIDING SYSTEM VALUE
 VALUES
     (1, 'Administrador', 1),
     (2, 'Supervisor',    1),
-    (3, 'Vendedor',      1),
-    (4, 'Cobrador',      1),
-    (5, 'Consulta',      1)
+    (3, 'Vendedor sin conexión', 1),
+    (4, 'Cobrador sin conexión', 1),
+    (5, 'Consulta', 1),
+    (6, 'Vendedor en línea', 1),
+    (7, 'Cobrador en línea', 1),
+    (8, 'Superadmin', 1),
+    (9, 'Auxiliar administrativo', 1)
 ON CONFLICT (IdRol) DO UPDATE
 SET
     Descripcion = EXCLUDED.Descripcion,

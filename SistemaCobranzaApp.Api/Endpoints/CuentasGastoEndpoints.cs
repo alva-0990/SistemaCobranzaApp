@@ -1,3 +1,5 @@
+using SistemaCobranzaApp.Shared.Seguridad;
+using SistemaCobranzaApp.Api.Seguridad;
 using SistemaCobranzaApp.Api.Comun;
 using SistemaCobranzaApp.Domain.Entidades;
 using SistemaCobranzaApp.Infrastructure.Gastos;
@@ -27,7 +29,8 @@ public class CuentasGastoEndpoints : IEndpointModule
     {
         var admin = app
             .MapGroup("/api/admin/cuentas-gasto")
-            .RequireAuthorization();
+            .RequireAuthorization(Politicas.AdminSupervisorAuxiliar);
+        admin.RequiereRolesParaEscribir(RolesSistema.Administrador, RolesSistema.Supervisor);
 
         // ============================================================
         // LISTAR CUENTAS DE GASTOS

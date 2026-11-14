@@ -1,3 +1,5 @@
+using SistemaCobranzaApp.Shared.Seguridad;
+using SistemaCobranzaApp.Api.Seguridad;
 using SistemaCobranzaApp.Api.Comun;
 using SistemaCobranzaApp.Infrastructure.Inventario;
 using SistemaCobranzaApp.Shared.Dtos;
@@ -27,6 +29,7 @@ public class CatalogosProductosEndpoints : IEndpointModule
 
         // ---- Panel de Administración Completo (Mismo estándar de todos tus catálogos) ----
         var admin = app.MapGroup("/api/admin/catalogos-productos").RequireAuthorization();
+        admin.RequiereRolesParaEscribir(RolesSistema.Administrador, RolesSistema.Supervisor);
         
                 // ==========================================
         // 1. CATEGORÍAS

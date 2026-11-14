@@ -1,3 +1,5 @@
+using SistemaCobranzaApp.Shared.Seguridad;
+using SistemaCobranzaApp.Api.Seguridad;
 using SistemaCobranzaApp.Api.Comun;
 using SistemaCobranzaApp.Infrastructure.Whatsapp;
 using SistemaCobranzaApp.Shared.Logging;
@@ -13,6 +15,7 @@ public class MensajesWhatsAppEndpoints : IEndpointModule
     public void MapEndpoints(IEndpointRouteBuilder app)
     {
         var admin = app.MapGroup("/api/admin/whatsapp").RequireAuthorization();
+        admin.RequiereRoles(RolesSistema.Administrador, RolesSistema.Supervisor, RolesSistema.AuxiliarAdministrativo);
 
         // Listado de mensajes (más recientes primero).
         admin.MapGet("/mensajes", async (

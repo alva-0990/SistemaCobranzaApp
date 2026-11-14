@@ -38,6 +38,7 @@ builder.Services.AddScoped<ServicioImpresionTicket>();
 builder.Services.AddScoped<IPermisosCamara, PermisosCamaraWeb>();
 builder.Services.AddScoped<IServicioUbicacion, ServicioUbicacionWeb>();
 builder.Services.AddScoped<EstadoEmpresaGlobal>();
+builder.Services.AddScoped<INavegadorMapa, NavegadorMapaWeb>();
 builder.Services.AddScoped<IEnlaceExterno, EnlaceExternoWeb>();// ==========================================
 
 builder.Services.AddScoped<IDescargaArchivo, DescargaArchivoWeb>();

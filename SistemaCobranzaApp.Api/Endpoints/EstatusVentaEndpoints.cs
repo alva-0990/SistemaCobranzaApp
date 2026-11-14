@@ -1,3 +1,5 @@
+using SistemaCobranzaApp.Shared.Seguridad;
+using SistemaCobranzaApp.Api.Seguridad;
 using SistemaCobranzaApp.Api.Comun;
 using SistemaCobranzaApp.Infrastructure.Catalogos;
 using SistemaCobranzaApp.Shared.Dtos;
@@ -23,6 +25,7 @@ public class EstatusVentaEndpoints : IEndpointModule
 
         // ---- Panel de Administración ----
         var admin = app.MapGroup("/api/admin/estatus/venta").RequireAuthorization();
+        admin.RequiereRolesParaEscribir(RolesSistema.Administrador);
 
         admin.MapGet("/", async (ServicioEstatusVentaAdmin s, IServicioLog log, CancellationToken ct) =>
         {

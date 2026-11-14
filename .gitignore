@@ -32,3 +32,6 @@ obj/
 .DS_Store
 
 .env.local
+
+# Respaldos de BD (contienen datos reales)
+respaldos/

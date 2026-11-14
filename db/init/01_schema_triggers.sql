@@ -350,7 +350,9 @@ SET TotalAbonado               = TotalAbonado + NEW.MontoAbona,
     FechaUltimoPago            = NEW.FechaPago,
     PagosConsecutivosPuntuales = v_pagos_consecutivos,
     FechaModificacion          = now(),
-    IdEstatusVenta             = CASE WHEN saldo_actual_venta <= 0 THEN 3 ELSE IdEstatusVenta END
+    IdEstatusVenta             = CASE WHEN saldo_actual_venta <= 0 THEN 3
+                                      WHEN IdEstatusVenta = 1 THEN 2 -- PENDIENTE -> ABONANDO
+                                      ELSE IdEstatusVenta END
 WHERE IdVenta = NEW.IdVenta;
 
 -- ACCIÓN DE PRONTO PAGO: Inyectar fila de Descuento (ID 4)
@@ -400,7 +402,9 @@ UPDATE Venta
 SET SaldoPendiente    = saldo_actual_venta,
     FechaUltimoPago   = NEW.FechaPago,
     FechaModificacion = now(),
-    IdEstatusVenta    = CASE WHEN saldo_actual_venta <= 0 THEN 3 ELSE IdEstatusVenta END
+    IdEstatusVenta    = CASE WHEN saldo_actual_venta <= 0 THEN 3
+                             WHEN IdEstatusVenta = 1 THEN 2 -- PENDIENTE -> ABONANDO
+                             ELSE IdEstatusVenta END
 WHERE IdVenta = NEW.IdVenta;
 END IF;
     

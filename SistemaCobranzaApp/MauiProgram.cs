@@ -33,6 +33,7 @@ public static class MauiProgram
         // Add device-specific services used by the SistemaCobranzaApp.Shared project
         builder.Services.AddSingleton<IFormFactor, FormFactor>();
         builder.Services.AddSingleton<IEnlaceExterno, EnlaceExternoMaui>();
+        builder.Services.AddSingleton<INavegadorMapa, NavegadorMapaMaui>();
         
         builder.Services.AddMauiBlazorWebView();
 
@@ -88,7 +89,7 @@ public static class MauiProgram
         // Para pruebas locales con dispositivo físico, reemplaza por la IP LAN de tu máquina
         // (p. ej. "http://192.168.3.17:8081") o un túnel temporal de desarrollo.
         //const string ApiBaseUrlDispositivoFisico = "https://api.cobragil.com";
-        const string ApiBaseUrlDispositivoFisico = "http://192.168.1.5:8081";
+        const string ApiBaseUrlDispositivoFisico = "http://192.168.1.19:8081";
         const string ApiBaseUrlEmuladorAndroid   = "http://10.0.2.2:8081";
         const string ApiBaseUrlEscritorio         = "http://localhost:8081";
 

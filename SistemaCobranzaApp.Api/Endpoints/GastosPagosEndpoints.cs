@@ -1,3 +1,5 @@
+using SistemaCobranzaApp.Shared.Seguridad;
+using SistemaCobranzaApp.Api.Seguridad;
 
 using System.Security.Claims;
 using Microsoft.EntityFrameworkCore;
@@ -42,7 +44,8 @@ public class GastosPagosEndpoints : IEndpointModule
 
         var admin = app
             .MapGroup("/api/admin/gastos/{idGasto:long}/pagos")
-            .RequireAuthorization();
+            .RequireAuthorization(Politicas.AdminSupervisorAuxiliar);
+        admin.RequiereRolesParaEscribir(RolesSistema.Administrador, RolesSistema.Supervisor);
 
         // ============================================================
         // LISTAR PAGOS DE UN GASTO

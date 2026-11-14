@@ -1,0 +1,60 @@
+@using MudBlazor
+@using SistemaCobranzaApp.Shared.Services
+@inject IDialogService _dialogo
+@inject IFormFactor _formFactor
+
+@* Botón que abre el modal con el mapa (OpenStreetMap) y "Llévame ahí". Se deshabilita si no hay coordenadas. *@
+@if (SoloIcono)
+{
+    <MudTooltip Text="@(TieneUbicacion ? Texto : "Sin ubicación registrada")">
+        <MudIconButton Icon="@Icons.Material.Filled.Map" Size="Size.Small" Color="Color.Success"
+                       Variant="Variant.Outlined" Disabled="@(!TieneUbicacion)" OnClick="Abrir" />
+    </MudTooltip>
+}
+else
+{
+    <MudButton Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small" Class="@Class"
+               StartIcon="@Icons.Material.Filled.Map" Disabled="@(!TieneUbicacion)" OnClick="Abrir">
+        @Texto
+    </MudButton>
+}
+
+@code {
+    [Parameter] public decimal? Latitud { get; set; }
+    [Parameter] public decimal? Longitud { get; set; }
+    [Parameter] public string? Nombre { get; set; }
+    [Parameter] public string? Direccion { get; set; }
+    [Parameter] public string Titulo { get; set; } = "Ubicación";
+    [Parameter] public string Texto { get; set; } = "Ver mapa";
+    [Parameter] public bool SoloIcono { get; set; }
+    [Parameter] public string? Class { get; set; }
+
+    private bool TieneUbicacion => Latitud is not null && Longitud is not null
+                                   && !(Latitud == 0 && Longitud == 0);
+
+    private bool EsEntornoMovil
+    {
+        get
+        {
+            var ff = _formFactor.GetFormFactor();
+            return !ff.Equals("Web", StringComparison.OrdinalIgnoreCase)
+                   && !ff.Equals("Desktop", StringComparison.OrdinalIgnoreCase);
+        }
+    }
+
+    private async Task Abrir()
+    {
+        if (!TieneUbicacion) return;
+        var parametros = new DialogParameters<DialogoMapaCliente>
+        {
+            { x => x.Latitud, Latitud },
+            { x => x.Longitud, Longitud },
+            { x => x.Nombre, Nombre },
+            { x => x.Direccion, Direccion },
+            { x => x.Titulo, Titulo },
+            { x => x.PantallaCompleta, EsEntornoMovil }
+        };
+        await _dialogo.ShowAsync<DialogoMapaCliente>(Titulo, parametros,
+            new DialogOptions { FullScreen = EsEntornoMovil, FullWidth = true, MaxWidth = MaxWidth.Medium, CloseButton = true });
+    }
+}

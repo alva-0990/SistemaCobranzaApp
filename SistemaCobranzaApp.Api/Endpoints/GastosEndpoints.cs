@@ -1,3 +1,4 @@
+using SistemaCobranzaApp.Api.Seguridad;
 
 using System.Security.Claims;
 using Microsoft.EntityFrameworkCore;
@@ -56,7 +57,7 @@ public class GastosEndpoints : IEndpointModule
         }
 
         var api = app.MapGroup("/api/admin/gastos")
-            .RequireAuthorization();
+            .RequireAuthorization(Politicas.AdminSupervisorAuxiliar);
 
         // 1. Listar gastos con filtros opcionales.
         api.MapGet("/", async (
@@ -251,7 +252,7 @@ public class GastosEndpoints : IEndpointModule
             return r.NoEncontrado
                 ? Respuestas.NoEncontrado(r.Error ?? "")
                 : Respuestas.SolicitudInvalida("No se pudo autorizar el gasto.", r.Error ?? "");
-        }).WithName("AutorizarGastoAdmin");
+        }).RequireAuthorization(Politicas.AdminSupervisor).WithName("AutorizarGastoAdmin");
 
         // 6. Cancelar un gasto sin pagos registrados.
         api.MapPost("/{id:long}/cancelar", async (
@@ -281,6 +282,6 @@ public class GastosEndpoints : IEndpointModule
             return r.NoEncontrado
                 ? Respuestas.NoEncontrado(r.Error ?? "")
                 : Respuestas.SolicitudInvalida("No se pudo cancelar el gasto.", r.Error ?? "");
-        }).WithName("CancelarGastoAdmin");
+        }).RequireAuthorization(Politicas.AdminSupervisor).WithName("CancelarGastoAdmin");
     }
 }

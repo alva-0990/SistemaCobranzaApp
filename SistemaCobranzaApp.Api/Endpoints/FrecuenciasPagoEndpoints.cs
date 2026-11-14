@@ -1,3 +1,5 @@
+using SistemaCobranzaApp.Shared.Seguridad;
+using SistemaCobranzaApp.Api.Seguridad;
 using SistemaCobranzaApp.Api.Comun;
 using SistemaCobranzaApp.Infrastructure.Catalogos;
 using SistemaCobranzaApp.Shared.Dtos;
@@ -23,6 +25,7 @@ public class FrecuenciasPagoEndpoints : IEndpointModule
 
         // Rutas para el panel de administración
         var admin = app.MapGroup("/api/admin/frecuencias-pago").RequireAuthorization();
+        admin.RequiereRolesParaEscribir(RolesSistema.Administrador);
 
         admin.MapGet("/", async (ServicioFrecuenciasPagoAdmin s, IServicioLog log, CancellationToken ct) =>
         {

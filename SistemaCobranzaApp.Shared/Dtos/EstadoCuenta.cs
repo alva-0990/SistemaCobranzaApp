@@ -19,6 +19,10 @@ public record EstadoCuentaVentaDto(
     /// <summary>Venta cancelada: solo se permite consultar su detalle.</summary>
     public bool EsCancelada => IdEstatusVenta == EstatusVentaIds.Cancelada;
 
+    /// <summary>Coordenadas GPS donde se registró la venta (si se capturaron).</summary>
+    public decimal? Latitud { get; init; }
+    public decimal? Longitud { get; init; }
+
     /// <summary>Importe de los productos antes del descuento global.</summary>
     public decimal Subtotal { get; init; }
     /// <summary>Descuento global aplicado a la venta (Subtotal − DescuentoGlobal = TotalFinal).</summary>
@@ -33,6 +37,20 @@ public record EstadoCuentaVentaDto(
     public decimal Condonacion { get; init; }
     /// <summary>Mov. 7 LIQUIDADA POR RENOVACION: saldo traspasado a la nueva venta.</summary>
     public decimal TraspasoRenovacion { get; init; }
+
+    // ---- Renovaciones ----
+    /// <summary>Saldo de cuentas anteriores incluido en el TotalFinal de esta venta.</summary>
+    public decimal SaldoRenovado { get; init; }
+    /// <summary>Códigos de las cuentas anteriores que esta venta absorbió (separados por coma).</summary>
+    public string? RenuevaCuentas { get; init; }
+    /// <summary>Código de la venta nueva que liquidó esta cuenta por renovación.</summary>
+    public string? RenovadaEnCuenta { get; init; }
+
+    /// <summary>Participa en una renovación (absorbió una cuenta o fue liquidada por una): no se edita ni se cancela.</summary>
+    public bool EsRenovacion => SaldoRenovado > 0 || !string.IsNullOrWhiteSpace(RenovadaEnCuenta);
+
+    /// <summary>Importe de los productos de esta venta, sin el saldo traspasado.</summary>
+    public decimal TotalProductos => TotalFinal - SaldoRenovado;
 
     /// <summary>Descuentos y ajustes aplicados después de la venta (racha + plan + condonación).</summary>
     public decimal TotalBonificaciones => BonificacionRacha + LiquidacionPlan + Condonacion;

@@ -39,6 +39,10 @@ public class JwtTokenGenerator : IJwtTokenGenerator
         if (usuario.Rol is not null)
             claims.Add(new Claim(ClaimTypes.Role, usuario.Rol.Descripcion));
 
+        // El control de acceso usa el Id (estable), no el nombre del rol (editable).
+        if (usuario.IdRol is { } idRol)
+            claims.Add(new Claim("idrol", idRol.ToString()));
+
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_opciones.Key));
         var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 

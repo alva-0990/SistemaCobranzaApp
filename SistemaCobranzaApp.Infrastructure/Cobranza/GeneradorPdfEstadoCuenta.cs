@@ -193,7 +193,20 @@ public static class GeneradorPdfEstadoCuenta
                 t.Cell().Element(x => Celda(x, true)).Text(h).FontColor("#FFFFFF").SemiBold();
             foreach (var c in e.Creditos)
             {
-                t.Cell().Element(x => Celda(x)).Text(c.Codigo).SemiBold();
+                t.Cell().Element(x => Celda(x)).Text(tx =>
+                {
+                    tx.Span(c.Codigo).SemiBold();
+                    if (!string.IsNullOrWhiteSpace(c.RenuevaCuentas))
+                    {
+                        tx.Line(string.Empty);
+                        tx.Span($"Renueva {c.RenuevaCuentas}").FontSize(6.5f).FontColor(Gris);
+                    }
+                    if (!string.IsNullOrWhiteSpace(c.RenovadaEnCuenta))
+                    {
+                        tx.Line(string.Empty);
+                        tx.Span($"Renovada en {c.RenovadaEnCuenta}").FontSize(6.5f).FontColor(Gris);
+                    }
+                });
                 t.Cell().Element(x => Celda(x)).Text(Fecha(c.FechaCompra));
                 t.Cell().Element(x => Celda(x)).Text(c.Estado.ToUpperInvariant()).FontColor(ColorEstado(c.Estado, c.Saldo)).SemiBold();
                 t.Cell().Element(x => Celda(x)).Text(Dinero(c.Descuento));
@@ -222,6 +235,16 @@ public static class GeneradorPdfEstadoCuenta
                 t.Span("Descuento Global: ").SemiBold(); t.Span($"{Dinero(c.Descuento)}  |  ");
                 t.Span("Total del Crédito: ").SemiBold(); t.Span(Dinero(c.Total));
             });
+            if (c.SaldoRenovado > 0)
+            {
+                box.Item().Text(t =>
+                {
+                    t.Span("Renovación de crédito: ").SemiBold().FontColor(Acento);
+                    t.Span($"el total incluye {Dinero(c.SaldoRenovado)} de saldo traspasado de {c.RenuevaCuentas}. ");
+                    t.Span($"(Productos nuevos {Dinero(c.Total - c.SaldoRenovado)} + saldo anterior {Dinero(c.SaldoRenovado)})")
+                        .FontSize(8).FontColor(Gris);
+                });
+            }
             box.Item().Text(t =>
             {
                 t.Span("Enganche: ").SemiBold(); t.Span($"{Dinero(c.Enganche)}  |  ");
@@ -335,7 +358,20 @@ public static class GeneradorPdfEstadoCuenta
                 t.Cell().Element(x => Celda(x, true)).Text(h).FontColor("#FFFFFF").SemiBold();
             foreach (var f in filas)
             {
-                t.Cell().Element(x => Celda(x)).Text(f.Codigo);
+                t.Cell().Element(x => Celda(x)).Text(tx =>
+                {
+                    tx.Span(f.Codigo);
+                    if (!string.IsNullOrWhiteSpace(f.RenovadaEnCuenta))
+                    {
+                        tx.Line(string.Empty);
+                        tx.Span($"Renovada en {f.RenovadaEnCuenta}").FontSize(6.5f).FontColor(Gris);
+                    }
+                    if (!string.IsNullOrWhiteSpace(f.RenuevaCuentas))
+                    {
+                        tx.Line(string.Empty);
+                        tx.Span($"Renueva {f.RenuevaCuentas}").FontSize(6.5f).FontColor(Gris);
+                    }
+                });
                 t.Cell().Element(x => Celda(x)).Text(Fecha(f.FechaCompra));
                 t.Cell().Element(x => Celda(x)).Text(Fecha(f.FechaCierre));
                 t.Cell().Element(x => Celda(x)).Text(Dinero(f.Descuento));

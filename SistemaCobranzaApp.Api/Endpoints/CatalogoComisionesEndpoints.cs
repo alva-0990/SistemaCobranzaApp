@@ -1,3 +1,5 @@
+using SistemaCobranzaApp.Shared.Seguridad;
+using SistemaCobranzaApp.Api.Seguridad;
 using SistemaCobranzaApp.Api.Comun;
 using SistemaCobranzaApp.Infrastructure.CatalogoComisiones;
 using SistemaCobranzaApp.Infrastructure.Catalogos;
@@ -24,6 +26,7 @@ public class CatalogoComisionesEndpoints : IEndpointModule
 
         // 2. Grupo Administrativo (CRUD completo para el panel de control)
         var admin = app.MapGroup("/api/admin/comisiones").RequireAuthorization();
+        admin.RequiereRolesParaEscribir(RolesSistema.Administrador);
 
         admin.MapGet("/", async (ServicioCatalogoComisionesAdmin s, IServicioLog log, CancellationToken ct) =>
         {

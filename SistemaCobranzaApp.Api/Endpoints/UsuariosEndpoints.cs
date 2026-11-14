@@ -1,3 +1,4 @@
+using SistemaCobranzaApp.Api.Seguridad;
 using SistemaCobranzaApp.Api.Comun;
 using SistemaCobranzaApp.Infrastructure.Seguridad;
 using SistemaCobranzaApp.Shared.Dtos;
@@ -9,7 +10,7 @@ public class UsuariosEndpoints : IEndpointModule
 {
     public void MapEndpoints(IEndpointRouteBuilder app)
     {
-        var admin = app.MapGroup("/api/admin/usuarios").RequireAuthorization();
+        var admin = app.MapGroup("/api/admin/usuarios").RequireAuthorization(Politicas.AdminSupervisor);
 
         admin.MapGet("/", async (bool? incluirInactivos, ServicioUsuariosAdmin s, IServicioLog log, CancellationToken ct) =>
         {
@@ -48,7 +49,7 @@ public class UsuariosEndpoints : IEndpointModule
             }
             log.Warn(proceso, $"No se pudo crear el usuario: {r.Error}");
             return Respuestas.SolicitudInvalida("No se pudo crear el usuario.", r.Error ?? "");
-        });
+        }).RequireAuthorization(Politicas.SoloAdmin);
 
         admin.MapPut("/{id:long}", async (long id, ActualizarUsuarioRequest req, ServicioUsuariosAdmin s, IServicioLog log, CancellationToken ct) =>
         {
@@ -68,7 +69,7 @@ public class UsuariosEndpoints : IEndpointModule
             }
             log.Warn(proceso, $"No se pudo actualizar el usuario #{id}: {r.Error}");
             return Respuestas.SolicitudInvalida("No se pudo actualizar el usuario.", r.Error ?? "");
-        });
+        }).RequireAuthorization(Politicas.SoloAdmin);
 
         admin.MapDelete("/{id:long}", async (long id, ServicioUsuariosAdmin s, IServicioLog log, CancellationToken ct) =>
         {
@@ -82,6 +83,6 @@ public class UsuariosEndpoints : IEndpointModule
             }
             log.Warn(proceso, $"Usuario #{id} no encontrado.");
             return Respuestas.NoEncontrado(r.Error ?? $"No se encontró el usuario #{id}.");
-        });
+        }).RequireAuthorization(Politicas.SoloAdmin);
     }
 }

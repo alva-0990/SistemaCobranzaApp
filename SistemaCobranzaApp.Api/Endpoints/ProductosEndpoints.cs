@@ -1,3 +1,5 @@
+using SistemaCobranzaApp.Shared.Seguridad;
+using SistemaCobranzaApp.Api.Seguridad;
 using SistemaCobranzaApp.Api.Comun;
 using SistemaCobranzaApp.Infrastructure.Inventario;
 using SistemaCobranzaApp.Shared.Dtos;
@@ -10,6 +12,7 @@ public class ProductosEndpoints : IEndpointModule
     public void MapEndpoints(IEndpointRouteBuilder app)
     {
         var productos = app.MapGroup("/api/productos").RequireAuthorization();
+        productos.RequiereRolesParaEscribir(RolesSistema.Administrador, RolesSistema.Supervisor, RolesSistema.AuxiliarAdministrativo);
 
         // Listado paginado con filtros (texto, incluirInactivos, pagina, tamanoPagina).
         productos.MapGet("/", async (string? texto, bool? incluirInactivos, int? pagina, int? tamanoPagina,

@@ -34,6 +34,7 @@ public class CobranzaDbContext : DbContext
     public DbSet<DetalleVenta> DetallesVenta => Set<DetalleVenta>();
     public DbSet<Pago> Pagos => Set<Pago>();
     public DbSet<VentaPlan> VentaPlan => Set<VentaPlan>();
+    public DbSet<VentaUnificacion> VentaUnificaciones => Set<VentaUnificacion>();
     public DbSet<InventarioCentral> InventarioCentral => Set<InventarioCentral>();
     public DbSet<InventarioZona> InventarioZona => Set<InventarioZona>();
     public DbSet<InventarioMovimiento> InventarioMovimientos => Set<InventarioMovimiento>();
@@ -393,6 +394,20 @@ public class CobranzaDbContext : DbContext
                 .WithMany(v => v.PlanesPromocionales)
                 .HasForeignKey(x => x.IdVenta)
                 .OnDelete(DeleteBehavior.Cascade);
+        });
+
+// ---- RENOVACIONES (traspaso de saldo de una venta vieja a una nueva) ----
+        b.Entity<VentaUnificacion>(e =>
+        {
+            e.ToTable("ventaunificaciones");
+            e.HasKey(x => x.IdUnificacion);
+            e.Property(x => x.IdUnificacion).HasColumnName("idunificacion");
+            e.Property(x => x.IdVentaNueva).HasColumnName("idventanueva");
+            e.Property(x => x.IdVentaVieja).HasColumnName("idventavieja");
+            e.Property(x => x.MontoTraspasado).HasColumnName("montotraspasado");
+            e.Property(x => x.CodigoLiquidacion).HasColumnName("codigoliquidacion");
+            e.Property(x => x.FechaUnificacion).HasColumnName("fechaunificacion");
+            e.Property(x => x.IdUsuarioRegistro).HasColumnName("idusuarioregistro");
         });
 
 // ---- HISTORIAL DE PAGOS ----

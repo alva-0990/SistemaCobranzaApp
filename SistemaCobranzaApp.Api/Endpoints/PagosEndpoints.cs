@@ -1,3 +1,4 @@
+using SistemaCobranzaApp.Api.Seguridad;
 using SistemaCobranzaApp.Api.Comun;
 using SistemaCobranzaApp.Infrastructure.Pagos;
 using SistemaCobranzaApp.Shared.Logging;
@@ -9,7 +10,7 @@ public class PagosEndpoints : IEndpointModule
     public void MapEndpoints(IEndpointRouteBuilder app)
     {
         // Colócalo dentro del MapEndpoints junto a tus otros grupos de administración
-        var admin = app.MapGroup("/api/admin/pagos").RequireAuthorization();
+        var admin = app.MapGroup("/api/admin/pagos").RequireAuthorization(Politicas.AdminSupervisor);
 
         admin.MapDelete("/{id:long}", async (long id, ServicioPagosAdmin s, IServicioLog log, CancellationToken ct) =>
         {

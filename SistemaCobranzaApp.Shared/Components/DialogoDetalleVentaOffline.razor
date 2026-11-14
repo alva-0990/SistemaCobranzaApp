@@ -19,10 +19,45 @@
                     </MudChip>
                 </div>
                 <div class="resumen-banda">
+                    @* Renovación: el Total incluye el saldo de la cuenta anterior; se desglosa para que cuadre. *@
+                    @if (venta.SaldoRenovado > 0)
+                    {
+                        @Metrica("Productos nuevos", venta.TotalProductos, Color.Default)
+                        @Metrica("+ Saldo de cuenta anterior", venta.SaldoRenovado, Color.Warning)
+                    }
                     @Metrica("Total", venta.TotalFinal, Color.Default)
                     @Metrica("Enganche", venta.Enganche, Color.Info)
                     @Metrica("Saldo pendiente", venta.SaldoPendiente, venta.SaldoPendiente > 0 ? Color.Error : Color.Success)
                 </div>
+                <BotonMapa Class="mt-2" Latitud="venta.Latitud" Longitud="venta.Longitud"
+                           Nombre="@($"Venta {venta.CodigoVenta ?? $"#{venta.IdVenta}"}")" Direccion="@venta.NombreCliente"
+                           Titulo="Ubicación de la venta" Texto="Ubicación de la venta" />
+                @if (venta.CuentasRenovadas.Count > 0)
+                {
+                    <MudAlert Severity="Severity.Info" Dense="true" Variant="Variant.Outlined" Class="mt-2">
+                        <b>Renovación de crédito.</b> Esta cuenta absorbió el saldo de:
+                        <ul class="lista-renovacion">
+                            @foreach (var c in venta.CuentasRenovadas)
+                            {
+                                <li>
+                                    <b>@(c.CodigoVentaVieja ?? $"#{c.IdVentaVieja}")</b> · @c.MontoTraspasado.ToString("C2")
+                                    · folio @c.CodigoLiquidacion
+                                    · @c.FechaUnificacion.EnZonaProyecto().DateTime.ToString("dd/MM/yyyy")
+                                </li>
+                            }
+                        </ul>
+                        <span>Total @venta.TotalFinal.ToString("C2") = productos nuevos @venta.TotalProductos.ToString("C2") + saldo anterior @venta.SaldoRenovado.ToString("C2").</span>
+                    </MudAlert>
+                }
+                @if (venta.RenovadaEn is { } renovada)
+                {
+                    <MudAlert Severity="Severity.Success" Dense="true" Variant="Variant.Outlined" Class="mt-2">
+                        <b>Cuenta liquidada por renovación.</b> Su saldo de @renovada.MontoTraspasado.ToString("C2")
+                        pasó a la cuenta <b>@(renovada.CodigoVentaNueva ?? $"#{renovada.IdVentaNueva}")</b>
+                        (folio @renovada.CodigoLiquidacion, @renovada.FechaUnificacion.EnZonaProyecto().DateTime.ToString("dd/MM/yyyy")).
+                        Ya no genera cobros; el cobro continúa en la cuenta nueva.
+                    </MudAlert>
+                }
                 @if (LimpiarObservaciones(venta.Observaciones) is { } observacionVisible)
                 {
                     <MudText Typo="Typo.body2" Class="mt-2 resumen-nota">@observacionVisible</MudText>
@@ -48,6 +83,13 @@
                         <MudTd DataLabel="Precio" Style="text-align:right;">@context.PrecioCobrado.ToString("C2")</MudTd>
                         <MudTd DataLabel="Importe" Style="text-align:right;"><b>@context.Importe.ToString("C2")</b></MudTd>
                     </RowTemplate>
+                    <FooterContent>
+                        @if (venta.SaldoRenovado > 0)
+                        {
+                            <MudTd colspan="3" Style="text-align:right;">Saldo de cuenta anterior</MudTd>
+                            <MudTd Style="text-align:right;"><b>@venta.SaldoRenovado.ToString("C2")</b></MudTd>
+                        }
+                    </FooterContent>
                     <NoRecordsContent>
                         <div class="pa-3 text-center">
                             <MudIcon Icon="@Icons.Material.Filled.Inbox" Color="Color.Secondary" />
@@ -115,6 +157,7 @@
     .resumen-item { display: flex; flex-direction: column; }
     .resumen-etiqueta { font-size: 0.75rem; color: var(--mud-palette-text-secondary); }
     .resumen-valor { font-weight: 700; line-height: 1.2; }
+    .lista-renovacion { margin: 4px 0 6px 18px; padding: 0; }
     .resumen-nota { color: var(--mud-palette-text-secondary); font-style: italic; }
 
     .monto-abono { color: var(--mud-palette-success); }

@@ -1,3 +1,4 @@
+using SistemaCobranzaApp.Api.Seguridad;
 
 using System.Security.Claims;
 using SistemaCobranzaApp.Api.Comun;
@@ -34,7 +35,7 @@ public class GastosComprobantesEndpoints : IEndpointModule
 
         var admin = app
             .MapGroup("/api/admin/gastos/{idGasto:long}/comprobantes")
-            .RequireAuthorization();
+            .RequireAuthorization(Politicas.AdminSupervisorAuxiliar);
 
         // ============================================================
         // 1. LISTAR COMPROBANTES DE UN GASTO

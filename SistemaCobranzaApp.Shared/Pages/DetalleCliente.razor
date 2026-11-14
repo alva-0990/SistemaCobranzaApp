@@ -110,6 +110,8 @@
                     @Campo("Ruta", string.IsNullOrWhiteSpace(c.Ruta) ? "Sin ruta" : c.Ruta!)
                     @Campo("Zona", _estadoCuenta?.Zona ?? "—")
                     @Campo("Referencia", Mostrar(c.ReferenciaUbicacion))
+                    <BotonMapa Class="mt-2" Latitud="c.Latitud" Longitud="c.Longitud" Nombre="@c.NombreCompleto"
+                               Direccion="@c.Direccion" Titulo="Ubicación del cliente" Texto="Ver mapa" />
                 </MudPaper>
             </MudItem>
         </MudGrid>
@@ -176,7 +178,12 @@
                 </HeaderContent>
                 <RowTemplate>
                     <MudTd DataLabel="Pedido">@context.IdVenta</MudTd>
-                    <MudTd DataLabel="Código"><b>@(context.CodigoVenta ?? "—")</b></MudTd>
+                    <MudTd DataLabel="Código">
+                        @* La renovación no se pinta en la tabla: se explica en el tooltip (y completa en "Ver detalle"). *@
+                        <MudTooltip Text="@DetalleRenovacion(context)" Disabled="@(!context.EsRenovacion)">
+                            <b>@(context.CodigoVenta ?? "—")</b>
+                        </MudTooltip>
+                    </MudTd>
                     <MudTd DataLabel="Fecha">@context.FechaCompra.EnZonaProyecto().DateTime.ToString("dd/MM/yyyy")</MudTd>
                     <MudTd DataLabel="Estado">
                         <MudChip T="string" Size="Size.Small" Variant="Variant.Text" Color="Color.Primary" Class="chip-compacto">
@@ -205,6 +212,9 @@
                                                Size="Size.Small" Variant="Variant.Outlined"
                                                OnClick="@(() => VerDetalleVenta(context))" />
                             </MudTooltip>
+                            <BotonMapa SoloIcono="true" Latitud="context.Latitud" Longitud="context.Longitud"
+                                       Nombre="@($"Venta {context.CodigoVenta ?? $"#{context.IdVenta}"}")"
+                                       Direccion="@_cliente?.Direccion" Titulo="Ubicación de la venta" Texto="Ubicación de la venta" />
                             @* Venta cancelada: solo consulta de detalle (sin renovar, editar ni cancelar). *@
                             @if (context.Saldo > 0 && !context.EsCancelada)
                             {
@@ -222,6 +232,15 @@
                             <MudChip T="string" Size="Size.Small" Variant="Variant.Text" Color="Color.Error" Class="chip-compacto">
                                 Cancelada
                             </MudChip>
+                        }
+                        else if (context.EsRenovacion)
+                        {
+                            @* Cuenta ligada a una renovación: su saldo ya se traspasó, no se edita ni se cancela. *@
+                            <MudTooltip Text="@(string.IsNullOrWhiteSpace(context.RenovadaEnCuenta) ? $"Incluye el saldo de {context.RenuevaCuentas}; no puede editarse ni cancelarse." : $"Liquidada por renovación en {context.RenovadaEnCuenta}; no puede editarse ni cancelarse.")">
+                                <MudChip T="string" Size="Size.Small" Variant="Variant.Text" Color="Color.Info" Class="chip-compacto">
+                                    @(string.IsNullOrWhiteSpace(context.RenovadaEnCuenta) ? "Renovación" : "Renovada")
+                                </MudChip>
+                            </MudTooltip>
                         }
                         else if (context.TotalAbonos == 0)
                         {
@@ -276,6 +295,18 @@
     string DesgloseBonificaciones(EstadoCuentaVentaDto v)
         => $"Racha: {v.BonificacionRacha:C2} · Plan a meses: {v.LiquidacionPlan:C2} · " +
            $"Acuerdo/ajuste: {v.Condonacion:C2} · Renovación: {v.TraspasoRenovacion:C2}";
+
+    // Explicación de la renovación para el tooltip del código de la venta.
+    string DetalleRenovacion(EstadoCuentaVentaDto v)
+    {
+        var partes = new List<string>();
+        if (v.SaldoRenovado > 0)
+            partes.Add($"Renovación: incluye el saldo de {v.RenuevaCuentas} ({v.SaldoRenovado:C2}). " +
+                       $"Productos nuevos {v.TotalProductos:C2} + saldo anterior {v.SaldoRenovado:C2} = {v.TotalFinal:C2}.");
+        if (!string.IsNullOrWhiteSpace(v.RenovadaEnCuenta))
+            partes.Add($"Liquidada por renovación: su saldo ({v.TraspasoRenovacion:C2}) pasó a {v.RenovadaEnCuenta}.");
+        return string.Join(" ", partes);
+    }
 
     // Métrica monetaria compacta para la banda de crédito.
     RenderFragment Metrica(string etiqueta, decimal monto, Color color) => __builder =>
@@ -439,6 +470,7 @@
     private static string Mostrar(string? valor) => string.IsNullOrWhiteSpace(valor) ? "—" : valor!;
 
     private void Regresar() => _nav.NavigateTo("/clientes");
+
 
     // Tras una venta exitosa espera 5 s (para ver el resultado / terminar la impresión en móvil)
     // y regresa automáticamente a la búsqueda de clientes.

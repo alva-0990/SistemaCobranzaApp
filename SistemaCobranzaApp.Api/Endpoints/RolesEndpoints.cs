@@ -1,3 +1,4 @@
+using SistemaCobranzaApp.Api.Seguridad;
 using SistemaCobranzaApp.Api.Comun;
 using SistemaCobranzaApp.Infrastructure.Seguridad;
 using SistemaCobranzaApp.Shared.Dtos;
@@ -9,7 +10,7 @@ public class RolesEndpoints : IEndpointModule
 {
     public void MapEndpoints(IEndpointRouteBuilder app)
     {
-        var admin = app.MapGroup("/api/admin/roles").RequireAuthorization();
+        var admin = app.MapGroup("/api/admin/roles").RequireAuthorization(Politicas.SoloAdmin);
 
         admin.MapGet("/", async (bool? incluirInactivos, ServicioRolesAdmin s, IServicioLog log, CancellationToken ct) =>
         {

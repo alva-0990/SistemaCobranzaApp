@@ -123,4 +123,30 @@ public record VentaDto(
     List<DetalleVentaDto>? Detalles = null,
     List<VentaCuotaDto>? Cuotas = null,
     List<VentaPlanDto>? PlanesPromocionales = null
-);
+)
+{
+    /// <summary>Coordenadas GPS donde se registró la venta (si se capturaron).</summary>
+    public decimal? Latitud { get; init; }
+    public decimal? Longitud { get; init; }
+    /// <summary>Cuentas anteriores cuyo saldo absorbió esta venta al renovarse (vacío si no es renovación).</summary>
+    public List<VentaUnificacionDto> CuentasRenovadas { get; init; } = new();
+
+    /// <summary>Renovación que liquidó esta venta (null si no fue renovada).</summary>
+    public VentaUnificacionDto? RenovadaEn { get; init; }
+
+    /// <summary>Saldo de cuentas anteriores incluido en el TotalFinal de esta venta.</summary>
+    public decimal SaldoRenovado => CuentasRenovadas.Sum(c => c.MontoTraspasado);
+
+    /// <summary>Importe de los productos nuevos de la venta, sin el saldo traspasado.</summary>
+    public decimal TotalProductos => TotalFinal - SaldoRenovado;
+}
+
+/// <summary>Vínculo entre una venta vieja y la venta nueva que absorbió su saldo al renovar.</summary>
+public record VentaUnificacionDto(
+    long IdVentaVieja,
+    string? CodigoVentaVieja,
+    long IdVentaNueva,
+    string? CodigoVentaNueva,
+    decimal MontoTraspasado,
+    string CodigoLiquidacion,
+    DateTimeOffset FechaUnificacion);

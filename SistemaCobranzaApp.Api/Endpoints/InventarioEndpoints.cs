@@ -1,3 +1,6 @@
+using System.Security.Claims;
+using SistemaCobranzaApp.Shared.Seguridad;
+using SistemaCobranzaApp.Api.Seguridad;
 using SistemaCobranzaApp.Api.Comun;
 using SistemaCobranzaApp.Infrastructure.Inventario;
 using SistemaCobranzaApp.Shared.Dtos;
@@ -11,6 +14,7 @@ public class InventarioEndpoints : IEndpointModule
     {
         // ===================== Grupo: Operaciones de Inventario =====================
         var inventario = app.MapGroup("/api/admin/inventario").RequireAuthorization();
+        inventario.RequiereRolesParaEscribir(RolesSistema.Administrador, RolesSistema.Supervisor, RolesSistema.AuxiliarAdministrativo);
 
         // Existencias central
         inventario.MapGet("/central", async (ServicioInventario s, IServicioLog log, CancellationToken ct) =>
@@ -100,6 +104,8 @@ public class InventarioEndpoints : IEndpointModule
 
         // ===================== Grupo: Propuestas de Envío =====================
         var propuestas = app.MapGroup("/api/admin/propuestas").RequireAuthorization();
+        // Crear/consultar: Admin, Supervisor y Auxiliar. Confirmar/rechazar (mueven stock): solo Admin y Supervisor.
+        propuestas.RequiereRoles(RolesSistema.Administrador, RolesSistema.Supervisor, RolesSistema.AuxiliarAdministrativo);
 
         // Listar propuestas con filtros
         propuestas.MapGet("/", async (string? estatus, long? idZona, ServicioPropuestas s, IServicioLog log, CancellationToken ct) =>
@@ -147,12 +153,13 @@ public class InventarioEndpoints : IEndpointModule
         });
 
         // Confirmar propuesta (Transaccional: afecta Central y Zona)
-        propuestas.MapPost("/{id:long}/confirmar", async (long id, ResolverPropuestaRequest req, ServicioPropuestas s, IServicioLog log, CancellationToken ct) =>
+        propuestas.MapPost("/{id:long}/confirmar", async (long id, ResolverPropuestaRequest req, ClaimsPrincipal user, ServicioPropuestas s, IServicioLog log, CancellationToken ct) =>
         {
+            var idUsuarioConfirma = long.TryParse(user.FindFirstValue(ClaimTypes.NameIdentifier), out var uid) ? uid : 0L;
             const string proceso = "Confirmar Propuesta Envío";
-            log.Info(proceso, $"Procesando confirmación/cierre de la propuesta #{id} por el usuario #{req.IdUsuarioConfirma}.");
+            log.Info(proceso, $"Procesando confirmación/cierre de la propuesta #{id} por el usuario #{idUsuarioConfirma}.");
             
-            var r = await s.ConfirmarAsync(id, req.IdUsuarioConfirma, ct);
+            var r = await s.ConfirmarAsync(id, idUsuarioConfirma, ct);
             if (r.Exito)
             {
                 log.Info(proceso, $"Propuesta #{id} confirmada y stock transferido correctamente.", datos: r.Propuesta);
@@ -166,15 +173,16 @@ public class InventarioEndpoints : IEndpointModule
 
             log.Warn(proceso, $"No se pudo confirmar la propuesta #{id}: {r.Error}");
             return Respuestas.SolicitudInvalida("No se pudo completar la transferencia de la propuesta.", r.Error ?? "");
-        });
+        }).RequireAuthorization(Politicas.AdminSupervisor);
 
         // Rechazar propuesta (marca RECHAZADA; no toca inventario)
-        propuestas.MapPost("/{id:long}/rechazar", async (long id, ResolverPropuestaRequest req, ServicioPropuestas s, IServicioLog log, CancellationToken ct) =>
+        propuestas.MapPost("/{id:long}/rechazar", async (long id, ResolverPropuestaRequest req, ClaimsPrincipal user, ServicioPropuestas s, IServicioLog log, CancellationToken ct) =>
         {
+            var idUsuarioConfirma = long.TryParse(user.FindFirstValue(ClaimTypes.NameIdentifier), out var uid) ? uid : 0L;
             const string proceso = "Rechazar Propuesta Envío";
-            log.Info(proceso, $"Procesando rechazo de la propuesta #{id} por el usuario #{req.IdUsuarioConfirma}.");
+            log.Info(proceso, $"Procesando rechazo de la propuesta #{id} por el usuario #{idUsuarioConfirma}.");
 
-            var r = await s.RechazarAsync(id, req.IdUsuarioConfirma, ct);
+            var r = await s.RechazarAsync(id, idUsuarioConfirma, ct);
             if (r.Exito)
             {
                 log.Info(proceso, $"Propuesta #{id} rechazada correctamente.", datos: r.Propuesta);
@@ -188,6 +196,6 @@ public class InventarioEndpoints : IEndpointModule
 
             log.Warn(proceso, $"No se pudo rechazar la propuesta #{id}: {r.Error}");
             return Respuestas.SolicitudInvalida("No se pudo rechazar la propuesta.", r.Error ?? "");
-        });
+        }).RequireAuthorization(Politicas.AdminSupervisor);
     }
 }

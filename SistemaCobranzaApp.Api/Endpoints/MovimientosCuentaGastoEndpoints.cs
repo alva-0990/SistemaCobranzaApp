@@ -1,3 +1,5 @@
+using SistemaCobranzaApp.Shared.Seguridad;
+using SistemaCobranzaApp.Api.Seguridad;
 
 using System.Security.Claims;
 using SistemaCobranzaApp.Api.Comun;
@@ -42,7 +44,8 @@ public class MovimientosCuentaGastoEndpoints : IEndpointModule
 
         var admin = app
             .MapGroup("/api/admin/cuentas-gasto/{idCuentaGasto:long}/movimientos")
-            .RequireAuthorization();
+            .RequireAuthorization(Politicas.AdminSupervisorAuxiliar);
+        admin.RequiereRolesParaEscribir(RolesSistema.Administrador, RolesSistema.Supervisor);
 
         // ============================================================
         // LISTAR MOVIMIENTOS DE UNA CUENTA

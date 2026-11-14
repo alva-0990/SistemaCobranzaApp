@@ -1,3 +1,5 @@
+using SistemaCobranzaApp.Shared.Seguridad;
+using SistemaCobranzaApp.Api.Seguridad;
 using SistemaCobranzaApp.Api.Comun;
 using SistemaCobranzaApp.Infrastructure.Catalogos;
 using SistemaCobranzaApp.Shared.Dtos;
@@ -22,6 +24,7 @@ public class RutasEndpoints : IEndpointModule
         });
 
         var admin = app.MapGroup("/api/admin/rutas").RequireAuthorization();
+        admin.RequiereRolesParaEscribir(RolesSistema.Administrador, RolesSistema.Supervisor);
 
         admin.MapGet("/", async (bool? incluirInactivas, long? idZona, ServicioRutasAdmin s, IServicioLog log, CancellationToken ct) =>
         {

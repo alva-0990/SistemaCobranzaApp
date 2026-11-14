@@ -45,7 +45,13 @@ public record EstadoCuentaIntegralCreditoDto(
     decimal Bonificaciones,
     decimal Traspaso,
     decimal Saldo,
-    DateTimeOffset? FechaUltimoPago);
+    DateTimeOffset? FechaUltimoPago)
+{
+    /// <summary>Saldo de cuentas anteriores incluido en el Total (renovación).</summary>
+    public decimal SaldoRenovado { get; init; }
+    public string? RenuevaCuentas { get; init; }
+    public string? RenovadaEnCuenta { get; init; }
+}
 
 public record EstadoCuentaIntegralProductoDto(
     string Codigo,
@@ -94,7 +100,12 @@ public record EstadoCuentaIntegralCerradoDto(
     decimal Enganche,
     decimal Pagado,
     decimal Bonificaciones,
-    decimal Traspaso);
+    decimal Traspaso)
+{
+    public string? RenovadaEnCuenta { get; init; }
+    public decimal SaldoRenovado { get; init; }
+    public string? RenuevaCuentas { get; init; }
+}
 
 public record EstadoCuentaIntegralDto(
     string Empresa,

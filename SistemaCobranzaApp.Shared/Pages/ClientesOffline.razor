@@ -11,6 +11,7 @@
 @inject IDialogService _dialogo
 @inject ISnackbar _snackbar
 @inject IFormFactor _formFactor
+@inject IServicioUbicacion _ubicacion
 @inject NavigationManager _nav
 
 @if (_idCliente is { } id)
@@ -273,9 +274,13 @@ else
         if (await dialogo.Result is not { Canceled: false, Data: DialogoCliente.FormModel m }) return;
         try
         {
+            // GPS automático (best-effort): no bloquea el alta si no hay permiso/señal.
+            var gps = m.Latitud is null || m.Longitud is null ? await _ubicacion.ObtenerActualAsync() : null;
+            var lat = m.Latitud ?? gps?.Latitud;
+            var lon = m.Longitud ?? gps?.Longitud;
             var c = await Jornada.GuardarClienteAsync(new(m.Nombre.Trim(), m.ApPaterno, m.ApMaterno,
                 m.TelefonoPrincipal.Trim(), m.TelefonoSecundario, m.Email, m.Direccion.Trim(), m.CodigoPostal,
-                m.ReferenciaUbicacion, m.Latitud, m.Longitud, m.IdRuta ?? 0, d.Asignacion.IdVendedor,
+                m.ReferenciaUbicacion, lat, lon, m.IdRuta ?? 0, d.Asignacion.IdVendedor,
                 m.IdClasificacion, m.Observaciones, Api.Sesion!.IdUsuario));
             _snackbar.Add("Cliente guardado en dispositivo. Ya puedes registrar su venta.", Severity.Success);
             _idCliente = c.IdCliente;

@@ -1,3 +1,4 @@
+using SistemaCobranzaApp.Api.Seguridad;
 using SistemaCobranzaApp.Api.Comun;
 using SistemaCobranzaApp.Infrastructure.CatalogoComisiones;
 using SistemaCobranzaApp.Shared.Dtos;
@@ -9,7 +10,7 @@ public class PagosComisionesEndpoints : IEndpointModule
 {
     public void MapEndpoints(IEndpointRouteBuilder app)
     {
-        var grupo = app.MapGroup("/api/admin/pagos-comisiones").RequireAuthorization();
+        var grupo = app.MapGroup("/api/admin/pagos-comisiones").RequireAuthorization(Politicas.AdminSupervisor);
 
         // GET: Caja (Disponibles)
         grupo.MapGet("", async (long? idVendedor, long? idZona, DateTime? fechaDesde, DateTime? fechaHasta, 

@@ -1,3 +1,4 @@
+using SistemaCobranzaApp.Api.Seguridad;
 using SistemaCobranzaApp.Api.Comun;
 using SistemaCobranzaApp.Infrastructure.Catalogos;
 using SistemaCobranzaApp.Shared.Dtos;
@@ -40,7 +41,7 @@ public class ParametrosSistemaEndpoints : IEndpointModule
         });
 
         // ===================== Admin (CRUD) =====================
-        var admin = app.MapGroup("/api/admin/parametros").RequireAuthorization();
+        var admin = app.MapGroup("/api/admin/parametros").RequireAuthorization(Politicas.SoloAdmin);
 
         // Listado completo.
         admin.MapGet("/", async (ServicioParametrosAdmin s, IServicioLog log, CancellationToken ct) =>

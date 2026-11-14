@@ -1,3 +1,5 @@
+using SistemaCobranzaApp.Shared.Seguridad;
+using SistemaCobranzaApp.Api.Seguridad;
 using SistemaCobranzaApp.Api.Comun;
 using SistemaCobranzaApp.Infrastructure.Catalogos;
 using SistemaCobranzaApp.Shared.Dtos;
@@ -22,6 +24,7 @@ public class VendedoresEndpoints : IEndpointModule
         });
 
         var admin = app.MapGroup("/api/admin/vendedores").RequireAuthorization();
+        admin.RequiereRolesParaEscribir(RolesSistema.Administrador, RolesSistema.Supervisor);
 
         admin.MapGet("/", async (bool? incluirInactivos, long? idZona, ServicioVendedoresAdmin s, IServicioLog log, CancellationToken ct) =>
         {

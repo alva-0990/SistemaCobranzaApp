@@ -1,3 +1,5 @@
+using SistemaCobranzaApp.Shared.Seguridad;
+using SistemaCobranzaApp.Api.Seguridad;
 using System.Security.Claims;
 using SistemaCobranzaApp.Api.Comun;
 using SistemaCobranzaApp.Infrastructure.Cobranza;
@@ -22,6 +24,7 @@ public class VentaCreditoEndpoints : IEndpointModule
         // GRUPO DE ENDPOINTS OPERATIVOS Y ADMINISTRATIVOS (Módulo de Crédito y Cobro)
         // ===========================================================================
         var api = app.MapGroup("/api/admin/ventas").RequireAuthorization(); // 🎯 Actualizado a tu grupo admin
+        api.RequiereRolesParaEscribir(RolesSistema.Administrador, RolesSistema.Supervisor, RolesSistema.VendedorEnLinea);
 
         // 1. Crear venta a crédito con su respectiva tabla de amortización unificada
         api.MapPost("/", async (CrearVentaRequest req, ClaimsPrincipal user, ServicioVentasAdmin s, IServicioLog log, CancellationToken ct) =>

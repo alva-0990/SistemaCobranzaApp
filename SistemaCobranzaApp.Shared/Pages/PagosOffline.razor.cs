@@ -203,7 +203,13 @@ public partial class PagosOffline : ComponentBase, IAsyncDisposable
             new EstadoCuentaVentaDto(v.IdVenta, v.CodigoVenta, v.TotalFinal, v.Enganche,
                 v.TotalAbonado + v.SaldoPendiente - Jornada.SaldoDisponible(v), Jornada.SaldoDisponible(v),
                 v.DescripcionEstatus, v.FechaCompra, v.FechaUltimoPago)
-            { Subtotal = v.Subtotal, DescuentoGlobal = v.DescuentoGlobal }, Jornada.MovimientosDescargados(v.IdVenta))).ToList();
+            {
+                Subtotal = v.Subtotal, DescuentoGlobal = v.DescuentoGlobal, Latitud = v.Latitud, Longitud = v.Longitud,
+                SaldoRenovado = v.SaldoRenovado,
+                RenuevaCuentas = v.CuentasRenovadas.Count == 0 ? null
+                    : string.Join(", ", v.CuentasRenovadas.Select(c => c.CodigoVentaVieja ?? $"#{c.IdVentaVieja}")),
+                RenovadaEnCuenta = v.RenovadaEn is null ? null : v.RenovadaEn.CodigoVentaNueva ?? $"#{v.RenovadaEn.IdVentaNueva}"
+            }, Jornada.MovimientosDescargados(v.IdVenta))).ToList();
         EstadoCuenta = CuadreEstadoCuenta.ConTotales(new(Cliente.IdCliente, Cliente.NombreCompleto, Cliente.Ruta, Api.Sesion?.Zona,
             ventas.Sum(v => v.TotalFinal), ventas.Sum(v => v.TotalAbonos), ventas.Sum(v => v.Saldo), ventas, [])
         {
@@ -223,14 +229,14 @@ public partial class PagosOffline : ComponentBase, IAsyncDisposable
         PagosVenta = d!.Pagos.Where(p => p.IdVenta == idVenta).OrderByDescending(p => p.FechaPago)
             .Select(p => new PagoHistoricoDto(p.IdPago, p.FolioPago, p.ConsecutivoPago, p.MontoAbona,
                 p.SaldoAnterior, p.SaldoActual, p.IdCobrador, p.Cobrador, p.IdMovimiento ?? 0,
-                p.Movimiento, p.Observaciones, p.FechaPago, null, null)).ToList();
+                p.Movimiento, p.Observaciones, p.FechaPago, p.Latitud, p.Longitud)).ToList();
         foreach (var o in Jornada.Estado.Operaciones.Where(o => o.Aplicada && o.Pago?.IdVenta == idVenta && o.PagoCentral is not null))
         {
             var p = o.PagoCentral!;
             if (PagosVenta.Any(h => h.IdPago == p.IdPago)) continue;
             PagosVenta.Add(new(p.IdPago, p.FolioPago, p.ConsecutivoPago, p.MontoAbona,
                 p.SaldoAnterior, p.SaldoActual, o.Pago!.IdCobrador, Api.Sesion?.NombreCompleto,
-                1, "ABONO", o.Pago.Observaciones, o.Pago.FechaPago ?? o.FechaCaptura, null, null));
+                1, "ABONO", o.Pago.Observaciones, o.Pago.FechaPago ?? o.FechaCaptura, o.Pago.Latitud, o.Pago.Longitud));
         }
         PagosVenta = PagosVenta.OrderByDescending(p => p.FechaPago).ToList();
     }
@@ -303,6 +309,19 @@ public partial class PagosOffline : ComponentBase, IAsyncDisposable
     }
 
     protected static string Mostrar(string? valor) => string.IsNullOrWhiteSpace(valor) ? "—" : valor!;
+
+    // Explicación de la renovación para el tooltip del código de la venta.
+    protected static string DetalleRenovacion(EstadoCuentaVentaDto v)
+    {
+        var partes = new List<string>();
+        if (v.SaldoRenovado > 0)
+            partes.Add($"Renovación: incluye el saldo de {v.RenuevaCuentas} ({v.SaldoRenovado:C2}). " +
+                       $"Productos nuevos {v.TotalProductos:C2} + saldo anterior {v.SaldoRenovado:C2} = {v.TotalFinal:C2}.");
+        if (!string.IsNullOrWhiteSpace(v.RenovadaEnCuenta))
+            partes.Add($"Liquidada por renovación: su saldo ({v.TraspasoRenovacion:C2}) pasó a {v.RenovadaEnCuenta}.");
+        return string.Join(" ", partes);
+    }
+
 
     // Normaliza el código de venta tecleado o escaneado. Algunos lectores de código de barras,
     // por el layout de teclado, mapean el guión '-' a otros caracteres (apóstrofe, backtick, etc.).

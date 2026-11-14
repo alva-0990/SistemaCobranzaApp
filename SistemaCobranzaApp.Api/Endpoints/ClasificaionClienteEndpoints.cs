@@ -1,3 +1,5 @@
+using SistemaCobranzaApp.Shared.Seguridad;
+using SistemaCobranzaApp.Api.Seguridad;
 using SistemaCobranzaApp.Api.Comun;
 using SistemaCobranzaApp.Infrastructure.Catalogos;
 using SistemaCobranzaApp.Shared.Dtos;
@@ -24,6 +26,7 @@ public class ClasificaionClienteEndpoints : IEndpointModule
         });
 
         var admin = app.MapGroup("/api/admin/clasificacion/cliente").RequireAuthorization();
+        admin.RequiereRolesParaEscribir(RolesSistema.Administrador);
 
         admin.MapGet("/", async (ServicioClasificacionClienteAdmin s, IServicioLog log, CancellationToken ct) =>
         {

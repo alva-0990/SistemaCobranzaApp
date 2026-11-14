@@ -79,7 +79,7 @@ public class ServicioJornada(
         var ps = await db.Pagos.AsNoTracking().Where(p => ids.Contains(p.IdCliente))
             .Select(p => new PagoSyncDto(p.IdPago, p.PagoUuid, p.IdVenta, p.IdCliente, p.MontoAbona,
                 p.SaldoAnterior, p.SaldoActual, p.FolioPago, p.ConsecutivoPago, p.IdCobrador, p.FechaPago, p.FechaModificacion)
-                { IdMovimiento = p.IdMovimiento, Observaciones = p.Observaciones,
+                { IdMovimiento = p.IdMovimiento, Latitud = p.Latitud, Longitud = p.Longitud, Observaciones = p.Observaciones,
                   Cobrador = db.Cobradores.Where(c => c.IdCobrador == p.IdCobrador).Select(c => c.Nombre).FirstOrDefault(),
                   Movimiento = db.Movimientos.Where(m => m.IdMovimiento == p.IdMovimiento).Select(m => m.Descripcion).FirstOrDefault() })
             .ToListAsync(ct);

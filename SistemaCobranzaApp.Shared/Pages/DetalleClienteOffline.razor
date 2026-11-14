@@ -113,6 +113,8 @@
                     @Campo("Ruta", string.IsNullOrWhiteSpace(c.Ruta) ? "Sin ruta" : c.Ruta!)
                     @Campo("Zona", _estadoCuenta?.Zona ?? "—")
                     @Campo("Referencia", Mostrar(c.ReferenciaUbicacion))
+                    <BotonMapa Class="mt-2" Latitud="c.Latitud" Longitud="c.Longitud" Nombre="@c.NombreCompleto"
+                               Direccion="@c.Direccion" Titulo="Ubicación del cliente" Texto="Ver mapa" />
                 </MudPaper>
             </MudItem>
         </MudGrid>
@@ -177,7 +179,12 @@
                 </HeaderContent>
                 <RowTemplate>
                     <MudTd DataLabel="Pedido">@context.IdVenta</MudTd>
-                    <MudTd DataLabel="Código"><b>@(context.CodigoVenta ?? "—")</b></MudTd>
+                    <MudTd DataLabel="Código">
+                        @* La renovación no se pinta en la tabla: se explica en el tooltip (y completa en "Ver detalle"). *@
+                        <MudTooltip Text="@DetalleRenovacion(context)" Disabled="@(!context.EsRenovacion)">
+                            <b>@(context.CodigoVenta ?? "—")</b>
+                        </MudTooltip>
+                    </MudTd>
                     <MudTd DataLabel="Fecha">@context.FechaCompra.EnZonaProyecto().DateTime.ToString("dd/MM/yyyy")</MudTd>
                     <MudTd DataLabel="Estado">
                         <MudChip T="string" Size="Size.Small" Variant="Variant.Text" Color="Color.Primary" Class="chip-compacto">
@@ -206,6 +213,9 @@
                                                Size="Size.Small" Variant="Variant.Outlined"
                                                OnClick="@(() => VerDetalleVenta(context))" />
                             </MudTooltip>
+                            <BotonMapa SoloIcono="true" Latitud="context.Latitud" Longitud="context.Longitud"
+                                       Nombre="@($"Venta {context.CodigoVenta ?? $"#{context.IdVenta}"}")"
+                                       Direccion="@_cliente?.Direccion" Titulo="Ubicación de la venta" Texto="Ubicación de la venta" />
                             @if (context.Saldo > 0)
                             {
                                 <MudTooltip Text="Renovar cuenta">
@@ -254,6 +264,18 @@
     string DesgloseBonificaciones(EstadoCuentaVentaDto v)
         => $"Racha: {v.BonificacionRacha:C2} · Plan a meses: {v.LiquidacionPlan:C2} · " +
            $"Acuerdo/ajuste: {v.Condonacion:C2} · Renovación: {v.TraspasoRenovacion:C2}";
+
+    // Explicación de la renovación para el tooltip del código de la venta.
+    string DetalleRenovacion(EstadoCuentaVentaDto v)
+    {
+        var partes = new List<string>();
+        if (v.SaldoRenovado > 0)
+            partes.Add($"Renovación: incluye el saldo de {v.RenuevaCuentas} ({v.SaldoRenovado:C2}). " +
+                       $"Productos nuevos {v.TotalProductos:C2} + saldo anterior {v.SaldoRenovado:C2} = {v.TotalFinal:C2}.");
+        if (!string.IsNullOrWhiteSpace(v.RenovadaEnCuenta))
+            partes.Add($"Liquidada por renovación: su saldo ({v.TraspasoRenovacion:C2}) pasó a {v.RenovadaEnCuenta}.");
+        return string.Join(" ", partes);
+    }
 
     // Métrica monetaria compacta para la banda de crédito.
     RenderFragment Metrica(string etiqueta, decimal monto, Color color) => __builder =>
@@ -363,7 +385,14 @@
             new EstadoCuentaVentaDto(v.IdVenta, v.CodigoVenta, v.TotalFinal, v.Enganche,
                 v.TotalAbonado + Math.Max(0, v.SaldoPendiente - Local.SaldoDisponible(v)),
                 Local.SaldoDisponible(v), v.DescripcionEstatus, v.FechaCompra, v.FechaUltimoPago)
-            { Subtotal = v.Subtotal, DescuentoGlobal = v.DescuentoGlobal }, Local.MovimientosDescargados(v.IdVenta))).ToList();
+            {
+                Subtotal = v.Subtotal, DescuentoGlobal = v.DescuentoGlobal, Latitud = v.Latitud, Longitud = v.Longitud,
+                // Renovaciones: central (descargadas) o pendientes del dispositivo.
+                SaldoRenovado = v.SaldoRenovado,
+                RenuevaCuentas = v.CuentasRenovadas.Count == 0 ? null
+                    : string.Join(", ", v.CuentasRenovadas.Select(c => c.CodigoVentaVieja ?? $"#{c.IdVentaVieja}")),
+                RenovadaEnCuenta = v.RenovadaEn is null ? null : v.RenovadaEn.CodigoVentaNueva ?? $"#{v.RenovadaEn.IdVentaNueva}"
+            }, Local.MovimientosDescargados(v.IdVenta))).ToList();
         _estadoCuenta = CuadreEstadoCuenta.ConTotales(new(IdCliente, _cliente.NombreCompleto, _cliente.Ruta, Api.Sesion?.Zona,
             ventas.Sum(v => v.TotalFinal), ventas.Sum(v => v.TotalAbonos), ventas.Sum(v => v.Saldo), ventas, [])
         {

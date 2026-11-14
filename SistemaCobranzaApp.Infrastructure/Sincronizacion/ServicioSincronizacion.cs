@@ -154,7 +154,8 @@ public class ServicioSincronizacion
             .Select(p => new PagoSyncDto(
                 p.IdPago, p.PagoUuid, p.IdVenta, p.IdCliente, p.MontoAbona,
                 p.SaldoAnterior, p.SaldoActual, p.FolioPago, p.ConsecutivoPago,
-                p.IdCobrador, p.FechaPago, p.FechaModificacion))
+                p.IdCobrador, p.FechaPago, p.FechaModificacion)
+            { Latitud = p.Latitud, Longitud = p.Longitud })
             .ToListAsync(ct);
 
         return new PullCambiosResponse(marcaServidor, ventas, pagos);

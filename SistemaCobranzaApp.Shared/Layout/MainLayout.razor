@@ -6,6 +6,7 @@
 @using SistemaCobranzaApp.Shared.Theme
 @using SistemaCobranzaApp.Shared.Components
 @using SistemaCobranzaApp.Shared.Dtos
+@using SistemaCobranzaApp.Shared.Seguridad
 @inject IDialogService Dialogos
 @inject ISnackbar Snackbar
 @inject ApiCliente ApiClienteService
@@ -95,7 +96,10 @@
                   Gutters="false"
                   Style="flex: 1; width: 100%; max-width: none; box-sizing: border-box; padding-left: 24px; padding-right: 24px;"
                   Class="@(EsEntornoMovil ? "my-3 pt-2 pb-nav-movil" : "my-3 pt-2")">
-        @Body
+        @if (RutaPermitida)
+        {
+            @Body
+        }
     </MudContainer>
 
     @if (!EsEntornoMovil)
@@ -126,115 +130,175 @@ else if (EsEntornoMovil && ApiClienteService.Autenticado)
 {
     <nav class="bottom-nav-movil">
         <!-- ACCESOS PRINCIPALES DE OPERACIÓN DIARIA -->
+        @if (Puede(""))
+        {
         <NavLink class="bottom-nav-item" href="" Match="NavLinkMatch.All">
             <MudIcon Icon="@Icons.Material.Filled.Home" Size="Size.Medium" />
             <span class="bottom-nav-label">Home</span>
         </NavLink>
+        }
         
+        @if (Puede("clientes"))
+        {
         <NavLink class="bottom-nav-item" href="clientes">
             <MudIcon Icon="@Icons.Material.Filled.People" Size="Size.Medium" />
             <span class="bottom-nav-label">Clientes</span>
         </NavLink>
+        }
         
+        @if (Puede("pagos"))
+        {
         <NavLink class="bottom-nav-item" href="pagos">
             <MudIcon Icon="@Icons.Material.Filled.Payments" Size="Size.Medium" />
             <span class="bottom-nav-label">Pagos</span>
         </NavLink>
+        }
 
+        @if (Puede("reportes"))
+        {
         <NavLink class="bottom-nav-item" href="reportes">
             <MudIcon Icon="@Icons.Material.Filled.Assessment" Size="Size.Medium" />
             <span class="bottom-nav-label">Reportes</span>
         </NavLink>
+        }
 
         <!-- "Más": Abre la hoja inferior con control de rutas, catálogos y reportes -->
+        @if (HayEnMas)
+        {
         <button type="button" class="bottom-nav-item @(_mostrarMas ? "active" : "")" @onclick="AlternarMas">
             <MudIcon Icon="@Icons.Material.Filled.MoreHoriz" Size="Size.Medium" />
             <span class="bottom-nav-label">Más</span>
         </button>
+        }
     </nav>
 
     @* Hoja emergente del botón "Más". Overlay propio + z-index por encima de la barra
        (la barra usa 1300). Evita el popover de MudBlazor, poco fiable dentro de un
        <nav> fijo en el WebView de Android. *@
-    @if (_mostrarMas)
+    @if (_mostrarMas && HayEnMas)
     {
         <div class="mas-overlay" @onclick="CerrarMas"></div>
         <div class="mas-sheet">
             <!-- Continuación de Operación Diaria -->
+            @if (Puede("reversion-pagos"))
+            {
             <button type="button" class="mas-item" @onclick="@(() => IrA("reversion-pagos"))">
                 <MudIcon Icon="@Icons.Material.Filled.HistoryToggleOff" Size="Size.Medium" Class="mr-3" />
                 <span>Reversión de Pagos</span>
             </button>
+            }
+            @if (Puede("pagos-comisiones"))
+            {
             <button type="button" class="mas-item" @onclick="@(() => IrA("pagos-comisiones"))">
                 <MudIcon Icon="@Icons.Material.Filled.PriceCheck" Size="Size.Medium" Class="mr-3" />
                 <span>Pago Comisión Vendedores</span>
             </button>
+            }
 
             <!-- Separador Visual opcional o espacio para Zonas y Rutas -->
             <hr class="mas-divider" style="border: 0; border-top: 1px solid var(--mud-palette-lines); margin: 8px 0;" />
 
+            @if (Puede("zonas-rutas"))
+            {
             <button type="button" class="mas-item" @onclick="@(() => IrA("zonas-rutas"))">
                 <MudIcon Icon="@Icons.Material.Filled.AltRoute" Size="Size.Medium" Class="mr-3" />
                 <span>Control de Zonas y Rutas</span>
             </button>
+            }
+            @if (Puede("vendedores-cobradores"))
+            {
             <button type="button" class="mas-item" @onclick="@(() => IrA("vendedores-cobradores"))">
                 <MudIcon Icon="@Icons.Material.Filled.Badge" Size="Size.Medium" Class="mr-3" />
                 <span>Asignación de Vendedores</span>
             </button>
+            }
 
             <!-- Productos e Inventario -->
+            @if (Puede("productos"))
+            {
             <button type="button" class="mas-item" @onclick="@(() => IrA("productos"))">
                 <MudIcon Icon="@Icons.Material.Filled.LocalOffer" Size="Size.Medium" Class="mr-3" />
                 <span>Productos</span>
             </button>
+            }
+            @if (Puede("inventario"))
+            {
             <button type="button" class="mas-item" @onclick="@(() => IrA("inventario"))">
                 <MudIcon Icon="@Icons.Material.Filled.Inventory2" Size="Size.Medium" Class="mr-3" />
                 <span>Inventario</span>
             </button>
+            }
 
             <!-- Catálogos Reales y Reglas -->
+            @if (Puede("cartera-clientes"))
+            {
             <button type="button" class="mas-item" @onclick="@(() => IrA("cartera-clientes"))">
                 <MudIcon Icon="@Icons.Material.Filled.Rule" Size="Size.Medium" Class="mr-3" />
                 <span>Calificación de Clientes (B/M/R)</span>
             </button>
+            }
+            @if (Puede("operaciones-ventas"))
+            {
             <button type="button" class="mas-item" @onclick="@(() => IrA("operaciones-ventas"))">
                 <MudIcon Icon="@Icons.Material.Filled.SettingsApplications" Size="Size.Medium" Class="mr-3" />
                 <span>Reglas de Venta y Crédito</span>
             </button>
+            }
             
+            @if (Puede("estadisticas"))
+            {
             <button type="button" class="mas-item" @onclick="@(() => IrA("estadisticas"))">
                 <MudIcon Icon="@Icons.Material.Filled.Insights" Size="Size.Medium" Class="mr-3" />
                 <span>Estadísticas</span>
             </button>
+            }
 
             <!-- Reportes y Sistema -->
+            @if (Puede("gastos"))
+            {
             <button type="button" class="mas-item" @onclick="@(() => IrA("gastos"))">
                 <MudIcon Icon="@Icons.Material.Filled.PriceChange" Size="Size.Medium" Class="mr-3" />
                 <span>Gastos</span>
             </button>
+            }
             
+            @if (Puede("roles-usuarios"))
+            {
             <button type="button" class="mas-item" @onclick="@(() => IrA("roles-usuarios"))">
                 <MudIcon Icon="@Icons.Material.Filled.GroupAdd" Size="Size.Medium" Class="mr-3" />
                 <span>Roles y Usuarios</span>
             </button>
+            }
+            @if (Puede("parametros"))
+            {
             <button type="button" class="mas-item" @onclick="@(() => IrA("parametros"))">
                 <MudIcon Icon="@Icons.Material.Filled.Tune" Size="Size.Medium" Class="mr-3" />
                 <span>Parámetros Generales</span>
             </button>
+            }
+            @if (Puede("recordatorios-whatsapp"))
+            {
             <button type="button" class="mas-item" @onclick="@(() => IrA("recordatorios-whatsapp"))">
                 <MudIcon Icon="@Icons.Material.Filled.Send" Size="Size.Medium" Class="mr-3" />
                 <span>Envío de Recordatorios de Cobranza</span>
             </button>
+            }
 
+            @if (Puede("mensajes-whatsapp"))
+            {
             <button type="button" class="mas-item" @onclick="@(() => IrA("mensajes-whatsapp"))">
                 <MudIcon Icon="@Icons.Material.Filled.History" Size="Size.Medium" Class="mr-3" />
                 <span>Histórico Mensajes WhatsApp</span>
             </button>
+            }
 
+            @if (Puede("empresa"))
+            {
             <button type="button" class="mas-item" @onclick="@(() => IrA("empresa"))">
                 <MudIcon Icon="@Icons.Material.Filled.Business" Size="Size.Medium" Class="mr-3" />
                 <span>Datos de la Empresa</span>
             </button>
+            }
         </div>
     }
 }
@@ -259,12 +323,49 @@ else if (EsEntornoMovil && ApiClienteService.Autenticado)
         // Además, re-renderizamos en cada navegación: al pasar de /login a / el estado de
         // autenticación ya es definitivo y así la barra inferior (menú móvil) se evalúa de nuevo.
         NavigationManagerService.LocationChanged += OnLocationChanged;
+        VerificarAcceso();
     }
 
-    private void OnSesionCambiada() => InvokeAsync(StateHasChanged);
+    private void OnSesionCambiada()
+    {
+        VerificarAcceso();
+        InvokeAsync(StateHasChanged);
+    }
 
     private void OnLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e)
-        => InvokeAsync(StateHasChanged);
+    {
+        VerificarAcceso();
+        InvokeAsync(StateHasChanged);
+    }
+
+    // ===== Control de acceso por rol (ver Seguridad/PermisosRol.cs) =====
+    private long? IdRolActual => ApiClienteService.Sesion?.IdRol;
+
+    private bool Puede(string ruta) => PermisosRol.PuedeAcceder(IdRolActual, ruta);
+
+    // Opciones que solo viven en la hoja "Más" (el resto está en la barra principal).
+    private static readonly string[] RutasEnMas =
+    {
+        "reversion-pagos", "pagos-comisiones", "zonas-rutas", "vendedores-cobradores", "productos",
+        "inventario", "cartera-clientes", "operaciones-ventas", "estadisticas", "gastos",
+        "roles-usuarios", "parametros", "recordatorios-whatsapp", "mensajes-whatsapp", "empresa"
+    };
+
+    private bool HayEnMas => RutasEnMas.Any(Puede);
+
+    // Sin sesión no se restringe aquí: Routes.razor ya redirige a /login.
+    private bool RutaPermitida => !ApiClienteService.Autenticado
+        || PermisosRol.PuedeAcceder(IdRolActual, RutaRelativaActual());
+
+    private string RutaRelativaActual() =>
+        NavigationManagerService.ToBaseRelativePath(NavigationManagerService.Uri);
+
+    private void VerificarAcceso()
+    {
+        if (RutaPermitida) return;
+        _mostrarMas = false;
+        NavigationManagerService.NavigateTo(PermisosRol.RutaInicio(IdRolActual), replace: true);
+    }
 
     public void Dispose()
     {

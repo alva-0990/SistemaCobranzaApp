@@ -361,9 +361,33 @@ public sealed class ServicioJornadaLocal : IDisposable
                     req.Detalles.Select(l => new DetalleVentaDto(0, id, l.IdProducto,
                         d.Productos.FirstOrDefault(p => p.Id == l.IdProducto)?.Descripcion ?? $"Producto #{l.IdProducto}",
                         l.Cantidad, l.PrecioCobrado, l.Cantidad * l.PrecioCobrado)).ToList(), new(),
-                    (req.PlanesPromocionales ?? new()).Select(p => new VentaPlanDto(0, id, p.NumeroMeses, p.MontoLiquidacion, true)).ToList()));
+                    (req.PlanesPromocionales ?? new()).Select(p => new VentaPlanDto(0, id, p.NumeroMeses, p.MontoLiquidacion, true)).ToList())
+                    { Latitud = req.Latitud, Longitud = req.Longitud, CuentasRenovadas = RenovacionPendiente(o, id) });
         }
+
+        // Enlace inverso: la cuenta origen de una renovación (descargada o local) queda marcada como "renovada en".
+        // Las que ya vienen de central con RenovadaEn no se tocan.
+        foreach (var nueva in resultado.Where(v => v.CuentasRenovadas.Count > 0).ToList())
+            foreach (var vinculo in nueva.CuentasRenovadas)
+            {
+                var i = resultado.FindIndex(v => v.IdVenta == vinculo.IdVentaVieja && v.RenovadaEn is null);
+                if (i >= 0) resultado[i] = resultado[i] with { RenovadaEn = vinculo };
+            }
         return resultado;
+    }
+
+    // Vínculo de renovación de una operación local pendiente (la unificación real se aplica en central al sincronizar).
+    private List<VentaUnificacionDto> RenovacionPendiente(OperacionJornadaLocal o, long idNueva)
+    {
+        if (o.IdVentaVieja is null && o.VentaViejaUuid is null) return new();
+        var origen = o.VentaViejaUuid is { } uuid ? Estado.Operaciones.FirstOrDefault(x => x.Uuid == uuid) : null;
+        var idVieja = o.IdVentaVieja
+            ?? origen?.VentaCentral?.IdVenta
+            ?? (origen is null ? 0 : origen.IdLocal != 0 ? origen.IdLocal : -(Estado.Operaciones.IndexOf(origen) + 1L));
+        var codigoVieja = origen is not null ? CodigoVentaLocal(origen)
+            : Estado.Descarga?.Ventas.FirstOrDefault(v => v.IdVenta == idVieja)?.CodigoVenta;
+        return new() { new VentaUnificacionDto(idVieja, codigoVieja, idNueva, CodigoVentaLocal(o), o.SaldoArrastre,
+            $"RENOV-{idVieja}", o.FechaCaptura) };
     }
 
     // Una venta es de contado cuando su condición (catálogo descargado) contiene "CONTADO".

@@ -1,3 +1,5 @@
+using SistemaCobranzaApp.Shared.Seguridad;
+using SistemaCobranzaApp.Api.Seguridad;
 using SistemaCobranzaApp.Api.Comun;
 using SistemaCobranzaApp.Infrastructure.Catalogos;
 using SistemaCobranzaApp.Shared.Dtos;
@@ -23,6 +25,7 @@ public class MesesEndpoints : IEndpointModule
 
         // ---- Panel de Administración ----
         var admin = app.MapGroup("/api/admin/meses").RequireAuthorization();
+        admin.RequiereRolesParaEscribir(RolesSistema.Administrador);
 
         admin.MapGet("/", async (ServicioMesesAdmin s, IServicioLog log, CancellationToken ct) =>
         {

@@ -73,4 +73,6 @@ public record PagoSyncDto(
     public string? Movimiento { get; init; }
     public string? Cobrador { get; init; }
     public string? Observaciones { get; init; }
+    public decimal? Latitud { get; init; }
+    public decimal? Longitud { get; init; }
 }

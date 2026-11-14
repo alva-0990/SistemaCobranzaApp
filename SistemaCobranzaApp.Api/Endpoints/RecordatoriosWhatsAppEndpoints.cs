@@ -1,3 +1,5 @@
+using SistemaCobranzaApp.Shared.Seguridad;
+using SistemaCobranzaApp.Api.Seguridad;
 using SistemaCobranzaApp.Api.Comun;
 using SistemaCobranzaApp.Infrastructure.Whatsapp;
 using SistemaCobranzaApp.Shared.Dtos;
@@ -15,6 +17,7 @@ public class RecordatoriosWhatsAppEndpoints : IEndpointModule
     public void MapEndpoints(IEndpointRouteBuilder app)
     {
         var grupo = app.MapGroup("/api/admin/whatsapp/recordatorios").RequireAuthorization();
+        grupo.RequiereRoles(RolesSistema.Administrador, RolesSistema.Supervisor, RolesSistema.CobradorEnLinea, RolesSistema.AuxiliarAdministrativo);
 
         grupo.MapGet("/", async (
             long? idZona, long? idRuta, int? diasAtrasoMinimo,

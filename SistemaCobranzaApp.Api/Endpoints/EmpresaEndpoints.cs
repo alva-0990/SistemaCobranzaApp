@@ -1,3 +1,4 @@
+using SistemaCobranzaApp.Api.Seguridad;
 using SistemaCobranzaApp.Api.Comun;
 using SistemaCobranzaApp.Infrastructure.Empresas;
 using SistemaCobranzaApp.Shared.Dtos;
@@ -37,7 +38,7 @@ public class EmpresaEndpoints : IEndpointModule
         });
 
         // Endpoints Administrativos (Para paneles de control y configuración del sistema)
-        var admin = app.MapGroup("/api/admin/empresa").RequireAuthorization();
+        var admin = app.MapGroup("/api/admin/empresa").RequireAuthorization(Politicas.SoloAdmin);
 
         admin.MapGet("/{id:int}", async (int id, ServicioEmpresaAdmin s, IServicioLog log, CancellationToken ct) =>
         {

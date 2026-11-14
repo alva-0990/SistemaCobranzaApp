@@ -116,8 +116,8 @@ public class ServicioBusqueda
             x.mov != null ? x.mov.Descripcion : null,
             x.p.Observaciones, 
             x.p.FechaPago,
-            null, // Espacio para latitud de auditoría si la implementas en la entidad Pago
-            null  // Espacio para longitud de auditoría si la implementas en la entidad Pago
+            x.p.Latitud,
+            x.p.Longitud
         )).ToList();
     }
 }

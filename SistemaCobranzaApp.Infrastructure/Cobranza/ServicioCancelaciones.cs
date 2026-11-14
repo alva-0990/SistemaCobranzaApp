@@ -198,6 +198,15 @@ public async Task<ResultadoCancelacionVenta> CancelarVentaAsync(
                 "La venta ya se encuentra en estado CANCELADA.");
         }
 
+        // Una venta ligada a una renovación (origen liquidado o destino que absorbió saldo) no se cancela:
+        // hacerlo dejaría la cuenta vieja liquidada sin que nadie cobre su saldo.
+        if (await _db.VentaUnificaciones.AnyAsync(
+                u => u.IdVentaNueva == idVenta || u.IdVentaVieja == idVenta, ct))
+        {
+            return ResultadoCancelacionVenta.Fallo(
+                "La venta no puede cancelarse porque forma parte de una renovación de crédito.");
+        }
+
         // Regla de negocio:
         // solamente se pueden cancelar ventas sin abonos.
         if (venta.TotalAbonado > 0)

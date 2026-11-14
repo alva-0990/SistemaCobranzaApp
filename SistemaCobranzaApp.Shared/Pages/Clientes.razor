@@ -12,6 +12,7 @@
 @inject IDialogService _dialogo
 @inject ISnackbar _snackbar
 @inject IFormFactor _formFactor
+@inject IServicioUbicacion _ubicacion
 @inject NavigationManager _nav
 @inject IJSRuntime _js
 
@@ -330,11 +331,15 @@
         if (m is null) return;
 
         var idUsuario = Api.Sesion?.IdUsuario ?? 0;
+        // GPS automático (best-effort): en Android toma la posición del dispositivo; en Web devuelve null.
+        var gps = m.Latitud is null || m.Longitud is null ? await _ubicacion.ObtenerActualAsync() : null;
+        var latitud = m.Latitud ?? gps?.Latitud;
+        var longitud = m.Longitud ?? gps?.Longitud;
         var req = new CrearClienteRequest(
             m.Nombre.Trim(), Limpiar(m.ApPaterno), Limpiar(m.ApMaterno),
             m.TelefonoPrincipal.Trim(), Limpiar(m.TelefonoSecundario), Limpiar(m.Email),
             m.Direccion.Trim(), Limpiar(m.CodigoPostal), Limpiar(m.ReferenciaUbicacion),
-            m.Latitud, m.Longitud,
+            latitud, longitud,
             m.IdRuta ?? 0, m.IdVendedor, m.IdClasificacion,
             Limpiar(m.Observaciones), idUsuario);
 

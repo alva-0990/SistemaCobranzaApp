@@ -1,3 +1,5 @@
+using SistemaCobranzaApp.Shared.Seguridad;
+using SistemaCobranzaApp.Api.Seguridad;
 using System.Net.Http; // Para HttpMethod si fuera necesario externamente
 using Microsoft.AspNetCore.Mvc; // Mantener para consistencia de APIs
 using SistemaCobranzaApp.Api.Comun;
@@ -26,6 +28,7 @@ public class CondicionCreditoEndpoints : IEndpointModule
         });
 
         var admin = app.MapGroup("/api/admin/condicion/credito").RequireAuthorization();
+        admin.RequiereRolesParaEscribir(RolesSistema.Administrador);
 
         admin.MapGet("/", async (ServicioCondicionCreditoAdmin s, IServicioLog log, CancellationToken ct) =>
         {

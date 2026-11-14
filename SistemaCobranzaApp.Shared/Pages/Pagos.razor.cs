@@ -373,6 +373,19 @@ public partial class Pagos : ComponentBase, IAsyncDisposable
 
     protected static string Mostrar(string? valor) => string.IsNullOrWhiteSpace(valor) ? "—" : valor!;
 
+    // Explicación de la renovación para el tooltip del código de la venta.
+    protected static string DetalleRenovacion(EstadoCuentaVentaDto v)
+    {
+        var partes = new List<string>();
+        if (v.SaldoRenovado > 0)
+            partes.Add($"Renovación: incluye el saldo de {v.RenuevaCuentas} ({v.SaldoRenovado:C2}). " +
+                       $"Productos nuevos {v.TotalProductos:C2} + saldo anterior {v.SaldoRenovado:C2} = {v.TotalFinal:C2}.");
+        if (!string.IsNullOrWhiteSpace(v.RenovadaEnCuenta))
+            partes.Add($"Liquidada por renovación: su saldo ({v.TraspasoRenovacion:C2}) pasó a {v.RenovadaEnCuenta}.");
+        return string.Join(" ", partes);
+    }
+
+
     // Normaliza el código de venta tecleado o escaneado. Algunos lectores de código de barras,
     // por el layout de teclado, mapean el guión '-' a otros caracteres (apóstrofe, backtick, etc.).
     // Convertimos esos separadores a '-' para que el código coincida con el almacenado.
